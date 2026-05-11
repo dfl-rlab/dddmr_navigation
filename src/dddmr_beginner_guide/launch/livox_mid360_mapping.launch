@@ -1,0 +1,16 @@
+<launch>
+
+  <node pkg="lego_loam_bor" exec="lego_loam" output="screen" respawn="false">
+    <param from="$(find-pkg-share dddmr_beginner_guide)/config/livox_mid360_mapping.yaml" />
+    <remap from="/lslidar_point_cloud" to="/livox/lidar"/>
+    <remap from="/odom" to="/odom"/>
+  </node>
+
+  <!-- TF -->
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="baselink2footprint" args="0.0 0 -0.24 0.0 0.0 0 base_link base_footprint" />
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="baselink2mid360" args="0.3 0 0.38 0.0 0.486109 0 base_link livox_frame" />
+
+  <node pkg="rviz2" exec="rviz2" output="screen" respawn="false" args="-d $(find-pkg-share lego_loam_bor)/rviz/lego_loam.rviz">
+  </node>
+
+</launch>
