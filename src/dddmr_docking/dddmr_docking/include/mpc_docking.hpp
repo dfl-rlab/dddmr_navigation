@@ -1,7 +1,7 @@
 #ifndef DDDMR_DOCKING__MPC_DOCKING_HPP_
 #define DDDMR_DOCKING__MPC_DOCKING_HPP_
 
-#include "apriltag_trt_tracking.hpp"
+#include "apriltag_trt_pose_detector.hpp"
 #include <memory>
 #include <string>
 #include <rclcpp/rclcpp.hpp>
@@ -40,7 +40,7 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
 
   std::vector<std::string> cameras_;
-  std::map<std::string, std::shared_ptr<dddmr_docking::AprilTagTrtTracking>> apriltag_tracking_map_;
+  std::map<std::string, std::shared_ptr<dddmr_docking::AprilTagTrtPoseDetector>> apriltag_tracking_map_;
 };
 
 } // namespace dddmr_docking

@@ -8,5 +8,6 @@ dddmr_docking:
       detect_tag_frequency: 30.0
       topic_image_raw: /camera/camera/color/image_raw
       topic_image_info: /camera/camera/color/camera_info
-
+      depth_topic_image_raw: /camera/camera/depth/image_rect_raw
+      depth_topic_image_info: /camera/camera/depth/camera_info
           

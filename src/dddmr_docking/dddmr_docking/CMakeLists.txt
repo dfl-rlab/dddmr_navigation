@@ -23,6 +23,8 @@ find_package(OpenCV REQUIRED COMPONENTS core calib3d)
 find_package(cv_bridge REQUIRED)
 find_package(dddmr_sys_core REQUIRED)
 find_package(dddmr_trt REQUIRED)
+find_package(PCL 1.15 REQUIRED QUIET)
+find_package(pcl_conversions REQUIRED)
 
 set(dependencies
   rclcpp
@@ -37,6 +39,7 @@ set(dependencies
   angles
   image_geometry
   cv_bridge
+  pcl_conversions
 )
 
 #Check yolo build flag
@@ -54,6 +57,7 @@ if(TRT_ENABLED)
   
   include_directories(
     include
+    ${PCL_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
     ${dddmr_sys_core_INCLUDE_DIRS}
     ${dddmr_trt_INCLUDE_DIRS}
@@ -61,6 +65,7 @@ if(TRT_ENABLED)
 
   add_library(apriltag_trt_tracking SHARED
     src/apriltag_trt_tracking.cpp
+    src/apriltag_trt_pose_detector.cpp
   )
   target_link_libraries(apriltag_trt_tracking
     ${PCL_LIBRARIES}

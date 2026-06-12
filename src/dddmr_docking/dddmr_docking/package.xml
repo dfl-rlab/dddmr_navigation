@@ -18,7 +18,8 @@
   <depend>nav_msgs</depend>
   <depend>dddmr_sys_core</depend>
   <depend>dddmr_trt</depend>
-
+  <depend>pcl_conversions</depend>
+  
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
