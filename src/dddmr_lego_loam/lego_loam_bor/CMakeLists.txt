@@ -36,6 +36,7 @@ find_package(cv_bridge REQUIRED)
 find_package(image_geometry REQUIRED)
 find_package(dddmr_trt REQUIRED)
 find_package(dddmr_sys_core REQUIRED)
+find_package(dddmr_pcl REQUIRED)
 
 set(dependencies
   rclcpp
@@ -84,6 +85,7 @@ if(TRT_ENABLED)
     ${OpenCV_INCLUDE_DIRS}
     ${dddmr_trt_INCLUDE_DIRS}
     ${dddmr_sys_core_INCLUDE_DIRS}
+    ${dddmr_pcl_INCLUDE_DIRS}
   )
 else()
     message(STATUS "TensorRT is disabled.")
@@ -93,10 +95,9 @@ else()
       ${GTSAM_INCLUDE_DIRS}
       ${OpenCV_INCLUDE_DIRS}
       ${dddmr_sys_core_INCLUDE_DIRS}
+      ${dddmr_pcl_INCLUDE_DIRS}
     )
 endif()
-
-
 
 # opt_icp_gn
 add_library(opt_icp_gn SHARED
@@ -121,6 +122,7 @@ if(TRT_ENABLED)
     ${OpenCV_LIBRARIES}
     ${dddmr_trt_LIBRARIES}
     CUDA::cudart
+    ${dddmr_pcl_LIBRARIES}
   )
   target_include_directories(image_projection 
     PRIVATE ${CUDAToolkit_INCLUDE_DIRS}
@@ -136,6 +138,7 @@ else()
   target_link_libraries(image_projection
     ${PCL_LIBRARIES}
     ${OpenCV_LIBRARIES}
+    ${dddmr_pcl_LIBRARIES}
   )
   ament_target_dependencies(image_projection
     ${dependencies}
@@ -148,6 +151,7 @@ add_library(feature_association SHARED
 )
 target_link_libraries(feature_association
   ${PCL_LIBRARIES}
+  ${dddmr_pcl_LIBRARIES}
 )
 ament_target_dependencies(feature_association
   ${dependencies}
@@ -161,6 +165,7 @@ target_link_libraries(map_optimization
   ${PCL_LIBRARIES}
   ${GTSAM_LIBRARIES}
   opt_icp_gn
+  ${dddmr_pcl_LIBRARIES}
 )
 ament_target_dependencies(map_optimization
   ${dependencies}
@@ -172,6 +177,7 @@ add_library(lego_loam_map_visualization SHARED
 )
 target_link_libraries(lego_loam_map_visualization
   ${PCL_LIBRARIES}
+  ${dddmr_pcl_LIBRARIES}
 )
 ament_target_dependencies(lego_loam_map_visualization
   ${dependencies}
@@ -330,6 +336,7 @@ if(TRT_ENABLED)
     ${GTSAM_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
     ${dddmr_trt_INCLUDE_DIRS}
+    ${dddmr_pcl_INCLUDE_DIRS}
   )
 
   #yolo ros2 test node
@@ -445,8 +452,6 @@ if(TEST_ENABLED)
   )
 
 endif()
-
-
 
 # --- Everything CI/CD test finish here ---
 

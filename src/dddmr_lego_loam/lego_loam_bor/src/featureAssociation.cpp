@@ -48,7 +48,7 @@ FeatureAssociation::FeatureAssociation(std::string name, Channel<ProjectionOut> 
   odom_topic_alive_ = false;
   odom_tf_alive_ = false;
   odom_tf_detect_number_ = 0;
-
+  baselink_frame_ = "base_link";
   //@ this cloud is for localization, therefore, we need good QoS
   pubCornerPointsSharp = this->create_publisher<sensor_msgs::msg::PointCloud2>
       ("laser_cloud_sharp", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
@@ -122,6 +122,9 @@ void FeatureAssociation::initializeValue() {
   cloudSmoothness.resize(cloud_size);
 
   downSizeFilter.setLeafSize(0.2, 0.2, 0.2);
+  downSizeFilter_omp.setNumberOfThreads(6);
+  downSizeFilter_omp.setLeafSize (0.2, 0.2, 0.2);
+  downSizeFilter_omp.setSaveLeafLayout(false);
 
   segmentedCloud.reset(new pcl::PointCloud<PointType>());
   outlierCloud.reset(new pcl::PointCloud<PointType>());
@@ -538,9 +541,12 @@ void FeatureAssociation::extractFeatures() {
     // surfPointsFlat = surfPointsFlatFiltered;
 
     surfPointsLessFlatScanDS->clear();
-    downSizeFilter.setInputCloud(surfPointsLessFlatScan);
-    downSizeFilter.filter(*surfPointsLessFlatScanDS);
-
+    //downSizeFilter.setInputCloud(surfPointsLessFlatScan);
+    //downSizeFilter.filter(*surfPointsLessFlatScanDS);
+    downSizeFilter_omp.setInputCloud(surfPointsLessFlatScan);
+    downSizeFilter_omp.setFinalFilter(true);
+    downSizeFilter_omp.filter(*surfPointsLessFlatScanDS);
+    
     *surfPointsLessFlat += *surfPointsLessFlatScanDS;
   }
 }
@@ -1494,9 +1500,8 @@ void FeatureAssociation::runFeatureAssociation() {
   segInfo = std::move(projection.seg_msg);
 
   cloudHeader = segInfo.header;
-  cloudHeader.stamp = clock_->now();
+  cloudHeader.stamp = segInfo.header.stamp;
   trans_c2s_ = projection.trans_c2s;
-  baselink_frame_ = "base_link";
   tf2_trans_b2s_.setOrigin(tf2::Vector3(projection.trans_b2s.transform.translation.x, 
                               projection.trans_b2s.transform.translation.y, projection.trans_b2s.transform.translation.z));
   tf2_trans_b2s_.setRotation(tf2::Quaternion(projection.trans_b2s.transform.rotation.x, 
@@ -1543,7 +1548,14 @@ void FeatureAssociation::runFeatureAssociation() {
   else{
     assignMappingOdometry(transformExternalOdometrySum);
   }
-
+  
+  if(odom_type_!="laser_odometry"){
+    if(!first_odom_prepared_){
+      RCLCPP_WARN(this->get_logger(), "External odometry is asked, but the topic is not received yet.");
+      return;
+    }
+  }
+  
   //publishOdometryPath();
 
   

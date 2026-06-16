@@ -8,6 +8,7 @@ p2p_move_base:
     controller_patience: 10.0
     no_plan_retry_num: 10
     waiting_patience: 10.0
+    main_trajectory_generator: "differential_drive_simple" #the generator should be one of the plugins in trajectory_generators
 global_plan_manager:
   ros__parameters:
     global_planner_action_name: "get_plan"

@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node pkg="mcl_3dl" exec="pcl_publisher" output="screen" respawn="false">
+    <param from="$(find-pkg-share mcl_3dl)/config/pcl_publisher.yaml" />
+    <param name="map_dir" value="$(find-pkg-share perception_3d)/map/map.pcd" />
+    <param name="ground_dir" value="$(find-pkg-share perception_3d)/map/ground.pcd" />
+  </node>
+
+  <!--- TF -->
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="map2baselink" args="1.0 0 0.0 0.0 0.0 0.0 /map /base_link" />
+
+  <let name="rviz_config" value="$(find-pkg-share perception_3d)/rviz/pc_delete_utils.rviz"/>
+  <node name="rviz2" pkg="rviz2" exec="rviz2" args="-d $(var rviz_config)"/>
+
+</launch>
+

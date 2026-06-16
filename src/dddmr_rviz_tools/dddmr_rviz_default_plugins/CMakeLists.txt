@@ -76,6 +76,7 @@ set(dddmr_rviz_default_plugins_headers_to_moc
   include/dddmr_rviz_default_plugins/tools/select/edge_selection_tool.hpp
   include/dddmr_rviz_default_plugins/tools/select/node_selection_tool.hpp
   include/dddmr_rviz_default_plugins/tools/point_cloud_selection/point_cloud_selection_tool.hpp
+  include/dddmr_rviz_default_plugins/tools/point_cloud_delete/point_cloud_delete_tool.hpp
 )
 
 foreach(header "${dddmr_rviz_default_plugins_headers_to_moc}")
@@ -90,6 +91,7 @@ set(dddmr_rviz_default_plugins_source_files
   src/dddmr_rviz_default_plugins/tools/move/move_tool.cpp
   src/dddmr_rviz_default_plugins/tools/select/node_selection_tool.cpp
   src/dddmr_rviz_default_plugins/tools/point_cloud_selection/point_cloud_selection_tool.cpp
+  src/dddmr_rviz_default_plugins/tools/point_cloud_delete/point_cloud_delete_tool.cpp
 )
 
 add_library(dddmr_rviz_default_plugins SHARED

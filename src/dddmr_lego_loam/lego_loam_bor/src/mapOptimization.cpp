@@ -76,9 +76,9 @@ MapOptimization::MapOptimization(std::string name,
   pubM2Ci = this->create_publisher<geometry_msgs::msg::TransformStamped>("lego_loam/m2ci", 1);  
   pubC2S = this->create_publisher<geometry_msgs::msg::TransformStamped>("lego_loam/c2s", 1);  
   pubB2S = this->create_publisher<geometry_msgs::msg::TransformStamped>("lego_loam/c2s", 1);  
-  pubMap = this->create_publisher<sensor_msgs::msg::PointCloud2>("lego_loam_map", 1);  
-  pubGround = this->create_publisher<sensor_msgs::msg::PointCloud2>("lego_loam_ground", 1);  
-  pubGroundEdge = this->create_publisher<sensor_msgs::msg::PointCloud2>("lego_loam_ground_edge", 1);
+  //pubMap = this->create_publisher<sensor_msgs::msg::PointCloud2>("lego_loam_map", 1);  
+  //pubGround = this->create_publisher<sensor_msgs::msg::PointCloud2>("lego_loam_ground", 1);  
+  //pubGroundEdge = this->create_publisher<sensor_msgs::msg::PointCloud2>("lego_loam_ground_edge", 1);
     
   //TF broadcaster
   tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
@@ -88,13 +88,36 @@ MapOptimization::MapOptimization(std::string name,
   downSizeFilterSurf.setLeafSize(0.4, 0.4, 0.4);
   downSizeFilterOutlier.setLeafSize(0.4, 0.4, 0.4);
 
-  // for histor key frames of loop closure
+  downSizeFilterCorner_omp.setNumberOfThreads(6);
+  downSizeFilterCorner_omp.setLeafSize (0.2, 0.2, 0.2);
+  downSizeFilterCorner_omp.setSaveLeafLayout(false);
+
+  downSizeFilterCornerKeyFrame_omp.setNumberOfThreads(6);
+  downSizeFilterCornerKeyFrame_omp.setLeafSize (0.2, 0.2, 0.2);
+  downSizeFilterCornerKeyFrame_omp.setSaveLeafLayout(false);
+
+  downSizeFilterSurf_omp.setNumberOfThreads(6);
+  downSizeFilterSurf_omp.setLeafSize (0.4, 0.4, 0.4);
+  downSizeFilterSurf_omp.setSaveLeafLayout(false);
+
+  downSizeFilterSurfKeyFrame_omp.setNumberOfThreads(6);
+  downSizeFilterSurfKeyFrame_omp.setLeafSize (0.4, 0.4, 0.4);
+  downSizeFilterSurfKeyFrame_omp.setSaveLeafLayout(false);
+
+  downSizeFilterOutlier_omp.setNumberOfThreads(6);
+  downSizeFilterOutlier_omp.setLeafSize (0.4, 0.4, 0.4);
+  downSizeFilterOutlier_omp.setSaveLeafLayout(false);
+
+  downSizeFilterSurfTotal_omp.setNumberOfThreads(6);
+  downSizeFilterSurfTotal_omp.setLeafSize (0.4, 0.4, 0.4);
+  downSizeFilterSurfTotal_omp.setSaveLeafLayout(false);
+
+
   downSizeFilterHistoryKeyFrames.setLeafSize(0.4, 0.4, 0.4);
 
-  // for global map visualization
-  downSizeFilterGlobalMapKeyPoses.setLeafSize(1.0, 1.0, 1.0);
-  // for global map visualization
-  downSizeFilterGlobalMapKeyFrames.setLeafSize(0.4, 0.4, 0.4);
+  downSizeFilterHistoryKeyFrames_omp.setNumberOfThreads(6);
+  downSizeFilterHistoryKeyFrames_omp.setLeafSize (0.4, 0.4, 0.4);
+  downSizeFilterHistoryKeyFrames_omp.setSaveLeafLayout(false);
 
   // DS for final stitch
   downSizeFilterFinalStitch.setLeafSize(0.1, 0.1, 0.1);
@@ -126,12 +149,6 @@ MapOptimization::MapOptimization(std::string name,
   declare_parameter("mapping.distance_between_key_frame", rclcpp::ParameterValue(0.3));
   this->get_parameter("mapping.distance_between_key_frame", distance_between_key_frame_);
   RCLCPP_INFO(this->get_logger(), "mapping.distance_between_key_frame: %.2f", distance_between_key_frame_);
-
-  declare_parameter("mapping.ground_voxel_size", rclcpp::ParameterValue(0.3f));
-  this->get_parameter("mapping.ground_voxel_size", ground_voxel_size_);
-  RCLCPP_INFO(this->get_logger(), "mapping.ground_voxel_size: %.2f", ground_voxel_size_);
-  downSizeFilterGlobalGroundKeyFrames.setLeafSize(ground_voxel_size_, ground_voxel_size_, ground_voxel_size_);
-  downSizeFilterGlobalGroundKeyFrames_Copy.setLeafSize(ground_voxel_size_, ground_voxel_size_, ground_voxel_size_);
 
   declare_parameter("mapping.ground_edge_threshold_num", rclcpp::ParameterValue(50));
   this->get_parameter("mapping.ground_edge_threshold_num", ground_edge_threshold_num_);
@@ -466,8 +483,6 @@ void MapOptimization::loopClosureThread()
 
 void MapOptimization::transformAssociateToMap() {
 
-  std::lock_guard<std::mutex> lock(mtx);
-
   float x1 = cos(transformSum[1]) * (transformBefMapped[3] - transformSum[3]) -
              sin(transformSum[1]) * (transformBefMapped[5] - transformSum[5]);
   float y1 = transformBefMapped[4] - transformSum[4];
@@ -729,7 +744,7 @@ void MapOptimization::publishTF() {
   geometry_msgs::msg::TransformStamped map2odom;
   map2odom.header.frame_id = "map";
 
-  map2odom.header.stamp = externalOdometry.header.stamp;
+  map2odom.header.stamp = timeLaserOdometry_header_.stamp;
   map2odom.child_frame_id = externalOdometry.header.frame_id;
   map2odom.transform.rotation.x = tf2_trans_m2o.getRotation().x();
   map2odom.transform.rotation.y = tf2_trans_m2o.getRotation().y();
@@ -742,7 +757,7 @@ void MapOptimization::publishTF() {
 
   if(broadcast_external_odom_tf_){
     geometry_msgs::msg::TransformStamped odom2baselink;
-    odom2baselink.header.stamp = map2odom.header.stamp;
+    odom2baselink.header.stamp = externalOdometry.header.stamp;
     odom2baselink.header.frame_id = map2odom.child_frame_id;
     odom2baselink.child_frame_id = externalOdometry.child_frame_id;
     odom2baselink.transform.rotation.x = externalOdometry.pose.pose.orientation.x;
@@ -757,7 +772,6 @@ void MapOptimization::publishTF() {
 }
 
 void MapOptimization::publishKeyPosesAndFrames() {
-  std::lock_guard<std::mutex> lock(mtx);
   
   if(!has_m2ci_af3_)
     return;
@@ -861,7 +875,6 @@ bool MapOptimization::detectLoopClosure() {
   nearHistorySurfKeyFrameCloud->clear();
   nearHistorySurfKeyFrameCloudDS->clear();
 
-  std::lock_guard<std::mutex> lock(mtx);
   // find the closest history key frame
   std::vector<int> pointSearchIndLoop;
   std::vector<float> pointSearchSqDisLoop;
@@ -1001,8 +1014,11 @@ bool MapOptimization::detectLoopClosure() {
         &cloudKeyPoses6D->points[closestHistoryFrameID + j]);
   }
   
-  downSizeFilterHistoryKeyFrames.setInputCloud(nearHistorySurfKeyFrameCloud);
-  downSizeFilterHistoryKeyFrames.filter(*nearHistorySurfKeyFrameCloudDS);
+  //downSizeFilterHistoryKeyFrames.setInputCloud(nearHistorySurfKeyFrameCloud);
+  //downSizeFilterHistoryKeyFrames.filter(*nearHistorySurfKeyFrameCloudDS);
+  downSizeFilterHistoryKeyFrames_omp.setInputCloud(nearHistorySurfKeyFrameCloud);
+  downSizeFilterHistoryKeyFrames_omp.setFinalFilter(true);
+  downSizeFilterHistoryKeyFrames_omp.filter(*nearHistorySurfKeyFrameCloudDS);
   // publish history near key frames
   
   sensor_msgs::msg::PointCloud2 cloudMsgTemp;
@@ -1143,8 +1159,6 @@ void MapOptimization::performLoopClosure() {
 
 void MapOptimization::addEdgeFromPose(int pose_1, int pose_2, gtsam::Pose3 poseFrom, gtsam::Pose3 poseTo, float icp_score){
 
-  std::lock_guard<std::mutex> lock(mtx);
-
   std::pair<int, int> edge;
   edge.first = pose_1;
   edge.second = pose_2;
@@ -1172,7 +1186,7 @@ void MapOptimization::addEdgeFromPose(int pose_1, int pose_2, gtsam::Pose3 poseF
 }
 
 void MapOptimization::extractSurroundingKeyFrames() {
-  std::lock_guard<std::mutex> lock(mtx);
+
   if (cloudKeyPoses3D->points.empty() == true) return;
   
   // only use recent key poses for graph building
@@ -1227,41 +1241,60 @@ void MapOptimization::extractSurroundingKeyFrames() {
   std::vector<int> indices_tmp1;
   laserCloudCornerFromMap->is_dense = false;
   pcl::removeNaNFromPointCloud(*laserCloudCornerFromMap, *laserCloudCornerFromMap, indices_tmp1);
-  downSizeFilterCorner.setInputCloud(laserCloudCornerFromMap);
-  downSizeFilterCorner.filter(*laserCloudCornerFromMapDS);
+  //downSizeFilterCorner.setInputCloud(laserCloudCornerFromMap);
+  //downSizeFilterCorner.filter(*laserCloudCornerFromMapDS);
+  downSizeFilterCornerKeyFrame_omp.setInputCloud(laserCloudCornerFromMap);
+  downSizeFilterCornerKeyFrame_omp.setFinalFilter(true);
+  downSizeFilterCornerKeyFrame_omp.filter(*laserCloudCornerFromMapDS);
   laserCloudCornerFromMapDSNum = laserCloudCornerFromMapDS->points.size();
+
   // Downsample the surrounding surf key frames (or map)
   std::vector<int> indices_tmp2;
   laserCloudSurfFromMap->is_dense = false;
   pcl::removeNaNFromPointCloud(*laserCloudSurfFromMap, *laserCloudSurfFromMap, indices_tmp2);
-  downSizeFilterSurf.setInputCloud(laserCloudSurfFromMap);
-  downSizeFilterSurf.filter(*laserCloudSurfFromMapDS);
+  //downSizeFilterSurf.setInputCloud(laserCloudSurfFromMap);
+  //downSizeFilterSurf.filter(*laserCloudSurfFromMapDS);
+  downSizeFilterSurfKeyFrame_omp.setInputCloud(laserCloudSurfFromMap);
+  downSizeFilterSurfKeyFrame_omp.setFinalFilter(true);
+  downSizeFilterSurfKeyFrame_omp.filter(*laserCloudSurfFromMapDS);
   laserCloudSurfFromMapDSNum = laserCloudSurfFromMapDS->points.size();
 
 }
 
 void MapOptimization::downsampleCurrentScan() {
-  std::lock_guard<std::mutex> lock(mtx);
+  
   laserCloudCornerLastDS->clear();
-  downSizeFilterCorner.setInputCloud(laserCloudCornerLast);
-  downSizeFilterCorner.filter(*laserCloudCornerLastDS);
-
+  //downSizeFilterCorner.setInputCloud(laserCloudCornerLast);
+  //downSizeFilterCorner.filter(*laserCloudCornerLastDS);
+  downSizeFilterCorner_omp.setInputCloud(laserCloudCornerLast);
+  downSizeFilterCorner_omp.setFinalFilter(true);
+  downSizeFilterCorner_omp.filter(*laserCloudCornerLastDS);
+  
   laserCloudSurfLastDS->clear();
-  downSizeFilterSurf.setInputCloud(laserCloudSurfLast);
-  downSizeFilterSurf.filter(*laserCloudSurfLastDS);
+  //downSizeFilterSurf.setInputCloud(laserCloudSurfLast);
+  //downSizeFilterSurf.filter(*laserCloudSurfLastDS);
+  downSizeFilterSurf_omp.setInputCloud(laserCloudSurfLast);
+  downSizeFilterSurf_omp.setFinalFilter(true);
+  downSizeFilterSurf_omp.filter(*laserCloudSurfLastDS);
   laserCloudSurfLastDSNum = laserCloudSurfLastDS->points.size();
-
+  
   laserCloudOutlierLastDS->clear();
-  downSizeFilterOutlier.setInputCloud(laserCloudOutlierLast);
-  downSizeFilterOutlier.filter(*laserCloudOutlierLastDS);
+  //downSizeFilterOutlier.setInputCloud(laserCloudOutlierLast);
+  //downSizeFilterOutlier.filter(*laserCloudOutlierLastDS);
+  downSizeFilterOutlier_omp.setInputCloud(laserCloudOutlierLast);
+  downSizeFilterOutlier_omp.setFinalFilter(true);
+  downSizeFilterOutlier_omp.filter(*laserCloudOutlierLastDS);
   laserCloudOutlierLastDSNum = laserCloudOutlierLastDS->points.size();
 
   laserCloudSurfTotalLast->clear();
   laserCloudSurfTotalLastDS->clear();
   *laserCloudSurfTotalLast += *laserCloudSurfLastDS;
   *laserCloudSurfTotalLast += *laserCloudOutlierLastDS;
-  downSizeFilterSurf.setInputCloud(laserCloudSurfTotalLast);
-  downSizeFilterSurf.filter(*laserCloudSurfTotalLastDS);
+  //downSizeFilterSurf.setInputCloud(laserCloudSurfTotalLast);
+  //downSizeFilterSurf.filter(*laserCloudSurfTotalLastDS);
+  downSizeFilterSurfTotal_omp.setInputCloud(laserCloudSurfTotalLast);
+  downSizeFilterSurfTotal_omp.setFinalFilter(true);
+  downSizeFilterOutlier_omp.filter(*laserCloudSurfTotalLastDS);
 }
 
 void MapOptimization::cornerOptimization(int iterCount) {
@@ -1609,7 +1642,7 @@ bool MapOptimization::LMOptimization(int iterCount) {
 }
 
 void MapOptimization::scan2MapOptimization() {
-  std::lock_guard<std::mutex> lock(mtx);
+
   //RCLCPP_ERROR(this->get_logger(), "%lu, %lu", laserCloudCornerFromMapDSNum, laserCloudSurfFromMapDSNum);
   if (laserCloudCornerFromMapDSNum > 10 && laserCloudSurfFromMapDSNum > 100) {
     kdtreeCornerFromMap.setInputCloud(laserCloudCornerFromMapDS);
@@ -1646,7 +1679,6 @@ void MapOptimization::scan2MapOptimization() {
 
 void MapOptimization::saveKeyFramesAndFactor() {
 
-  std::lock_guard<std::mutex> lock(mtx);
   currentRobotPos_.x = transformAftMapped[3];
   currentRobotPos_.y = transformAftMapped[4];
   currentRobotPos_.z = transformAftMapped[5];
@@ -1844,21 +1876,10 @@ void MapOptimization::saveKeyFramesAndFactor() {
   patchedGroundEdgeKeyFrames.push_back(thisPatchedGroundEdgeKeyFrame);
   outlierCloudKeyFrames.push_back(thisOutlierKeyFrame);
 
-  pcl::PointCloud<PointType>::Ptr thisCornerKeyFrameVisualization(
-      new pcl::PointCloud<PointType>());
-  downSizeFilterGlobalMapKeyFrames.setInputCloud(thisCornerKeyFrame);
-  downSizeFilterGlobalMapKeyFrames.filter(*thisCornerKeyFrameVisualization);
-  cornerCloudKeyFramesVisualization.push_back(thisCornerKeyFrameVisualization);
-
-  pcl::PointCloud<PointType>::Ptr thisPatchedGroundKeyFrameVisualization(
-      new pcl::PointCloud<PointType>());
-  downSizeFilterGlobalGroundKeyFrames.setInputCloud(thisPatchedGroundKeyFrame);
-  downSizeFilterGlobalGroundKeyFrames.filter(*thisPatchedGroundKeyFrameVisualization);
-  patchedGroundKeyFramesVisualization.push_back(thisPatchedGroundKeyFrameVisualization);
 }
 
 void MapOptimization::correctPoses() {
-  std::lock_guard<std::mutex> lock(mtx);
+
   if (aLoopIsClosed == true) {
     recentCornerCloudKeyFrames.clear();
     recentSurfCloudKeyFrames.clear();
@@ -1888,7 +1909,7 @@ void MapOptimization::correctPoses() {
 }
 
 void MapOptimization::clearCloud() {
-  std::lock_guard<std::mutex> lock(mtx);
+
   laserCloudCornerFromMap->clear();
   laserCloudSurfFromMap->clear();
   laserCloudCornerFromMapDS->clear();
@@ -1936,7 +1957,7 @@ void MapOptimization::run() {
   transformAssociateToMap();
   
   extractSurroundingKeyFrames();
-
+  
   downsampleCurrentScan();
   
   scan2MapOptimization();
@@ -1976,6 +1997,11 @@ void MapOptimization::runWoLO(){
   tf2_trans_b2s_.setRotation(tf2::Quaternion(association.trans_b2s.transform.rotation.x, association.trans_b2s.transform.rotation.y, association.trans_b2s.transform.rotation.z, association.trans_b2s.transform.rotation.w));
   tf2_trans_b2s_.setOrigin(tf2::Vector3(association.trans_b2s.transform.translation.x, association.trans_b2s.transform.translation.y, association.trans_b2s.transform.translation.z));
   has_m2ci_af3_ = true;
+
+  /*
+  decisive_odometry.stamp = laser_cloud.stamp
+  external_odometry.stamp = odom.stamp
+  */
   externalOdometry = association.external_odometry;
 
   pcl::transformPointCloud(*association.cloud_patched_ground_last, *laserCloudPatchedGroundLast, trans_c2s_af3_);

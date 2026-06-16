@@ -85,7 +85,7 @@ bool StackedGenerator::hasMoreTrajectories(std::string pname) {
     return theories_[pname]->hasMoreTrajectories();
   }
   else{
-    RCLCPP_FATAL(logger_->get_logger(), "Trajectory plugin name is not in the theories.");
+    RCLCPP_FATAL(logger_->get_logger(), "Trajectory plugin name is not in the theories: %s", pname.c_str());
     return false;
   }
 
@@ -108,6 +108,15 @@ bool StackedGenerator::nextTrajectory(std::string pname, base_trajectory::Trajec
   else
     return false;
 
+}
+
+/**
+ * Return existence of theory for the sanity check
+ */
+bool StackedGenerator::theoryExists(std::string pname){
+  if(theories_.count(pname))
+    return true;
+  return false;
 }
 
 }//end of name space

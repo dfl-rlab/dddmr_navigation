@@ -63,6 +63,8 @@ class RotateInPlaceBehavior: public RobotBehavior{
     rclcpp::Clock::SharedPtr clock_;
     std::string trajectory_generator_name_;
 
+    void pubZeroVelocity();
+
   protected:
 
     virtual void onInitialize();

@@ -83,6 +83,9 @@ void Trajectory_Generators_ROS::initial(){
 
 }
 
+bool Trajectory_Generators_ROS::theoryExists(std::string pname) {
+  return stacked_generator_->theoryExists(pname);
+}
 
 Trajectory_Generators_ROS::~Trajectory_Generators_ROS()
 {

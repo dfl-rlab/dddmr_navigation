@@ -8,6 +8,7 @@ p2p_move_base:
     controller_patience: 10.0
     no_plan_retry_num: 10
     waiting_patience: 10.0
+    main_trajectory_generator: "differential_drive_simple" #the generator should be one of the plugins in trajectory_generators
 global_plan_manager:
   ros__parameters:
     global_planner_action_name: "get_dwa_plan"
@@ -18,7 +19,7 @@ mcl_ip:
     # leishen16
     laser:
         odom_type: "laser_odometry"         #wheel_odometry/laser_odometry 
-        baselink_frame: "base_link"
+        base_ground_frame: "base_link"
         num_vertical_scans: 16
         num_horizontal_scans: 1000
         vertical_angle_bottom: -15.0          # degrees
@@ -57,7 +58,7 @@ sub_maps:
     pose_graph_dir: "/root/dddmr_bags/benanli_detention_basin_pg"
     sub_map_search_radius: 50.0
     sub_map_warmup_trigger_distance: 20.0
-    complete_map_voxel_size: 0.4
+    complete_map_voxel_size: 0.3
 mcl_3dl:
   ros__parameters:
     init_x: 0.0
@@ -347,7 +348,7 @@ global_planner:
   ros__parameters:
     turning_weight: 0.1 #Punish the zig-zag path
     enable_detail_log: false
-    a_star_expanding_radius: 0.5
+    a_star_expanding_radius: 1.0
 
 #if we use get_dwa_plan in global_plan_manager, we setup parameters for dwa_global_planner
 dynamic_window_aware_global_planner:

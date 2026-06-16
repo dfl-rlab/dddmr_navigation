@@ -28,12 +28,12 @@
 * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "p2p_move_base/p2p_fsm.h"
+#include "p2p_move_base/p2p_state.h"
 
 namespace p2p_move_base
 {
 
-FSM::FSM(const rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr& m_logger,
+State::State(const rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr& m_logger,
               const rclcpp::node_interfaces::NodeParametersInterface::SharedPtr& m_parameter)
 {
   logger_ = m_logger;
@@ -88,21 +88,26 @@ FSM::FSM(const rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr& m_logge
   use_twist_stamped_ = use_twist_stamped.as_bool();
   RCLCPP_INFO(logger_->get_logger(), "use_stamped_twist: %d", use_twist_stamped_); 
 
-  parameter_->declare_parameter("twist_frame_id", rclcpp::ParameterValue("base_link"));
-  rclcpp::Parameter twist_frame_id = parameter_->get_parameter("twist_frame_id");
-  twist_frame_id_ = twist_frame_id.as_string();
-  RCLCPP_INFO(logger_->get_logger(), "twist_frame_id: %s", twist_frame_id_.c_str()); 
+  parameter_->declare_parameter("use_position_control_at_goal", rclcpp::ParameterValue(false));
+  rclcpp::Parameter use_position_control_at_goal = parameter_->get_parameter("use_position_control_at_goal");
+  use_position_control_at_goal_ = use_position_control_at_goal.as_bool();
+  RCLCPP_INFO(logger_->get_logger(), "use_position_control_at_goal: %d", use_position_control_at_goal_); 
+
+  parameter_->declare_parameter("main_trajectory_generator", rclcpp::ParameterValue("differential_drive_simple"));
+  rclcpp::Parameter main_trajectory_generator = parameter_->get_parameter("main_trajectory_generator");
+  main_trajectory_generator_ = main_trajectory_generator.as_string();
+  RCLCPP_INFO(logger_->get_logger(), "main_trajectory_generator: %s", main_trajectory_generator_.c_str()); 
 
 }
 
-bool FSM::isCurrentDecision(std::string m_decision){
+bool State::isCurrentDecision(std::string m_decision){
   if(m_decision==current_decision_)
     return true;
   return false;
 }
 
 
-void FSM::initialParams(geometry_msgs::msg::TransformStamped robot_curent_pose, rclcpp::Time current_time){
+void State::initialParams(geometry_msgs::msg::TransformStamped robot_curent_pose, rclcpp::Time current_time){
 
   last_decision_ = "d_initial";
   current_decision_ = "d_initial";
@@ -116,7 +121,7 @@ void FSM::initialParams(geometry_msgs::msg::TransformStamped robot_curent_pose, 
 }
 
 
-double FSM::getDistance(geometry_msgs::msg::TransformStamped& a, geometry_msgs::msg::TransformStamped& b){
+double State::getDistance(geometry_msgs::msg::TransformStamped& a, geometry_msgs::msg::TransformStamped& b){
 
   double dx = a.transform.translation.x - b.transform.translation.x;
   double dy = a.transform.translation.y - b.transform.translation.y;
@@ -125,7 +130,7 @@ double FSM::getDistance(geometry_msgs::msg::TransformStamped& a, geometry_msgs::
   return sqrt(dx*dx + dy*dy + dz*dz);
 }
 
-double FSM::getAngle(geometry_msgs::msg::TransformStamped& a, geometry_msgs::msg::TransformStamped& b){
+double State::getAngle(geometry_msgs::msg::TransformStamped& a, geometry_msgs::msg::TransformStamped& b){
 
   tf2::Transform pose_a;
   pose_a.setRotation(tf2::Quaternion(a.transform.rotation.x, a.transform.rotation.y, a.transform.rotation.z, a.transform.rotation.w));
@@ -147,7 +152,7 @@ double FSM::getAngle(geometry_msgs::msg::TransformStamped& a, geometry_msgs::msg
 
 }
 
-bool FSM::setDecision(std::string m_decision){
+bool State::setDecision(std::string m_decision){
 
   last_decision_ = current_decision_;
   current_decision_ = m_decision;

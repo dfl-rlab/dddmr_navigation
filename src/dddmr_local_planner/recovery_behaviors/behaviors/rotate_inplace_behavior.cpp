@@ -120,6 +120,14 @@ void RotateInPlaceBehavior::trans2Pose(geometry_msgs::msg::TransformStamped& tra
   pose.pose.orientation.w = trans.transform.rotation.w;
 }
 
+void RotateInPlaceBehavior::pubZeroVelocity(){
+  geometry_msgs::msg::Twist cmd_vel;
+  cmd_vel.linear.x = 0.0;
+  cmd_vel.linear.y = 0.0;
+  cmd_vel.angular.z = 0.0;
+  cmd_vel_pub_->publish(cmd_vel);
+}
+
 dddmr_sys_core::RecoveryState RotateInPlaceBehavior::runBehavior(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<dddmr_sys_core::action::RecoveryBehaviors>> goal_handle){
 
@@ -156,24 +164,15 @@ dddmr_sys_core::RecoveryState RotateInPlaceBehavior::runBehavior(
           std::fabs(angles::shortest_angular_distance(current_angle, start_angle)) > tolerance_))
   {
 
-    RCLCPP_WARN_THROTTLE(node_->get_logger().get_child(name_), *clock_, 5000, "Behavior is running with thread ID : %lu", id);
+    RCLCPP_WARN_THROTTLE(node_->get_logger().get_child(name_), *clock_, 5000, "Behavior: %s is running with thread ID : %lu", name_.c_str(), id);
     if(!goal_handle->is_active()){
-      geometry_msgs::msg::Twist cmd_vel;
-      cmd_vel.linear.x = 0.0;
-      cmd_vel.linear.y = 0.0;
-      cmd_vel.angular.z = 0.0;
-      cmd_vel_pub_->publish(cmd_vel);
+      pubZeroVelocity();
       RCLCPP_INFO(node_->get_logger().get_child(name_), "Behavior preempted.");
       m_recovery_result = dddmr_sys_core::RecoveryState::INTERRUPT_BY_NEW_GOAL;
       break;
     }
     if(goal_handle->is_canceling()){
-
-      geometry_msgs::msg::Twist cmd_vel;
-      cmd_vel.linear.x = 0.0;
-      cmd_vel.linear.y = 0.0;
-      cmd_vel.angular.z = 0.0;
-      cmd_vel_pub_->publish(cmd_vel);
+      pubZeroVelocity();
       goal_handle->canceled(result);
       RCLCPP_INFO(node_->get_logger().get_child(name_), "Behavior cancelled.");
       m_recovery_result = dddmr_sys_core::RecoveryState::INTERRUPT_BY_CANCEL;
@@ -263,11 +262,7 @@ dddmr_sys_core::RecoveryState RotateInPlaceBehavior::runBehavior(
     mpc_critics_ros_->getSharedDataPtr()->pcl_perception_kdtree_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
 
     if(got_180){
-      geometry_msgs::msg::Twist cmd_vel;
-      cmd_vel.linear.x = 0.0;
-      cmd_vel.linear.y = 0.0;
-      cmd_vel.angular.z = 0.0;
-      cmd_vel_pub_->publish(cmd_vel);
+      pubZeroVelocity();
       goal_handle->succeed(result);
       RCLCPP_INFO(node_->get_logger().get_child(name_), "Behavior succeed.");
       m_recovery_result = dddmr_sys_core::RecoveryState::RECOVERY_DONE;
@@ -278,21 +273,13 @@ dddmr_sys_core::RecoveryState RotateInPlaceBehavior::runBehavior(
       RCLCPP_WARN_THROTTLE(node_->get_logger().get_child(name_), *clock_, 5000,"%s: All trajectories are rejected by critics.", name_.c_str());
       auto valid_time = clock_->now() - last_valid_control_;
       if( valid_time.seconds() > 5.0){
-        geometry_msgs::msg::Twist cmd_vel;
-        cmd_vel.linear.x = 0.0;
-        cmd_vel.linear.y = 0.0;
-        cmd_vel.angular.z = 0.0;
-        cmd_vel_pub_->publish(cmd_vel);
+        pubZeroVelocity();
         goal_handle->abort(result);
         RCLCPP_INFO(node_->get_logger().get_child(name_), "Behavior abort.");
         m_recovery_result = dddmr_sys_core::RecoveryState::RECOVERY_FAIL;
         break;
       }
-      geometry_msgs::msg::Twist cmd_vel;
-      cmd_vel.linear.x = 0.0;
-      cmd_vel.linear.y = 0.0;
-      cmd_vel.angular.z = 0.0;
-      cmd_vel_pub_->publish(cmd_vel);      
+      pubZeroVelocity();    
     }
     else{
       geometry_msgs::msg::Twist cmd_vel;

@@ -1,0 +1,22 @@
+<launch>
+
+  <node pkg="global_planner" exec="occupancy2ground" output="screen" respawn="false">
+    <param from="$(find-pkg-share p2p_move_base)/config/zinger_localization.yaml" />
+  </node>
+
+  <!--name argument is not required, because it will overwrite all node name in the exec-->
+  <node pkg="global_planner" exec="global_planner_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share p2p_move_base)/config/zinger_localization.yaml" />
+  </node>
+
+  <!--name argument is not required, because it will overwrite all node name in the exec-->
+  <node pkg="p2p_move_base" exec="p2p_move_base_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share p2p_move_base)/config/zinger_localization.yaml" />
+  </node>
+  <node pkg="p2p_move_base" exec="clicked2goal.py" output="screen" respawn="false"/>
+  
+
+  <let name="rviz_config" value="$(find-pkg-share p2p_move_base)/rviz/zinger_localization.rviz"/>
+  <node name="rviz2" pkg="rviz2" exec="rviz2" args="-d $(var rviz_config)"/>
+
+</launch>

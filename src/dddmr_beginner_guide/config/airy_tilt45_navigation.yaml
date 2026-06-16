@@ -18,7 +18,7 @@ mcl_ip:
     # leishen16
     laser:
         odom_type: "wheel_odometry"         #wheel_odometry/laser_odometry 
-        baselink_frame: "base_link"
+        base_ground_frame: "base_link"
         num_vertical_scans: 100
         num_horizontal_scans: 400
         vertical_angle_bottom: 0.0          # degrees

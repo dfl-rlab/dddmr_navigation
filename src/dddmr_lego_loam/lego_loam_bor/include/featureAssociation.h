@@ -13,6 +13,9 @@
 #include <tf2_ros/transform_listener.h>
 #include "tf2_ros/create_timer_ros.h"
 
+// omp voxel
+#include "dddmr_pcl/voxel_omp/voxel_grid_omp.h"
+
 // chrono_literals handles user-defined time durations (e.g. 500ms) 
 using namespace std::chrono_literals;
 
@@ -88,6 +91,7 @@ class FeatureAssociation : public rclcpp::Node
   pcl::PointCloud<PointType>::Ptr surfPointsLessFlatScanDS;
 
   pcl::VoxelGrid<PointType> downSizeFilter;
+  pcl::VoxelGridOMP downSizeFilter_omp;
   
   double timeScanCur;
 

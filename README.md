@@ -59,7 +59,18 @@ Our stack is a total solution for a mobile platform to navigate in 3D environmen
     <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_navigation/navigation_diagram.png" width="780" height="560"/>
 </p>
 
-🤝 We would like to thank the contributors and users of [Navigation](https://github.com/ros-planning/navigation) and [Navigation2](https://github.com/ros-navigation/navigation2), ddd navigation stands on your shoulder!
+## Citation
+
+Please cite the following if you use this code or parts of it:
+
+```
+@software{dddmr_navigation_dfl-rlab,
+  author = {CM, PS, Tarek Taha},
+  title = {dddmr_navigation: 3D Mobile Robot Navigation},
+  url = {https://github.com/dfl-rlab/dddmr_navigation},
+  year = {2025}
+}
+```
 
 😵‍💫😵‍💫😵‍💫😵‍💫😵‍💫😵‍💫😵‍💫😵‍💫😵‍💫😵‍💫 I have a robot, but where to start?[Click me to see the beginner's guide](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_beginner_guide/README.md)😵‍💫😵‍💫😵‍💫😵‍💫😵‍💫😵‍💫😵‍💫😵‍💫😵‍💫😵‍💫
 ## 🏁 Detail documentations for each package

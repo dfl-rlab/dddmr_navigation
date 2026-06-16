@@ -14,6 +14,7 @@ find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(ackermann_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
@@ -40,6 +41,7 @@ set(dependencies
   sensor_msgs
   visualization_msgs
   nav_msgs
+  ackermann_msgs
   geometry_msgs
   builtin_interfaces
   message_filters
@@ -97,6 +99,7 @@ add_library(theories SHARED
   theories/dd_rotate_inplace_theory.cpp
   theories/dd_simple_trajectory_generator_theory.cpp
   theories/omni_simple_trajectory_generator_theory.cpp
+  theories/one_state_trajectory_generator_theory.cpp
 )
 target_link_libraries(theories
   trajectory_generator_ros

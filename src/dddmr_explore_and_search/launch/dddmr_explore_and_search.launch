@@ -1,0 +1,31 @@
+<launch>
+
+  <!--name argument is not required, because it will overwrite all node name in the exec-->
+  <node pkg="lego_loam_bor" exec="lego_loam" output="screen" respawn="false">
+    <param from="$(find-pkg-share dddmr_explore_and_search)/config/dddmr_explore_and_search.yaml" />
+    <remap from="/lslidar_point_cloud" to="/airy_points"/>
+  </node>
+
+  <!--- TF -->
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="baselink2sensor"  args="0.235 0 0.16 0.0 0.785398 0 base_link airy" />
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="baselink2footprint"  args="0.0 0 -0.3 0.0 0.0 0 base_link base_footprint" />
+  
+  <!--name argument is not required, because it will overwrite all node name in the exec-->
+  <node pkg="global_planner" exec="global_planner_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share dddmr_explore_and_search)/config/dddmr_explore_and_search.yaml" />
+  </node>
+
+  <!--name argument is not required, because it will overwrite all node name in the exec-->
+  <node pkg="p2p_move_base" exec="p2p_move_base_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share dddmr_explore_and_search)/config/dddmr_explore_and_search.yaml" />
+  </node>
+  <node pkg="p2p_move_base" exec="clicked2goal.py" output="screen" respawn="false"/>
+
+  <!--<node pkg="dddmr_explore_and_search" exec="dddmr_explore_and_search_node" output="screen">
+    <param from="$(find-pkg-share dddmr_explore_and_search)/config/dddmr_explore_and_search.yaml" />
+  </node>-->
+
+  <node pkg="rviz2" exec="rviz2" output="screen" respawn="false" args="-d $(find-pkg-share dddmr_explore_and_search)/rviz/dddmr_explore_and_search.rviz">
+  </node>
+
+</launch>

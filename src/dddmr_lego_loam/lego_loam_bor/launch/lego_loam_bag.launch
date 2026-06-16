@@ -1,7 +1,7 @@
 <launch>
 
   <!--name argument is not required, because it will overwrite all node name in the exec-->
-  <node pkg="lego_loam_bor" exec="lego_loam_bag" output="screen" respawn="false">
+  <node pkg="lego_loam_bor" exec="lego_loam_bag" output="screen" respawn="false" launch-prefix="xterm -e gdb --args" >
     <param from="$(find-pkg-share lego_loam_bor)/config/loam_bag_c16_config.yaml" />
   </node>
 

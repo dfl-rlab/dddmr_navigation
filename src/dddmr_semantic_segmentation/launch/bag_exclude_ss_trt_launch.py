@@ -63,7 +63,7 @@ def generate_launch_description():
             'use_class_based_mask_result': True #False use rgb based
         }],
         remappings=[
-            ('/camera/camera/color/image_raw', '/realsense/mid/color/image_raw')
+            ('/camera/camera/color/image_raw', '/camera/camera/color/image_raw')
         ]
     )
 
@@ -78,9 +78,9 @@ def generate_launch_description():
             'exclude_class': [0]
         }],
         remappings=[
-            ('/camera_info', '/realsense/mid/depth/camera_info'),
+            ('/camera_info', '/camera/camera/depth/camera_info'),
             ('/ddrnet_inferenced_mask', '/ddrnet_inferenced_mask'),
-            ('/image_rect_raw', '/realsense/mid/depth/image_rect_raw')
+            ('/image_rect_raw', '/camera/camera/depth/image_rect_raw')
         ]
     )
     
@@ -99,7 +99,7 @@ def generate_launch_description():
             "bag",
             "play",
             "--loop",
-            "/root/dddmr_bags/rs435_rgbd_848x380",
+            "/root/dddmr_bags/rs455_rgbd_848x480",
         ],
         output="screen",
     )
@@ -108,7 +108,7 @@ def generate_launch_description():
             package="tf2_ros",
             executable="static_transform_publisher",
             output="screen" ,
-            arguments=["0.0", "0.0", "0.0", "-1.571", "-0.000", "-1.571", "camera_link", "mid_depth_optical_frame"]
+            arguments=["0.0", "0.0", "0.0", "-1.571", "-0.000", "-1.571", "camera_link", "camera_depth_optical_frame"]
         )
 
     # Create the launch description and populate

@@ -179,6 +179,7 @@ void DWA_GlobalPlanner::makePlan(const std::shared_ptr<rclcpp_action::ServerGoal
       threading_timer_->reset();
     }
     pub_path_->publish(global_path_);
+    global_dwa_path_.poses.clear();
   }
   else{
     auto result = std::make_shared<dddmr_sys_core::action::GetPlan::Result>();
@@ -278,6 +279,10 @@ void DWA_GlobalPlanner::determineDWAPlan(){
   dwa_goal.pose.position.y = pcl_global_path_->points[dwa_pivot].y;
   dwa_goal.pose.position.z = pcl_global_path_->points[dwa_pivot].z;
   
+  RCLCPP_DEBUG(this->get_logger(), "DWA pivot: %d is at %.2f, %.2f, %.2f with start: %.2f, %.2f, %.2f", 
+        dwa_pivot, dwa_goal.pose.position.x, dwa_goal.pose.position.y, dwa_goal.pose.position.z,
+        start.pose.position.x, start.pose.position.y, start.pose.position.z);
+
   nav_msgs::msg::Path dwa_path = global_planner_->makeROSPlan(start, dwa_goal);
   for(size_t i=dwa_pivot; i<pcl_global_path_->points.size(); i++){
     dwa_path.poses.push_back(global_path_.poses[i]);

@@ -50,6 +50,7 @@ class Trajectory_Generators_ROS : public rclcpp::Node {
 
     StackedGenerator* getStackedGeneratorPtr(){return stacked_generator_;}  
     
+    bool theoryExists(std::string pname);
     void initial();
 
   private:

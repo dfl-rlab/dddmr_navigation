@@ -50,4 +50,14 @@
     </description>
   </class>
 
+  <class
+    name="dddmr_rviz_default_plugins/DeletePointCloud"
+    type="dddmr_rviz_default_plugins::tools::PointCloudDeleteTool"
+    base_class_type="rviz_common::Tool"
+  >
+    <description>
+      Ddelete selected point cloud
+    </description>
+  </class>
+
 </library>

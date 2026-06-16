@@ -1,0 +1,5 @@
+<library path="libmap_delete_panel">
+  <class name="map_delete_panel/MapDeletePanel" type="map_delete_panel::MapDeletePanel" base_class_type="rviz_common::Panel">
+    <description> map_delete_panel</description>
+  </class>
+</library>

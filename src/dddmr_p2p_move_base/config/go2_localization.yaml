@@ -17,7 +17,7 @@ mcl_ip:
   ros__parameters:
     laser:
         odom_type: "wheel_odometry"         #wheel_odometry/laser_odometry 
-        baselink_frame: "base_link"
+        base_ground_frame: "base_link"
         num_vertical_scans: 16
         num_horizontal_scans: 440
         vertical_angle_bottom: -15.0          # degrees

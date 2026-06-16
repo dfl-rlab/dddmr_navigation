@@ -99,6 +99,7 @@ ament_target_dependencies(recovery_behaviors_ros
 # behaviors
 add_library(behaviors SHARED
   behaviors/rotate_inplace_behavior.cpp
+  behaviors/position_control_behavior.cpp
 )
 target_link_libraries(behaviors
   recovery_behaviors_ros

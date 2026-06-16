@@ -1,16 +1,25 @@
 # DDDMR P2P Move Base
 
 This repo is the finite state machine for [dddmr_navigation](https://github.com/dfl-rlab/dddmr_navigation) that can control a mobile robot to move from one pose to another pose in 3D space.
-The p2p_move_base is different from the move_base in following aspects:
-- The robot will rotate in place to the rough heading and then move out, which is similar to [Nav2_Rotation_Shim_Controller](https://github.com/ros-navigation/navigation2/tree/main/nav2_rotation_shim_controller)
-- The robot will wait for n seconds (waiting_patience) when the prune plan is being blocked, after n seconds if the obstacles remain, it will compute a new global plan to avoid the obstacles.
-- Recovery behaviors are implemented as action servers, therefore, when a goal is being cancelled, it will first cancels recovery behavior (Move base does not allow user to interrupt recovery).
-- Recovery behaviors are plugin-based see: [dddmr_local_planner](https://github.com/dfl-rlab/dddmr_navigation/tree/main/src/dddmr_local_planner), allow user to customized recovery behaviors.
-  - [ ] TODO: make recovery behaviors configurable in yaml file. Current version only use rotate in place as recovery behavior.
+
+## Mobile Robot Kinematics
+
+We now support variant mobile kinematics models, we are working on unifying all kinds of mobile robots to run on [dddmr_navigation](https://github.com/dfl-rlab/dddmr_navigation).
+
+In dddmr navigation, we extensively use the simulation to develop/debug our stack and later deploy to real mobile robot to test. Thus we think by providing different simulated mobile robot types for users would faciliate the developing process.
+
+[Different Drive]
+
+[Omni Direction](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_p2p_move_base/kinematics_md/OMNIDIRECTION.md)
+
+[Ackermann Steering]
+
+[Tricycle]
+
+[Articulated Vehicle]
 
 
-
-## Run The Demo
+## Run Basic Demo with a bag
 ### 1. Create docker image
 The package runs in the docker, so we need to build the image first. We support both x64 (tested in intel NUC) and arm64 (tested in nvidia jetson jpack6).
 ```

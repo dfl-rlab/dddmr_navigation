@@ -76,17 +76,23 @@ class Occupancy2Ground : public rclcpp::Node
     PGMImage_t pgm_t_;
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr pc_ground_;
-    pcl::PointCloud<pcl::PointXYZI> pc_wall_, pc_wall_flat_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr pc_wall_, pc_wall_flat_;
 
     double inflation_radius_;
     std::map<std::pair<int, int>, size_t> twoD2oneD_;
     std::vector<std::pair<int, int>> obstacles_;
+    float ground_voxel_size_;
+
+    double map_rotate_around_x_, map_rotate_around_y_, map_rotate_around_z_;
+    double map_translate_x_, map_translate_y_, map_translate_z_;
 };
 
 
 Occupancy2Ground::Occupancy2Ground():Node("occupancy2ground"){
 
   pc_ground_.reset(new pcl::PointCloud<pcl::PointXYZI>());
+  pc_wall_.reset(new pcl::PointCloud<pcl::PointXYZI>());
+  pc_wall_flat_.reset(new pcl::PointCloud<pcl::PointXYZI>());
   
   pub_ground_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("mapground",
               rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
@@ -101,6 +107,40 @@ Occupancy2Ground::Occupancy2Ground():Node("occupancy2ground"){
   this->declare_parameter("inflation_radius", rclcpp::ParameterValue(1.0));
   this->get_parameter("inflation_radius", inflation_radius_);
   RCLCPP_INFO(this->get_logger(), "inflation_radius: %.2f" , inflation_radius_);
+
+  this->declare_parameter("ground_voxel_size", rclcpp::ParameterValue(0.1f));
+  this->get_parameter("ground_voxel_size", ground_voxel_size_);
+  RCLCPP_INFO(this->get_logger(), "ground_voxel_size: %.2f" , ground_voxel_size_);
+
+  this->declare_parameter("map_rotate_around_x", rclcpp::ParameterValue(0.0));
+  rclcpp::Parameter map_rotate_around_x = this->get_parameter("map_rotate_around_x");
+  map_rotate_around_x_ = map_rotate_around_x.as_double();
+  RCLCPP_INFO(this->get_logger(), "map_rotate_around_x: %.2f", map_rotate_around_x_);
+
+  this->declare_parameter("map_rotate_around_y", rclcpp::ParameterValue(0.0));
+  rclcpp::Parameter map_rotate_around_y = this->get_parameter("map_rotate_around_y");
+  map_rotate_around_y_ = map_rotate_around_y.as_double();
+  RCLCPP_INFO(this->get_logger(), "map_rotate_around_y: %.2f", map_rotate_around_y_);
+
+  this->declare_parameter("map_rotate_around_z", rclcpp::ParameterValue(0.0));
+  rclcpp::Parameter map_rotate_around_z = this->get_parameter("map_rotate_around_z");
+  map_rotate_around_z_ = map_rotate_around_z.as_double();
+  RCLCPP_INFO(this->get_logger(), "map_rotate_around_z: %.2f", map_rotate_around_z_);
+
+  this->declare_parameter("map_translate_x", rclcpp::ParameterValue(0.0));
+  rclcpp::Parameter map_translate_x = this->get_parameter("map_translate_x");
+  map_translate_x_ = map_translate_x.as_double();
+  RCLCPP_INFO(this->get_logger(), "map_translate_x: %.2f", map_translate_x_);
+
+  this->declare_parameter("map_translate_y", rclcpp::ParameterValue(0.0));
+  rclcpp::Parameter map_translate_y = this->get_parameter("map_translate_y");
+  map_translate_y_ = map_translate_y.as_double();
+  RCLCPP_INFO(this->get_logger(), "map_translate_y: %.2f", map_translate_y_);
+
+  this->declare_parameter("map_translate_z", rclcpp::ParameterValue(0.0));
+  rclcpp::Parameter map_translate_z = this->get_parameter("map_translate_z");
+  map_translate_z_ = map_translate_z.as_double();
+  RCLCPP_INFO(this->get_logger(), "map_translate_z: %.2f", map_translate_z_);
 
   if(!std::filesystem::exists(map_dir_))
   {
@@ -133,9 +173,9 @@ void Occupancy2Ground::img2Ground() {
         pt.x = (i%pgm_t_.width)*0.05;
         pt.y = pgm_t_.height*0.05 - (int)(i/pgm_t_.width)*0.05;
         pt.z = j*0.2;
-        pc_wall_.push_back(pt);
+        pc_wall_->push_back(pt);
         if(j==0)
-          pc_wall_flat_.push_back(pt);
+          pc_wall_flat_->push_back(pt);
       }
       pcl::PointXYZI pt;
       pt.x = (i%pgm_t_.width)*0.05;
@@ -170,19 +210,34 @@ void Occupancy2Ground::img2Ground() {
     }
   }
 
-
   pcl::VoxelGrid<pcl::PointXYZI> sor;
   sor.setInputCloud (pc_ground_);
-  sor.setLeafSize (0.05f, 0.05f, 0.05f);
+  sor.setLeafSize (ground_voxel_size_, ground_voxel_size_, ground_voxel_size_);
   sor.filter (*pc_ground_);
+
+  Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
+
+  // Define a translation of 0.0 meters on the axis.
+  transform_2.translation() << map_translate_x_, map_translate_y_, map_translate_z_;
+
+  // The same rotation matrix as before; theta radians around X axis
+  if(fabs(map_rotate_around_x_)>0.01)
+    transform_2.rotate (Eigen::AngleAxisf (map_rotate_around_x_, Eigen::Vector3f::UnitX()));
+  if(fabs(map_rotate_around_y_)>0.01)
+    transform_2.rotate (Eigen::AngleAxisf (map_rotate_around_y_, Eigen::Vector3f::UnitY()));
+  if(fabs(map_rotate_around_z_)>0.01)
+    transform_2.rotate (Eigen::AngleAxisf (map_rotate_around_z_, Eigen::Vector3f::UnitZ()));  
   
+  pcl::transformPointCloud(*pc_ground_, *pc_ground_, transform_2);
+  pcl::transformPointCloud(*pc_wall_, *pc_wall_, transform_2);
+
   sensor_msgs::msg::PointCloud2 ros_msg_map_ground;
   pcl::toROSMsg(*pc_ground_, ros_msg_map_ground);
   ros_msg_map_ground.header.frame_id = "map";
   pub_ground_->publish(ros_msg_map_ground);
 
   sensor_msgs::msg::PointCloud2 ros_msg_map_wall;
-  pcl::toROSMsg(pc_wall_, ros_msg_map_wall);
+  pcl::toROSMsg(*pc_wall_, ros_msg_map_wall);
   ros_msg_map_wall.header.frame_id = "map";
   pub_wall_->publish(ros_msg_map_wall);
   

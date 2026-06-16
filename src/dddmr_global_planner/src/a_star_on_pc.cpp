@@ -241,7 +241,11 @@ void A_Star_on_Graph::getPath(
 
     //@dealing with orphan node
     if(pointIdxRadiusSearch.size()<8){
-      ASLS_->kdtree_ground_->nearestKSearch(pcl_now, 8, pointIdxRadiusSearch, pointRadiusSquaredDistance);
+      std::vector<int> pointIdxRadiusX2Search;
+      std::vector<float> pointRadiusSquaredDistanceX2;
+      //ASLS_->kdtree_ground_->nearestKSearch(pcl_now, 8, pointIdxRadiusX2Search, pointRadiusSquaredDistanceX2);
+      ASLS_->kdtree_ground_->radiusSearch(pcl_now, 2*a_star_expanding_radius_, pointIdxRadiusX2Search, pointRadiusSquaredDistanceX2);
+      pointIdxRadiusSearch = pointIdxRadiusX2Search;
     }
 
     //@ calculated average intensity, because we have sparse low cost orphan, and it is unlikely to have a low cost node surrounded by high cost nodes

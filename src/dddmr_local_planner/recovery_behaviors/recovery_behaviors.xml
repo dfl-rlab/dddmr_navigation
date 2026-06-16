@@ -5,6 +5,10 @@
       <description>TBW</description>
     </class>
 
+    <class type="recovery_behaviors::PositionControlBehavior"  base_class_type="recovery_behaviors::RobotBehavior">
+      <description>TBW</description>
+    </class>
+
   </library>
 </class_libraries>
 

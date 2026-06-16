@@ -102,6 +102,10 @@ void MultiLayerSpinningLidar::onInitialize()
   node_->get_parameter(name_ + ".euclidean_cluster_extraction_min_cluster_size", euclidean_cluster_extraction_min_cluster_size_);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "euclidean_cluster_extraction_min_cluster_size: %d", euclidean_cluster_extraction_min_cluster_size_);
 
+  node_->declare_parameter(name_ + ".euclidean_cluster_minimum_accepted_size", rclcpp::ParameterValue(10));
+  node_->get_parameter(name_ + ".euclidean_cluster_minimum_accepted_size", euclidean_cluster_minimum_accepted_size_);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "euclidean_cluster_minimum_accepted_size: %d", euclidean_cluster_minimum_accepted_size_);
+
   clock_ = node_->get_clock();
   last_observation_time_ = clock_->now();
 
@@ -117,6 +121,10 @@ void MultiLayerSpinningLidar::onInitialize()
   node_->get_parameter(name_ + ".marking_height", marking_height_);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "marking_height: %.2f", marking_height_);
 
+  node_->declare_parameter(name_ + ".marking_minimum_height", rclcpp::ParameterValue(0.05));
+  node_->get_parameter(name_ + ".marking_minimum_height", marking_minimum_height_);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "marking_minimum_height: %.2f", marking_minimum_height_);
+  
   node_->declare_parameter(name_ + ".perception_window_size", rclcpp::ParameterValue(0.0));
   node_->get_parameter(name_ + ".perception_window_size", perception_window_size_);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "perception_window_size: %.2f", perception_window_size_);
@@ -144,43 +152,58 @@ void MultiLayerSpinningLidar::onInitialize()
   node_->declare_parameter(name_ + ".pub_gbl_marking_frequency", rclcpp::ParameterValue(1.0));
   node_->get_parameter(name_ + ".pub_gbl_marking_frequency", pub_gbl_marking_frequency_);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "pub_gbl_marking_frequency: %.1f", pub_gbl_marking_frequency_);  
-  
+
   sensor_cb_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   rclcpp::SubscriptionOptions sub_options;
   sub_options.callback_group = sensor_cb_group_;
 
   sensor_sub_ = node_->create_subscription<sensor_msgs::msg::PointCloud2>(
-    topic_, 2, 
+    topic_, rclcpp::QoS(rclcpp::KeepLast(1)).durability_volatile().best_effort(), 
     std::bind(&MultiLayerSpinningLidar::cbSensor, this, std::placeholders::_1), sub_options);
   
   std::string pre_topic_name = node_name + "/" + name_;
   pub_current_observation_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/current_observation", 2);
-  pub_current_window_marking_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/current_window_marking", 2);
-  pub_current_projected_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/current_projected", 2);
-  pub_current_segmentation_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/current_segmentation", 2);
-  pub_gbl_marking_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/global_marking", 2);
-  pub_dGraph_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/dGraph", 2);
   pub_lethal_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/lethal", 2);
-
-  pub_casting_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(pre_topic_name + "/tracing_objects", 2);
 
   pct_marking_ = std::make_shared<Marking>(name_, &dGraph_, 
         gbl_utils_->getInscribedRadius(), gbl_utils_->getInflationRadius(), shared_data_, resolution_, height_resolution_);
   get_first_tf_ = false;
   
-  marking_pub_cb_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  auto publish_time = std::chrono::milliseconds(int(1000/pub_gbl_marking_frequency_));
-  marking_pub_timer_ = node_->create_wall_timer(publish_time, std::bind(&MultiLayerSpinningLidar::pubUpdateLoop, this), marking_pub_cb_group_);
+  if(!is_local_planner_){
+
+    pub_current_window_marking_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/current_window_marking", 2);
+    pub_current_projected_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/current_projected", 2);
+    pub_current_segmentation_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/current_segmentation", 2);
+    pub_casting_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(pre_topic_name + "/tracing_objects", 2);
+    pub_gbl_marking_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/global_marking", 2);
+    pub_dGraph_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/dGraph", 2);
+
+    marking_pub_cb_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+    auto publish_time = std::chrono::milliseconds(int(1000/pub_gbl_marking_frequency_));
+    marking_pub_timer_ = node_->create_wall_timer(publish_time, std::bind(&MultiLayerSpinningLidar::pubUpdateLoop, this), marking_pub_cb_group_);
+  }
 
 }
 
 void MultiLayerSpinningLidar::cbSensor(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
-{
+{ 
+  //@ Sanity check
+  rclcpp::Time time1(last_sensor_receiving_time_.stamp);
+  rclcpp::Time time2(msg->header.stamp);
+  rclcpp::Duration diff = time2 - time1;
+  double seconds_between_expectation = fabs(diff.seconds() - expected_sensor_time_);
+  last_sensor_receiving_time_ = msg->header;
+  if(seconds_between_expectation>0.05){
+    RCLCPP_WARN_THROTTLE(node_->get_logger().get_child(name_), 
+        *clock_, 1000, "Topic: %s received with lantency higher than your expection: %.3f seconds difference and your are expecting: %.3f", 
+          topic_.c_str(), diff.seconds(), expected_sensor_time_);
+  }
 
   //@if not stitch, save copy time
-  pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_msg (new pcl::PointCloud<pcl::PointXYZ>);
+  pcl_msg_.reset(new pcl::PointCloud<pcl::PointXYZ>);
+  //pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_msg (new pcl::PointCloud<pcl::PointXYZ>);
   if(stitcher_num_<=0){
-    pcl::fromROSMsg(*msg, *pcl_msg);
+    pcl::fromROSMsg(*msg, *pcl_msg_);
   }
   else{
     pcl::PointCloud<pcl::PointXYZ>::Ptr scan_msg (new pcl::PointCloud<pcl::PointXYZ>);
@@ -195,7 +218,7 @@ void MultiLayerSpinningLidar::cbSensor(const sensor_msgs::msg::PointCloud2::Shar
     }
     
     for(auto si=pcl_stitcher_.begin(); si!=pcl_stitcher_.end();si++){
-      *pcl_msg += (*si);
+      *pcl_msg_ += (*si);
     }
   }
 
@@ -230,11 +253,12 @@ void MultiLayerSpinningLidar::cbSensor(const sensor_msgs::msg::PointCloud2::Shar
   //RCLCPP_INFO_STREAM(node_->get_logger().get_child(name_), "Rotation d: " << d.rotation());
   
   Eigen::Affine3d trans_b2s_af3 = tf2::transformToEigen(trans_b2s_);
-  pcl::transformPointCloud(*pcl_msg, *pcl_msg, trans_b2s_af3);
+  pcl::transformPointCloud(*pcl_msg_, *pcl_msg_, trans_b2s_af3);
+  pcl_msg_->header.frame_id = gbl_utils_->getRobotFrame();
 
   std::vector<int> indices;
-  pcl_msg->is_dense = false;
-  pcl::removeNaNFromPointCloud(*pcl_msg, *pcl_msg, indices);
+  pcl_msg_->is_dense = false;
+  pcl::removeNaNFromPointCloud(*pcl_msg_, *pcl_msg_, indices);
 
   //@Get affine tf from gbl to sensor
   Eigen::Affine3d trans_gbl2b_af3 = tf2::transformToEigen(trans_gbl2b_);
@@ -242,28 +266,28 @@ void MultiLayerSpinningLidar::cbSensor(const sensor_msgs::msg::PointCloud2::Shar
   trans_gbl2s_ = tf2::eigenToTransform (trans_gbl2s_af3_);
 
   pcl::PassThrough<pcl::PointXYZ> pass;
-  pass.setInputCloud (pcl_msg);
+  pass.setInputCloud (pcl_msg_);
   pass.setFilterFieldName ("x");
   pass.setFilterLimits (-perception_window_size_, perception_window_size_);
-  pass.filter (*pcl_msg);
-  pass.setInputCloud (pcl_msg);
+  pass.filter (*pcl_msg_);
+  pass.setInputCloud (pcl_msg_);
   pass.setFilterFieldName ("y");
-  pass.filter (*pcl_msg);
-  pass.setInputCloud (pcl_msg);
+  pass.filter (*pcl_msg_);
+  pass.setInputCloud (pcl_msg_);
   pass.setFilterFieldName ("z");
-  pass.setFilterLimits (0.0, marking_height_);
-  pass.filter (*pcl_msg);
+  pass.setFilterLimits (marking_minimum_height_, marking_height_);
+  pass.filter (*pcl_msg_);
 
   pcl::VoxelGrid<pcl::PointXYZ> sor;
-  sor.setInputCloud (pcl_msg);
+  sor.setInputCloud (pcl_msg_);
   sor.setLeafSize (0.1f, 0.1f, 0.1f);
-  sor.filter (*pcl_msg);
+  sor.filter (*pcl_msg_);
 
   //@Protect Mark/Clear functions
   std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
 
-  pcl_msg_.reset(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl_msg_ = pcl_msg;
+  //pcl_msg_.reset(new pcl::PointCloud<pcl::PointXYZ>);
+  //pcl_msg_ = pcl_msg;
 
   if(is_local_planner_){
     //@ put to current observation, different for global/local
@@ -285,6 +309,8 @@ void MultiLayerSpinningLidar::cbSensor(const sensor_msgs::msg::PointCloud2::Shar
 }
 
 void MultiLayerSpinningLidar::updateLethalPointCloud(){
+
+  if(is_local_planner_){return;}
 
   std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
   
@@ -308,10 +334,10 @@ void MultiLayerSpinningLidar::updateLethalPointCloud(){
 }
 
 void MultiLayerSpinningLidar::selfMark(){
-  
-  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
 
   if(is_local_planner_){return;}
+
+  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
 
   if(! get_first_tf_){
     RCLCPP_INFO_THROTTLE(node_->get_logger().get_child(name_), *clock_, 1, "Wait for TF between global frame to sensor, either your TF tree is corrupted or your sensor did not send any msg to topic: %s", topic_.c_str());
@@ -333,6 +359,7 @@ void MultiLayerSpinningLidar::selfMark(){
   pcl_msg_gbl_.reset(new pcl::PointCloud<pcl::PointXYZ>);
   Eigen::Affine3d trans_gbl2b_af3 = tf2::transformToEigen(trans_gbl2b_);
   pcl::transformPointCloud(*pcl_msg_, *pcl_msg_gbl_, trans_gbl2b_af3);
+  pcl_msg_gbl_->header.frame_id = gbl_utils_->getGblFrame();
 
   pcl::search::KdTree<pcl::PointXYZ>::Ptr pc_kdtree (new pcl::search::KdTree<pcl::PointXYZ>);
   pc_kdtree->setInputCloud (pcl_msg_gbl_);
@@ -371,14 +398,17 @@ void MultiLayerSpinningLidar::selfMark(){
       cloud_clusters->points.push_back(i_pt);
 
     }
+
+    if(cloud_cluster->points.size()<euclidean_cluster_minimum_accepted_size_)
+      continue;
+
     centroid.x/=it->indices.size();
     centroid.y/=it->indices.size();
     centroid.z/=it->indices.size();
     centroid.intensity = intensity_cnt;
     cloud_clusters->points.push_back(centroid);   
     intensity_cnt += 100;
- 
-
+    
     //@ Sometimes the lidar accidently add ground scan (due to lego loam did not segment them correctly)
     //@ Therefore we implement following temporal solution -> when cluster center attaches ground, ignore it!
     std::vector<int> id(1);
@@ -476,9 +506,9 @@ void MultiLayerSpinningLidar::selfMark(){
 
 void MultiLayerSpinningLidar::selfClear(){
 
-  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
-
   if(is_local_planner_){return;}
+
+  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
 
   if(! get_first_tf_){
     RCLCPP_INFO_THROTTLE(node_->get_logger().get_child(name_), *clock_, 1, "Wait for TF between global frame to sensor, either your TF tree is corrupted or your sensor did not send any msg to topic: %s", topic_.c_str());
@@ -762,7 +792,6 @@ void MultiLayerSpinningLidar::getCastingPointCloud(pcl::PointXYZ& cluster_center
 }
 
 bool MultiLayerSpinningLidar::isinLidarObservation(pcl::PointXYZ& pc){
-  
   
   //@ Solving vertical distance to sensor plan, so we can compute sin for vertical FOV check
   

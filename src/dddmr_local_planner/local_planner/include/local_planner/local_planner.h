@@ -83,6 +83,7 @@ class Local_Planner : public rclcpp::Node {
 
       void updateGlobalPose();
       geometry_msgs::msg::TransformStamped getGlobalPose();
+      std::string getControlFrame();
       
     private: 
       
@@ -102,7 +103,8 @@ class Local_Planner : public rclcpp::Node {
       std::string robot_frame_;
       std::string odom_topic_;
       std::string odom_topic_qos_;
-      
+      std::string ackermann_topic_;
+
       /*For cuboid visualization*/
       visualization_msgs::msg::MarkerArray robot_cuboid_;
       visualization_msgs::msg::Marker marker_edge_;
@@ -134,9 +136,11 @@ class Local_Planner : public rclcpp::Node {
 
       /*Sub*/
       rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_ros_sub_;
-
+      rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr ackermann_drive_ros_sub_;
+      
       /*cb*/
       void cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg);
+      void cbAckermannDrive(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg);
 
       void trajectory2posearray_cuboids(const base_trajectory::Trajectory& a_traj, 
                                       geometry_msgs::msg::PoseArray& pose_arr,
@@ -172,6 +176,7 @@ class Local_Planner : public rclcpp::Node {
       std::shared_ptr<tf2_ros::TransformListener> tfl_;
       std::shared_ptr<tf2_ros::Buffer> tf2Buffer_;  ///< @brief Used for transforming point clouds
       nav_msgs::msg::Odometry robot_state_;
+      ackermann_msgs::msg::AckermannDriveStamped ackermann_drive_state_;
       std::shared_ptr<std::vector<base_trajectory::Trajectory>> trajectories_;
       nav_msgs::msg::Path prune_plan_;
       pcl::PointCloud<pcl::PointXYZI> pcl_prune_plan_; //@ will be copied to perception_ros, so do not use shared_ptr

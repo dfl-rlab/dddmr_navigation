@@ -130,6 +130,7 @@ class GlobalPlanner : public rclcpp::Node {
       double a_star_expanding_radius_;
       size_t static_ground_size_;
       bool use_pre_graph_;
+      double find_start_tolerance_;
       
       /*Original point cloud*/
       pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_ground_;

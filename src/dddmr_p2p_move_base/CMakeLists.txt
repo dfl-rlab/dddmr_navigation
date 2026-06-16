@@ -58,14 +58,14 @@ include_directories(
   ${dddmr_sys_core_INCLUDE_DIRS}
 )
 
-# p2p_fsm
-add_library(p2p_fsm SHARED
-  src/p2p_fsm.cpp
+# p2p_state
+add_library(p2p_state SHARED
+  src/p2p_state.cpp
 )
-target_link_libraries(p2p_fsm
+target_link_libraries(p2p_state
   ${PCL_LIBRARIES}
 )
-ament_target_dependencies(p2p_fsm
+ament_target_dependencies(p2p_state
   ${dependencies}
 )
 
@@ -85,7 +85,7 @@ add_library(p2p_mov2_base SHARED
   src/p2p_move_base.cpp
 )
 target_link_libraries(p2p_mov2_base
-  p2p_fsm
+  p2p_state
   p2p_global_plan_manager
 )
 ament_target_dependencies(p2p_mov2_base
@@ -104,7 +104,7 @@ ament_target_dependencies(p2p_move_base_node
 )
 
 install(TARGETS
-  p2p_fsm
+  p2p_state
   p2p_mov2_base
   p2p_global_plan_manager
   ARCHIVE DESTINATION lib
@@ -137,6 +137,6 @@ install(PROGRAMS
 
 
 ament_export_include_directories(include)
-ament_export_libraries(p2p_fsm p2p_mov2_base p2p_global_plan_manager)
+ament_export_libraries(p2p_state p2p_mov2_base p2p_global_plan_manager)
 ament_export_dependencies(${dependencies})
 ament_package()

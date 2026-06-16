@@ -55,7 +55,7 @@ class StackedGenerator{
     void initializeTheories_wi_Shared_data();
     bool hasMoreTrajectories(std::string pname);
     bool nextTrajectory(std::string pname, base_trajectory::Trajectory& comp_traj);
- 
+    bool theoryExists(std::string pname);
     // Provide a typedef to ease future code maintenance
     typedef std::recursive_mutex theory_mutex_t;
     theory_mutex_t* getMutex()

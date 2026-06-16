@@ -147,7 +147,11 @@ void StaticLayer::cbMap(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
   std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
   /*transform to point cloud library format first so we can leverage PCL*/
-  pcl::fromROSMsg(*msg, *pcl_map_);  
+  pcl::fromROSMsg(*msg, *pcl_map_);
+  // remove NaN
+  std::vector<int> indices;
+  pcl_map_->is_dense = false;
+  pcl::removeNaNFromPointCloud(*pcl_map_, *pcl_map_, indices);
 
   if(shared_data_->static_map_size_!=pcl_map_->points.size()){
     new_map_ = true;
@@ -164,6 +168,10 @@ void StaticLayer::cbGround(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 
   std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
   pcl::fromROSMsg(*msg, *pcl_ground_);  
+  // remove NaN
+  std::vector<int> indices;
+  pcl_ground_->is_dense = false;
+  pcl::removeNaNFromPointCloud(*pcl_ground_, *pcl_ground_, indices);
 
   if(shared_data_->static_ground_size_!=pcl_ground_->points.size()){
     new_ground_ = true;

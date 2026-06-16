@@ -50,11 +50,11 @@
 namespace p2p_move_base
 {
 
-class FSM{
+class State{
 
   public:
     
-    FSM(const rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr& m_logger,
+    State(const rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr& m_logger,
               const rclcpp::node_interfaces::NodeParametersInterface::SharedPtr& m_parameter);
 
     bool setDecision(std::string m_decision);
@@ -89,7 +89,9 @@ class FSM{
     double getAngle(geometry_msgs::msg::TransformStamped& a, geometry_msgs::msg::TransformStamped& b);
 
     bool use_twist_stamped_;
-    std::string twist_frame_id_;
+    
+    bool use_position_control_at_goal_;
+    std::string main_trajectory_generator_;
 
   private:
 

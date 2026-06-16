@@ -101,6 +101,11 @@ void GlobalPlanner::initial(const std::shared_ptr<perception_3d::Perception3D_RO
   this->get_parameter("use_pre_graph", use_pre_graph_);
   RCLCPP_INFO(this->get_logger(), "use_pre_graph: %d", use_pre_graph_);    
 
+  declare_parameter("find_start_tolerance", rclcpp::ParameterValue(0.5));
+  this->get_parameter("find_start_tolerance", find_start_tolerance_);
+  RCLCPP_INFO(this->get_logger(), "find_start_tolerance: %.2f", find_start_tolerance_);    
+
+  
 
   tf_listener_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   action_server_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -450,7 +455,7 @@ bool GlobalPlanner::getStartGoalID(const geometry_msgs::msg::PoseStamped& start,
   pcl_start.y = start.pose.position.y;
   pcl_start.z = start.pose.position.z;
 
-  if(kdtree_ground_->radiusSearch (pcl_start, 0.5, pointIdxRadiusSearch_start, pointRadiusSquaredDistance_start)<1){
+  if(kdtree_ground_->radiusSearch (pcl_start, find_start_tolerance_, pointIdxRadiusSearch_start, pointRadiusSquaredDistance_start)<1){
     RCLCPP_WARN(this->get_logger(), "Start is not found.");
     return false;
   }
@@ -547,15 +552,6 @@ void GlobalPlanner::getStaticGraphFromPerception3D(){
   
   //@Calculate node weight
   
-  /*
-  //static graph has been remove 9 Mar 2025
-  graph_t* static_graph; //std::unordered_map<unsigned int, std::set<edge_t>> typedef in static_graph.h
-  static_graph = static_graph_.getGraphPtr();
-  pubStaticGraph();
-  
-  RCLCPP_INFO(this->get_logger(), "Static graph is generated with size: %lu", static_graph_.getSize());
-  */
-
   if(!has_initialized_){
     has_initialized_ = true;
     if(a_star_expanding_radius_ >= perception_3d_ros_->getGlobalUtils()->getInscribedRadius()*2){
@@ -583,9 +579,21 @@ void GlobalPlanner::getStaticGraphFromPerception3D(){
 
 void GlobalPlanner::pubWeight(){
 
+  /*
+  When generate_static_graph is true, the static_layer will generate sGraph_ptr_.
+  And there will be wo condition:
+  1. enable_edge_detection = false; This arg will push zero element to node_weight_ 
+  */
+
   pcl::PointCloud<pcl::PointXYZI>::Ptr weighted_pc (new pcl::PointCloud<pcl::PointXYZI>);
   
   unsigned long node_weight_size = perception_3d_ros_->getSharedDataPtr()->sGraph_ptr_->getNodeWeightSize();
+  bool is_node_weight = true;
+  if(node_weight_size<=0){
+    node_weight_size = perception_3d_ros_->getSharedDataPtr()->sGraph_ptr_->getSize();
+    is_node_weight = false;
+  }
+
   for(auto it=0; it<node_weight_size; it++){
 
     pcl::PointXYZI ipt;
@@ -593,7 +601,10 @@ void GlobalPlanner::pubWeight(){
     ipt.x = pcl_ground_->points[it].x;
     ipt.y = pcl_ground_->points[it].y;
     ipt.z = pcl_ground_->points[it].z;
-    ipt.intensity = static_graph_.getNodeWeight(it);    
+    if(is_node_weight)
+      ipt.intensity = static_graph_.getNodeWeight(it);
+    else
+      ipt.intensity = 0;
     weighted_pc->push_back(ipt);
 
   }

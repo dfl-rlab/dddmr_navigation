@@ -30,7 +30,7 @@
 */
 /*Debug*/
 #include <chrono>
-#include <p2p_move_base/p2p_fsm.h>
+#include <p2p_move_base/p2p_state.h>
 
 //@in enum state, the p_to_p_move_base is included
 #include <dddmr_sys_core/dddmr_enum_states.h>
@@ -92,7 +92,7 @@ class P2PMoveBase : public rclcpp::Node {
     void publishZeroVelocity();
     void publishVelocity(double vx, double vy, double angular_z);
 
-    std::shared_ptr<p2p_move_base::FSM> FSM_;
+    std::shared_ptr<p2p_move_base::State> STATE_;
     std::shared_ptr<local_planner::Local_Planner> LP_;
     std::shared_ptr<p2p_move_base::P2PGlobalPlanManager> GPM_;
 
@@ -111,7 +111,7 @@ class P2PMoveBase : public rclcpp::Node {
     void recovery_behaviors_client_result_callback(const rclcpp_action::ClientGoalHandle<dddmr_sys_core::action::RecoveryBehaviors>::WrappedResult & result);
     bool is_recoverying_;
     bool is_recoverying_succeed_;
-    void startRecoveryBehaviors();
+    void startRecoveryBehaviors(std::string behavior_name);
 
 
 };

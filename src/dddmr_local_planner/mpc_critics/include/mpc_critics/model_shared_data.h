@@ -51,6 +51,7 @@
 
 /*For robot state*/
 #include "nav_msgs/msg/odometry.hpp"
+#include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 
 #include <pcl/point_cloud.h>
 
@@ -104,6 +105,7 @@ class ModelSharedData{
     std::string global_frame_, base_frame_;
 
     nav_msgs::msg::Odometry robot_state_;
+    ackermann_msgs::msg::AckermannDriveStamped ackermann_drive_state_;
 
     double heading_deviation_;
 

@@ -140,3 +140,14 @@ Also you can play around the utils:
 ros2 launch perception_3d zone_editor_utils.launch 
 ```
 [![YouTube video thumbnail](https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/perception_3d/point_cloud_editor.png)](https://youtu.be/DHgzRD4HrjU)
+
+## Delete Point Cloud in .pcd file
+Using Point Cloud Deleting Tool to delete the point cloud you don't want in .pcd file
+
+Launch point cloud deleting using your .pcd file: [pcd file dir](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_perception_3d/launch/pc_delete_utils.launch)
+
+Also you can play around the utils:
+```
+ros2 launch perception_3d pc_delete_utils.launch
+```
+[![YouTube video thumbnail](https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/perception_3d/point_cloud_delete.png)](https://www.youtube.com/watch?v=kmR9HWOe8NM)

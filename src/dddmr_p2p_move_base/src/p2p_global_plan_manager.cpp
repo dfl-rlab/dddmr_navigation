@@ -150,6 +150,7 @@ void P2PGlobalPlanManager::global_planner_client_result_callback(const rclcpp_ac
 {
   switch (result.code) {
     case rclcpp_action::ResultCode::SUCCEEDED:
+      //RCLCPP_INFO(this->get_logger(), "Global Planner ---> %s: Global plan is found", global_planner_action_name_.c_str());
       break;
     case rclcpp_action::ResultCode::ABORTED:
       RCLCPP_ERROR(this->get_logger(), "Global Planner ---> %s: Goal was aborted", global_planner_action_name_.c_str());
