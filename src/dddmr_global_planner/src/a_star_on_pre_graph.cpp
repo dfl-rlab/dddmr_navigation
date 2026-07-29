@@ -192,7 +192,7 @@ void A_Star_on_PreGraph::getPath(
   unsigned int start, unsigned int goal,
   std::vector<unsigned int>& path){
 
-  //ROS_DEBUG("Start: %u, Goal: %u", start, goal);
+  //RCLCPP_INFO(rclcpp::get_logger("astar"),"Start: %u, Goal: %u", start, goal);
 
   /*
   Create the first node which is start and add into frontier

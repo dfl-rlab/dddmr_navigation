@@ -17,7 +17,13 @@ LegoLoamVisualization::LegoLoamVisualization(std::string name) : Node(name)
   declare_parameter("ground_voxel_size", rclcpp::ParameterValue(0.3f));
   this->get_parameter("ground_voxel_size", ground_voxel_size_);
   RCLCPP_INFO(this->get_logger(), "ground_voxel_size: %.2f", ground_voxel_size_);
-  downSizeFilterGlobalGroundKeyFrames_Copy.setLeafSize(ground_voxel_size_, ground_voxel_size_, ground_voxel_size_);
+  downSizeFilterGlobalGroundKeyFrames_Copy_omp.setNumberOfThreads(6);
+  downSizeFilterGlobalGroundKeyFrames_Copy_omp.setLeafSize (ground_voxel_size_, ground_voxel_size_, ground_voxel_size_);
+  downSizeFilterGlobalGroundKeyFrames_Copy_omp.setSaveLeafLayout(false);
+  
+  ds_patched_ground_omp_.setLeafSize(0.1, 0.5, 0.1); //we are in camera frame, z pointing to moving direction, y pointing to sky 
+  ds_patched_ground_omp_.setNumberOfThreads(6);
+  ds_patched_ground_omp_.setSaveLeafLayout(false);
 
   declare_parameter("ground_edge_threshold_num", rclcpp::ParameterValue(50));
   this->get_parameter("ground_edge_threshold_num", ground_edge_threshold_num_);
@@ -41,9 +47,9 @@ LegoLoamVisualization::LegoLoamVisualization(std::string name) : Node(name)
   get_key_frame_cloud_client_ = this->create_client<dddmr_sys_core::srv::GetKeyFrameCloud>("get_key_frame_cloud", rmw_qos_profile_services_default, cbs_group_);
 
   // Initialize Timer
-  sync_ground_timer_ = this->create_wall_timer(
+  sync_map_and_ground_timer_ = this->create_wall_timer(
     100ms,
-    std::bind(&LegoLoamVisualization::syncGroundThread, this), cbs_group_);
+    std::bind(&LegoLoamVisualization::syncMapAndGroundThread, this), cbs_group_);
 
   // Initialize Ground Publish Timer
   map_publish_timer_ = this->create_wall_timer(
@@ -74,7 +80,7 @@ void LegoLoamVisualization::cloudKeyPoses6D_callback(const sensor_msgs::msg::Poi
   
 }
 
-void LegoLoamVisualization::syncGroundThread()
+void LegoLoamVisualization::syncMapAndGroundThread()
 {
 
   auto request = std::make_shared<dddmr_sys_core::srv::GetKeyFrameCloud::Request>();
@@ -215,10 +221,10 @@ void LegoLoamVisualization::groundEdgeDetectionThread() {
   }
 
   //@ generate ground kdtree for edge to search
-  pcl::VoxelGrid<PointType> ds_patched_ground;
-  ds_patched_ground.setLeafSize(0.1, 0.5, 0.1); //we are in camera frame, z pointing to moving direction, y pointing to sky 
-  ds_patched_ground.setInputCloud(patched_ground);
-  ds_patched_ground.filter(*patched_ground);
+
+  ds_patched_ground_omp_.setInputCloud(patched_ground);
+  ds_patched_ground_omp_.setFinalFilter(true);
+  ds_patched_ground_omp_.filter(*patched_ground);
   pcl::KdTreeFLANN<PointType> kdtree_ground;
   kdtree_ground.setInputCloud(patched_ground);
   
@@ -307,8 +313,11 @@ void LegoLoamVisualization::groundEdgeDetectionThread() {
   //@ transform to map frame --> z pointing to sky
   pcl::transformPointCloud(*globalGroundEdgeKeyFrames, *globalGroundEdgeKeyFrames, trans_m2ci_af3_);
   //RCLCPP_INFO(this->get_logger(),"%lu, %lu", ground_edge_processed_.size(), globalGroundEdgeKeyFrames->points.size());
-  downSizeFilterGlobalGroundKeyFrames_Copy.setInputCloud(globalGroundEdgeKeyFrames);
-  downSizeFilterGlobalGroundKeyFrames_Copy.filter(*globalGroundEdgeKeyFrames);
+  //downSizeFilterGlobalGroundKeyFrames_Copy.setInputCloud(globalGroundEdgeKeyFrames);
+  //downSizeFilterGlobalGroundKeyFrames_Copy.filter(*globalGroundEdgeKeyFrames);
+  downSizeFilterGlobalGroundKeyFrames_Copy_omp.setInputCloud(globalGroundEdgeKeyFrames);
+  downSizeFilterGlobalGroundKeyFrames_Copy_omp.setFinalFilter(true);
+  downSizeFilterGlobalGroundKeyFrames_Copy_omp.filter(*globalGroundEdgeKeyFrames);
   sensor_msgs::msg::PointCloud2 cloud_msg_ground_edge;
   pcl::toROSMsg(*globalGroundEdgeKeyFrames, cloud_msg_ground_edge);
   cloud_msg_ground_edge.header.stamp = clock_->now();

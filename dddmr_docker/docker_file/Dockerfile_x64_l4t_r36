@@ -25,10 +25,21 @@ RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o 
 
 RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
-RUN apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y git openssl
 
 RUN apt install -y ros-humble-desktop
 # --- Humble has been installed
+
+#upgrade cmake
+RUN bash -c "cd /tmp && wget https://cmake.org/files/v3.25/cmake-3.25.3.tar.gz --no-check-certificate &&\
+    tar -zxvf cmake-3.25.3.tar.gz &&\
+    cd cmake-3.25.3 &&\
+    ./bootstrap --prefix=/usr -- -DCMAKE_USE_OPENSSL=ON &&\
+    make install -j9"
+
+#upgrade gcc to 13
+RUN add-apt-repository ppa:ubuntu-toolchain-r/test 
+RUN apt update && apt install -y gcc-13 g++-13 && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 --slave /usr/bin/g++ g++ /usr/bin/g++-13
 
 #install some tool
 RUN apt install -y nano openssh-server usbutils
@@ -172,7 +183,7 @@ RUN cmake -D CMAKE_BUILD_TYPE=RELEASE \
 RUN python3 -m pip install https://developer.download.nvidia.com/compute/redist/jp/v61/tensorflow/tensorflow-2.16.1+nv24.08-cp310-cp310-linux_aarch64.whl
 
 # rs
-RUN /bin/bash -c "cd /tmp && git clone https://github.com/IntelRealSense/librealsense.git && cd librealsense && git checkout e1688cc318457f7dd57abcdbedd3398062db3009"
+RUN /bin/bash -c "cd /tmp && git clone https://github.com/IntelRealSense/librealsense.git && cd librealsense && git checkout 05e3d1e57f3c87e6c9768eaca9e89639966beee2"
 COPY bash/libuvc_installation.bash /tmp/librealsense/scripts
 RUN /bin/bash -c "cd /tmp/librealsense && chmod +x /tmp/librealsense/scripts/libuvc_installation.bash && ./scripts/libuvc_installation.bash"
 #ARG LIBRS_VERSION=2.56.1
@@ -188,11 +199,19 @@ RUN /bin/bash -c "cd /tmp/librealsense && chmod +x /tmp/librealsense/scripts/lib
 
 # rs ros
 RUN apt install -y sudo ros-humble-diagnostic-updater
-WORKDIR /usr/local/src/realsense_ros/src 
-RUN git clone https://github.com/IntelRealSense/realsense-ros.git && cd realsense-ros && git checkout 1cbd81be81e807eefb46f098e76381888ffc7001\
+WORKDIR /usr/local/src/realsense_ros/src
+#solving got an unexpected keyword argument 'strip_trailing_zero'
+RUN pip3 install "setuptools<71.0.0" 
+RUN git clone https://github.com/IntelRealSense/realsense-ros.git && cd realsense-ros && git checkout 6d87b071dcfef15f2a0407e1e78945256add70d0\
     && cd ../..\
     && /bin/bash -c ". /opt/ros/humble/setup.bash && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release --merge-install --install-base /opt/ros/humble/install"\
     && rm -rf src
+
+#install ackermann msg to support ackermann drive
+RUN apt install -y ros-humble-ackermann-msgs
+
+RUN echo "function ws_build(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release\n}" >> ~/.bashrc
+RUN echo "function ws_build_trt(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON\n}" >> ~/.bashrc
 
 WORKDIR /root
 

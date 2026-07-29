@@ -9,6 +9,10 @@
 #include <eigen3/Eigen/Core>
 #include <pcl/common/transforms.h>
 #include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/filters/filter.h>
+
+// Required OpenMP header
+#include <omp.h> 
 
 class OptimizedICPGN {
 public:

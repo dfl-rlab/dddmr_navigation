@@ -89,7 +89,7 @@ public:
   double odom_err_ang_ang_;
   double euc_cluster_distance_;
   int euc_cluster_min_size_;
-  int map_update_interval_sec_;
+
   std::chrono::seconds map_update_interval_;
   int num_particles_;
   double match_output_dist_;

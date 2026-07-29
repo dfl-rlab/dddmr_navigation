@@ -74,7 +74,7 @@ class TrajectoryGeneratorSharedData{
     ackermann_msgs::msg::AckermannDriveStamped ackermann_drive_state_;
     nav_msgs::msg::Path prune_plan_;
     double current_allowed_max_linear_speed_;
-    geometry_msgs::msg::TwistStamped ref_twist_for_generate_trajectory_;
+    geometry_msgs::msg::TwistStamped ref_twist_for_trajectory_generation_;
     
     std::string global_frame_, base_frame_;
 

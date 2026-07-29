@@ -135,8 +135,8 @@ void StaticLayer::onInitialize()
 void StaticLayer::ptrInitial(){
   pcl_map_.reset(new pcl::PointCloud<pcl::PointXYZI>);
   pcl_ground_.reset(new pcl::PointCloud<pcl::PointXYZI>);
-  shared_data_->kdtree_map_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
-  shared_data_->kdtree_ground_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
+  shared_data_->kdtree_map_.reset(new pcl::search::KdTree<pcl::PointXYZI>());
+  shared_data_->kdtree_ground_.reset(new pcl::search::KdTree<pcl::PointXYZI>());
   sensor_current_observation_.reset(new pcl::PointCloud<pcl::PointXYZI>);
   shared_data_->sGraph_ptr_ = std::make_shared<perception_3d::StaticGraph>();
   new_map_ = new_ground_ = is_local_planner_ = false;
@@ -158,7 +158,7 @@ void StaticLayer::cbMap(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     RCLCPP_WARN(node_->get_logger().get_child(name_), "%s receive new \033[1;32mMap\033[0m with size: %lu", name_.c_str(), pcl_map_->points.size());
   }
   shared_data_->static_map_size_ = pcl_map_->points.size();
-  shared_data_->kdtree_map_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
+  shared_data_->kdtree_map_.reset(new pcl::search::KdTree<pcl::PointXYZI>());
   shared_data_->kdtree_map_->setInputCloud(pcl_map_);
   shared_data_->pcl_map_ = pcl_map_;
 }
@@ -178,7 +178,7 @@ void StaticLayer::cbGround(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     RCLCPP_WARN(node_->get_logger().get_child(name_), "%s receive new \033[1;32mGround\033[0m with size: %lu", name_.c_str(), pcl_ground_->points.size());
   }  
   shared_data_->static_ground_size_ = pcl_ground_->points.size();
-  shared_data_->kdtree_ground_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
+  shared_data_->kdtree_ground_.reset(new pcl::search::KdTree<pcl::PointXYZI>());
   shared_data_->kdtree_ground_->setInputCloud(pcl_ground_);
   shared_data_->pcl_ground_ = pcl_ground_;
  
@@ -220,14 +220,19 @@ void StaticLayer::selfClear(){
 
     //@ radius search connection to generate sGraph
     resetdGraph();
-    if(!is_local_planner_ && !mapping_mode_ && enable_edge_detection_)
-      radiusSearchConnection();
-
-    if(!is_local_planner_ && generate_static_graph_){
-      generateStaticGraph();
-      RCLCPP_INFO(node_->get_logger().get_child(name_), "Static graph is generated with graph size: %lu", shared_data_->sGraph_ptr_->getSize());
+    if(!is_local_planner_){
+      //@ it is static layer of a global planner
+      shared_data_->sGraph_ptr_->allocateGraph(pcl_ground_->points.size());
+      if(!mapping_mode_ && enable_edge_detection_){
+        radiusSearchConnection();
+        RCLCPP_INFO(node_->get_logger().get_child(name_), "Computation of Edge from ground point cloud is done.");
+      }
+      if(generate_static_graph_){
+        generateStaticGraph();
+        RCLCPP_INFO(node_->get_logger().get_child(name_), "Static graph is generated with graph size: %lu", shared_data_->sGraph_ptr_->getSize());
+      }
     }
-      
+
     shared_data_->is_static_layer_ready_ = true;
     is_ground_and_map_being_initialized_once_ = true;
   }
@@ -239,10 +244,11 @@ void StaticLayer::selfClear(){
 }
 
 void StaticLayer::generateStaticGraph(){
-  unsigned int index_cnt = 0;
-  for(auto it = pcl_ground_->points.begin();it!=pcl_ground_->points.end();it++){
-    pcl::PointXYZI pcl_node;
-    pcl_node = (*it);
+  
+  #pragma omp parallel for
+  for(unsigned int index_cnt = 0; index_cnt<pcl_ground_->points.size(); index_cnt++){
+
+    pcl::PointXYZI pcl_node = pcl_ground_->points[index_cnt];
 
     //@Kd-tree to find nn point for planar equation
     std::vector<int> pointIdxRadiusSearch;
@@ -276,7 +282,7 @@ void StaticLayer::generateStaticGraph(){
       //@Create an edge
       double distance_between_pair = sqrt(pcl::geometry::squaredDistance(pcl_ground_->points[node], pcl_ground_->points[a_edge.first]));
       a_edge.second = distance_between_pair;
-      shared_data_->sGraph_ptr_->insertNode(node, a_edge);
+      shared_data_->sGraph_ptr_->insertEdgeInNode(node, a_edge);
 
     }
 
@@ -288,24 +294,29 @@ void StaticLayer::generateStaticGraph(){
       if(distance_to_obstacle < gbl_utils_->getInscribedRadius())
         dGraph_.setValue(index_cnt, distance_to_obstacle);
     }
-    index_cnt++;
   }
 }
-void StaticLayer::radiusSearchConnection(){
-  unsigned int index_cnt = 0;
-  for(auto it = pcl_ground_->points.begin();it!=pcl_ground_->points.end();it++){
 
-    pcl::PointXYZI pcl_node;
-    pcl_node = (*it);
+void StaticLayer::radiusSearchConnection(){
+  
+  // 1. Determine total loop size
+  const unsigned int total_points = pcl_ground_->points.size();
+
+  // 2. OpenMP Parallel For Loop
+  // We specify that 'index_cnt' is the loop variable (implicitly private)
+  #pragma omp parallel for
+  for(unsigned int index_cnt = 0; index_cnt < total_points; index_cnt++){
+    
+    pcl::PointXYZI pcl_node = pcl_ground_->points[index_cnt];
 
     //@Kd-tree to find nn point for planar equation
     std::vector<int> pointIdxRadiusSearch;
     std::vector<float> pointRadiusSquaredDistance;
     if(!use_adaptive_connection_){
+      // kdtree radiusSearch is thread-safe for concurrent reads
       shared_data_->kdtree_ground_->radiusSearch (pcl_node, radius_of_ground_connection_, pointIdxRadiusSearch, pointRadiusSquaredDistance);
     }
     else{
-
       int hard_interrupt_cnt = 100;
       float search_r = 0.5;
       int search_cnt = 1;
@@ -322,47 +333,29 @@ void StaticLayer::radiusSearchConnection(){
       }
     }
     
+    // Allocating objects inside the loop ensures they are thread-local (private)
     pcl::PointCloud<pcl::PointXYZI>::Ptr nn_pc (new pcl::PointCloud<pcl::PointXYZI>);
     for(auto it = pointIdxRadiusSearch.begin(); it!=pointIdxRadiusSearch.end();it++){
-      
-      //chekc relative z value for the edge, because we need to eliminate stair and wheel chair passage issue
-      /*
-      edge_t a_edge;
-      auto node = index_cnt;
-      a_edge.first = (*it);
-      double z_diff = fabs(pcl_ground_->points[node].z - pcl_ground_->points[a_edge.first].z);
-      double distance_between_pair = sqrt(pcl::geometry::squaredDistance(pcl_ground_->points[node], pcl_ground_->points[a_edge.first]));
-      float vertical_angle = std::asin(z_diff / distance_between_pair);
-      if(vertical_angle >=0.349){ //@ 20 degree
-        RCLCPP_DEBUG(node_->get_logger().get_child(name_), "Connection between %u and %u is %.2f",node, a_edge.first, z_diff);
-        continue;
-      }
-      //@Create an edge
-      a_edge.second = distance_between_pair;
-      shared_data_->sGraph_ptr_->insertNode(node, a_edge);
-      */
-      //@Push bach the points for plane equation later
+      //@Push back the points for plane equation later
       nn_pc->push_back(pcl_ground_->points[(*it)]);
     }
 
     float weight = 1.0;
-    float intensity_weight = 1.0;
-    float max_radius = intensity_search_radius_; //this value is suggested to be 1.0 meters, because if it is too large, the narrow passage will be miscalculated
-
+    float intensity_penality = 0.0;
+    float max_radius = intensity_search_radius_; 
+    int reject_threshold = 0;
     //@ consider this scenario to be boundary of ground
     if(nn_pc->points.size()<5){
-      //This node is orphan, set high weight to it
       weight = 1000;
     }
     else{
       //@Use RANSAC to get normal
       pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
       pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
-      // Create the segmentation object
+      
+      // Creating the segmentation object locally per thread
       pcl::SACSegmentation<pcl::PointXYZI> seg;
-      // Optional
       seg.setOptimizeCoefficients (true);
-      // Mandatory
       seg.setModelType (pcl::SACMODEL_PLANE);
       seg.setMethodType (pcl::SAC_RANSAC);
       seg.setDistanceThreshold (0.05); 
@@ -370,10 +363,6 @@ void StaticLayer::radiusSearchConnection(){
       seg.setInputCloud (nn_pc);
       seg.segment (*inliers, *coefficients);
       
-      //@We get planar equation (coefficients), we now calculate z by iterate x,y value
-      //@We use polar coordinate to generate points (i.e.: iterate theta with given radius)
-      //@We search multiple rings
-      int reject_threshold = 0;
       for(float ring_radius=max_radius; ring_radius>0; ring_radius-=0.25){
         for(float d_theta=-3.1415926; d_theta<=3.1415926; d_theta+=0.174){ //per 10 deg
           pcl::PointXYZI pcl_ring;
@@ -382,19 +371,17 @@ void StaticLayer::radiusSearchConnection(){
           pcl_ring.z = (-coefficients->values[3]-coefficients->values[0]*pcl_ring.x-coefficients->values[1]*pcl_ring.y)/coefficients->values[2];
           if(isinf(pcl_ring.z)){
             pcl_ring.z = 0.0;
-            //RCLCPP_INFO(this->get_logger().get_child(name_), "%.2f,%.2f,%.2f", pcl_ring.x, pcl_ring.y, pcl_ring.z);
           }
           if(std::isnan(pcl_ring.z))
             continue;
-          //@Search around the ring
+          
           std::vector<int> pointIdxRadiusSearch_ring;
           std::vector<float> pointRadiusSquaredDistance_ring;
-          if(shared_data_->kdtree_ground_->radiusSearch (pcl_ring, 0.3, pointIdxRadiusSearch_ring, pointRadiusSquaredDistance_ring)<1) //0.3 is related to resolution, looks good for 0.5 m voxel
+          if(shared_data_->kdtree_ground_->radiusSearch (pcl_ring, 0.3, pointIdxRadiusSearch_ring, pointRadiusSquaredDistance_ring)<1) 
             reject_threshold++;
         }
       }
-      intensity_weight += reject_threshold*intensity_search_punish_weight_;
-      
+      intensity_penality += reject_threshold*intensity_search_punish_weight_;
       
       //@ use map to impose weight on each node
       pointIdxRadiusSearch.clear();
@@ -405,6 +392,7 @@ void StaticLayer::radiusSearchConnection(){
         pcl_z_axes->push_back(pcl_map_->points[*i_pcl_z_axes]);
       }
 
+      // Local Filter instantiation
       pcl::PassThrough<pcl::PointXYZI> pass;
       pass.setInputCloud (pcl_z_axes);
       pass.setFilterFieldName ("z");
@@ -418,12 +406,12 @@ void StaticLayer::radiusSearchConnection(){
       pass.setFilterFieldName ("y");
       pass.setFilterLimits (pcl_node.y-0.5, pcl_node.y+0.5);
       pass.filter (*pcl_z_axes);
+      
       if(pcl_z_axes->points.size()>10){
         dGraph_.setValue(index_cnt, 0.25);
       }  
     }
-    shared_data_->sGraph_ptr_->insertWeight(index_cnt, intensity_weight);//make the value of weight to 1 for non-weighted A*
-    index_cnt++;
+    shared_data_->sGraph_ptr_->setPenality(index_cnt, intensity_penality);
   }
   RCLCPP_DEBUG(node_->get_logger().get_child(name_), "Static graph has been generated.");
 }

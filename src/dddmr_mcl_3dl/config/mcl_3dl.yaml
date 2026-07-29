@@ -1,9 +1,18 @@
+dddmr_pg_map_server_manager:
+  ros__parameters:
+    maps: ["map1"]
+
+map1:
+  ros__parameters:
+    pose_graph_dir: "/root/dddmr_bags/benanli_detention_basin_pg"
+    complete_map_voxel_size: 0.3
+
 sub_maps:
   ros__parameters:
-    pose_graph_dir: "/root/dddmr/src/dddmr_mcl_3dl/map"
+    pg_map_server_name: "map1" #options from line#3
     sub_map_search_radius: 50.0
     sub_map_warmup_trigger_distance: 20.0
-    complete_map_voxel_size: 0.25
+
 mcl_3dl:
   ros__parameters:
     init_x: 0.0
@@ -11,7 +20,7 @@ mcl_3dl:
     init_z: 0.0
     init_roll: 0.0
     init_pitch: 0.0
-    init_yaw: 1.57
+    init_yaw: 0.0
     init_var_x: 2.0
     init_var_y: 2.0
     init_var_z: 0.5
@@ -24,7 +33,6 @@ mcl_3dl:
     map_downsample_x: 0.1
     map_downsample_y: 0.1
     map_downsample_z: 0.1
-    map_update_interval_sec: 2 #int
     num_particles: 60
 
     resample_var_x: 0.2
@@ -43,6 +51,7 @@ mcl_3dl:
 
     euc_cluster_distance: 0.8
     euc_cluster_min_size: 3
+    euc_cluster_max_size: 2400
 
     knn_num_of_ground_normals: 20
 

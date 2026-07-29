@@ -82,8 +82,8 @@ void GlobalPlanner::initial(const std::shared_ptr<perception_3d::Perception3D_RO
   
   pcl_map_.reset(new pcl::PointCloud<pcl::PointXYZI>);
   pcl_ground_.reset(new pcl::PointCloud<pcl::PointXYZI>);
-  kdtree_map_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>);
-  kdtree_ground_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>);
+  kdtree_map_.reset(new pcl::search::KdTree<pcl::PointXYZI>);
+  kdtree_ground_.reset(new pcl::search::KdTree<pcl::PointXYZI>);
   
   declare_parameter("turning_weight", rclcpp::ParameterValue(0.1));
   this->get_parameter("turning_weight", turning_weight_);
@@ -101,6 +101,11 @@ void GlobalPlanner::initial(const std::shared_ptr<perception_3d::Perception3D_RO
   this->get_parameter("use_pre_graph", use_pre_graph_);
   RCLCPP_INFO(this->get_logger(), "use_pre_graph: %d", use_pre_graph_);    
 
+  declare_parameter("find_start_tolerance", rclcpp::ParameterValue(0.5));
+  this->get_parameter("find_start_tolerance", find_start_tolerance_);
+  RCLCPP_INFO(this->get_logger(), "find_start_tolerance: %.2f", find_start_tolerance_);    
+
+  
 
   tf_listener_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   action_server_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -450,7 +455,7 @@ bool GlobalPlanner::getStartGoalID(const geometry_msgs::msg::PoseStamped& start,
   pcl_start.y = start.pose.position.y;
   pcl_start.z = start.pose.position.z;
 
-  if(kdtree_ground_->radiusSearch (pcl_start, 0.5, pointIdxRadiusSearch_start, pointRadiusSquaredDistance_start)<1){
+  if(kdtree_ground_->radiusSearch (pcl_start, find_start_tolerance_, pointIdxRadiusSearch_start, pointRadiusSquaredDistance_start)<1){
     RCLCPP_WARN(this->get_logger(), "Start is not found.");
     return false;
   }

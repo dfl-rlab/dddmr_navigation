@@ -58,6 +58,8 @@ bool MCL3dlNode::configure(const std::shared_ptr<mcl_3dl::SubMaps>& sub_maps)
 {
   sub_maps_ = sub_maps;
   params_ = std::make_shared<Parameters>(this->get_node_logging_interface(), this->get_node_parameters_interface());
+  sub_maps_->knn_num_of_ground_normals_ = params_->knn_num_of_ground_normals_;
+  
   lidar_measurements_ = std::make_shared<LidarMeasurementModelLikelihood>();
   lidar_measurements_->loadConfig(this->get_node_logging_interface(), this->get_node_parameters_interface());
 
@@ -151,9 +153,9 @@ void MCL3dlNode::cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg){
                 msg->pose.pose.orientation.y,
                 msg->pose.pose.orientation.z,
                 msg->pose.pose.orientation.w));
-  
+
+  odom_header_ = msg->header;
   odom_trans_.header = msg->header;
-  odom_trans_.header.stamp = clock_->now(); //@force to do it,because odom is fast, should be fine
   odom_trans_.child_frame_id = msg->child_frame_id;
   odom_trans_.transform.translation.x = msg->pose.pose.position.x;
   odom_trans_.transform.translation.y = msg->pose.pose.position.y;
@@ -162,6 +164,10 @@ void MCL3dlNode::cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg){
   odom_trans_.transform.rotation.y = msg->pose.pose.orientation.y;
   odom_trans_.transform.rotation.z = msg->pose.pose.orientation.z;
   odom_trans_.transform.rotation.w = msg->pose.pose.orientation.w;
+  if(odom_header_.stamp.sec==0 && odom_header_.stamp.nanosec == 0){
+    odom_trans_.header.stamp = clock_->now();
+    RCLCPP_WARN_THROTTLE(this->get_logger(), *clock_, 3000, "Odometry msg.header.timestamp = 0, use clock.now() as the timestamp");
+  }
   tfb_->sendTransform(odom_trans_);
 
   if (!has_odom_)
@@ -266,6 +272,8 @@ void MCL3dlNode::cbLeGoFeatureCloud(const sensor_msgs::msg::PointCloud2::SharedP
                     const sensor_msgs::msg::PointCloud2::SharedPtr pc_less_flatMsg){
   
   std::unique_lock<std::mutex> lock(protect_measure_in_odomcb_);
+  
+  laser_header_ = pc_less_sharpMsg->header;
 
   if(!sub_maps_->isCurrentReady())
     return;
@@ -294,8 +302,10 @@ void MCL3dlNode::cbLeGoFeatureCloud(const sensor_msgs::msg::PointCloud2::SharedP
   //pcl::transformPointCloud(*pc_sharp, *pc_sharp, trans_b2s_af3);
   pcl::transformPointCloud(*pc_less_sharp, *pc_less_sharp, trans_b2s_af3);
   pcl::transformPointCloud(*pc_flat, *pc_flat, trans_b2s_af3);
-  //pcl::transformPointCloud(*pc_less_flat, *pc_less_flat, trans_b2s_af3);
+  pcl::transformPointCloud(*pc_less_flat, *pc_less_flat, trans_b2s_af3);
   
+  //*pc_less_sharp+=*pc_less_flat;
+
   pc_less_sharp->header.frame_id = params_->frame_ids_["base_link"];
 
   RCLCPP_DEBUG(this->get_logger(), "Size pc_sharp: %lu, pc_less_sharp: %lu, pc_flat: %lu, pc_less_flat: %lu", 
@@ -468,7 +478,11 @@ void MCL3dlNode::measure(std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::
 
   if(!sub_maps_->isCurrentReady())
     return;
-  
+
+  if(sub_maps_->isWarmUpReady()){
+    sub_maps_->swapKdTree();
+  }
+
   const auto ts = std::chrono::high_resolution_clock::now();
   lidar_measurements_->setGlobalLocalizationStatus(
       params_->num_particles_, pf_->getParticleSize());
@@ -478,30 +492,21 @@ void MCL3dlNode::measure(std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::
   auto measure_func = [this, &pcl_segmentations,
                         &match_ratio_min, &match_ratio_max](const State6DOF& s) -> float
   {
-    float likelihood = 1;
     float qualities;
-
-    //const LidarMeasurementResult result = lidar_measurements_->measure(
-    //    kdtree_map_, kdtree_ground_, normals_ground_, pcl_segmentations, s);
-    
-    if(sub_maps_->isWarmUpReady()){
-      sub_maps_->swapKdTree();
-    }
     const LidarMeasurementResult result = lidar_measurements_->measure(
         sub_maps_->kdtree_map_current_, sub_maps_->kdtree_ground_current_, sub_maps_->normals_ground_current_, pcl_segmentations, s);
 
-    likelihood *= result.likelihood;
     qualities = result.quality;
     if (match_ratio_min > qualities)
       match_ratio_min = qualities;
     if (match_ratio_max < qualities)
       match_ratio_max = qualities;
-
-    return likelihood;
+    return result.likelihood;
   };
+
   //@ pf_->measure(measure_func) will loop particles
   pf_->measure(measure_func);
-  
+
   //@ This block first calculate the weight (p.probability_bias_) based on the particle state
   //@ It means that the particle away from last pose has less weight
   //@ This weight is different from the weight of likelihood
@@ -578,7 +583,7 @@ void MCL3dlNode::measure(std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::
   }
 
   
-  map2odom_trans_.header.stamp = clock_->now();
+  map2odom_trans_.header.stamp = laser_header_.stamp;
   map2odom_trans_.header.frame_id = params_->frame_ids_["map"];
   map2odom_trans_.child_frame_id = params_->frame_ids_["odom"];
   const auto rpy = map_rot.getRPY();
@@ -683,7 +688,7 @@ void MCL3dlNode::measure(std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::
 void MCL3dlNode::publishParticles()
 {
   geometry_msgs::msg::PoseArray pa;
-  pa.header.stamp = clock_->now();
+  pa.header.stamp = odom_header_.stamp;
   pa.header.frame_id = params_->frame_ids_["map"];
   for (size_t i = 0; i < pf_->getParticleSize(); i++)
   {
@@ -705,7 +710,11 @@ void MCL3dlNode::publishParticles()
 void MCL3dlNode::publishTFThread()
 {
   if (tf_ready_ && params_->publish_tf_){
-    map2odom_trans_.header.stamp = clock_->now();
+    if(laser_header_.stamp.sec==0 && laser_header_.stamp.nanosec == 0){
+      laser_header_.stamp = odom_header_.stamp;
+      RCLCPP_WARN_THROTTLE(this->get_logger(), *clock_, 3000, "Laser msg.header.timestamp = 0, use odom stamp as the timestamp");
+    }
+    map2odom_trans_.header.stamp = laser_header_.stamp;
     tfb_->sendTransform(map2odom_trans_);
     first_tf_ = true;
   }

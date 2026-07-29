@@ -1,8 +1,15 @@
 <launch>
 
+  <node pkg="dddmr_pg_map_server" exec="dddmr_pg_map_server_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share mcl_3dl)/config/mcl_3dl.yaml" />
+  </node>
+
   <!--name argument is not required, because it will overwrite all node name in the exec-->
   <node pkg="mcl_3dl" exec="mcl_3dl" output="screen" respawn="false">
     <param from="$(find-pkg-share mcl_3dl)/config/mcl_3dl.yaml" />
   </node>
+
+  <let name="rviz_config" value="$(find-pkg-share mcl_3dl)/rviz/mcl_3dl_demo.rviz"/>
+  <node name="rviz2" pkg="rviz2" exec="rviz2" args="-d $(var rviz_config)"/>
 
 </launch>

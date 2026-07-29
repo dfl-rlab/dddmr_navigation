@@ -123,6 +123,7 @@ OptICPGNPlayground::OptICPGNPlayground():Node("optimized_icp_gn_playground"){
   T_predict = af3_answer.matrix().inverse();
   
   // RCLCPP_INFO_STREAM(this->get_logger(), "Relative: \n" << T_predict2);  
+  rclcpp::Time start = clock_->now();
 
   OptimizedICPGN icp_opti;
   icp_opti.SetTargetCloud(key_frame_);
@@ -131,13 +132,14 @@ OptICPGNPlayground::OptICPGNPlayground():Node("optimized_icp_gn_playground"){
   icp_opti.SetMaxCorrespondDistance(10);
   icp_opti.Match(second_frame_, T_predict, cloud_source_opti_transformed_ptr, T_final);
   float icp_score = icp_opti.GetFitnessScore();
-  RCLCPP_INFO(this->get_logger(), "ICP score: %.2f", icp_score);
-
+  double t_taken = (clock_->now()-start).seconds();
+  RCLCPP_INFO(this->get_logger(), "Time taken: %.8f, ICP score: %.2f", t_taken, icp_score);
+  
   float x, y, z, roll, pitch, yaw;
   Eigen::Affine3f relative_rt;
   relative_rt = T_final;
   pcl::getTranslationAndEulerAngles(relative_rt, x, y, z, roll, pitch, yaw);
-  RCLCPP_INFO(this->get_logger(), "RT ---> XYZ: %.2f, %.2f, %.2f, RPY: %.2f, %.2f, %.2f", x, y, z, roll, pitch, yaw);
+  RCLCPP_INFO(this->get_logger(), "RT ---> XYZ: %.5f, %.5f, %.5f, RPY: %.5f, %.5f, %.5f", x, y, z, roll, pitch, yaw);
 
   key_2_second_af3_ = T_final;//icp.getFinalTransformation();
   key_2_second_af3d_ = key_2_second_af3_.cast<double>();

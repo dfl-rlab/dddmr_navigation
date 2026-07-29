@@ -8,6 +8,9 @@
     <param name="use_sim_time" value="$(var use_sim)"/>
   </node>
 
+  <node pkg="dddmr_pg_map_server" exec="dddmr_pg_map_server_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share p2p_move_base)/config/go2_localization.yaml" />
+  </node>
 
   <node pkg="mcl_3dl" exec="mcl_3dl" output="screen" respawn="false">
     <param from="$(find-pkg-share p2p_move_base)/config/go2_localization.yaml" />

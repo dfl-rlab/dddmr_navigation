@@ -30,6 +30,7 @@ find_package(image_geometry REQUIRED)
 
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(OpenMP REQUIRED)
 
 set(dependencies
   rclcpp
@@ -56,6 +57,7 @@ set(dependencies
 include_directories(
   include
   ${PCL_INCLUDE_DIRS}
+  ${OpenMP_CXX_INCLUDE_DIRS}
 )
 
 # shared data
@@ -150,7 +152,10 @@ add_library(layers SHARED
   plugins/depth_camera/depth_camera_layer.cpp
 )
 target_link_libraries(layers
-  cluster_marking depth_camera_buffer stacked_perception_ros
+  cluster_marking 
+  depth_camera_buffer 
+  stacked_perception_ros
+  OpenMP::OpenMP_CXX
 )
 ament_target_dependencies(layers
   ${dependencies}

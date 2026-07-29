@@ -45,7 +45,7 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
   _pub_projected_image = this->create_publisher<sensor_msgs::msg::Image>("projected_image", 1);
 
   _sub_laser_cloud = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-        "lslidar_point_cloud", 2,
+        "lslidar_point_cloud", rclcpp::QoS(rclcpp::KeepLast(1)).durability_volatile().best_effort(), 
         std::bind(&ImageProjection::cloudHandler, this, std::placeholders::_1));
 
   _pub_full_info_cloud = this->create_publisher<sensor_msgs::msg::PointCloud2>
@@ -110,9 +110,9 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
   this->get_parameter("laser.odom_type", odom_type_);
   RCLCPP_INFO(this->get_logger(), "laser.odom_type: %s", odom_type_.c_str());
   
-  declare_parameter("laser.baselink_frame", rclcpp::ParameterValue(""));
-  this->get_parameter("laser.baselink_frame", baselink_frame_);
-  RCLCPP_INFO(this->get_logger(), "laser.baselink_frame: %s", baselink_frame_.c_str());
+  declare_parameter("laser.base_ground_frame", rclcpp::ParameterValue("base_link"));
+  this->get_parameter("laser.base_ground_frame", base_ground_frame_);
+  RCLCPP_INFO(this->get_logger(), "laser.base_ground_frame: %s", base_ground_frame_.c_str());
   
   declare_parameter("imageProjection.maximum_detection_range", rclcpp::ParameterValue(0.0));
   this->get_parameter("imageProjection.maximum_detection_range", _maximum_detection_range);
@@ -196,6 +196,10 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
   this->get_parameter("imageProjection.ground_dz_tolerance", ground_dz_tolerance_);
   RCLCPP_INFO(this->get_logger(), "imageProjection.ground_dz_tolerance: %.6f", ground_dz_tolerance_);
 
+  declare_parameter("imageProjection.use_sensor_height_to_filter_out_ground", rclcpp::ParameterValue(false));
+  this->get_parameter("imageProjection.use_sensor_height_to_filter_out_ground", use_sensor_height_to_filter_out_ground_);
+  RCLCPP_INFO(this->get_logger(), "imageProjection.use_sensor_height_to_filter_out_ground: %d", use_sensor_height_to_filter_out_ground_);
+
   declare_parameter("imageProjection.patch_first_ring_to_baselink", rclcpp::ParameterValue(true));
   this->get_parameter("imageProjection.patch_first_ring_to_baselink", patch_first_ring_to_baselink_);
   RCLCPP_INFO(this->get_logger(), "imageProjection.patch_first_ring_to_baselink: %d", patch_first_ring_to_baselink_);
@@ -243,6 +247,15 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
   _full_info_cloud->points.resize(cloud_size);
   
   dsf_patched_ground_.setLeafSize(0.1, 0.1, 0.1);
+  
+  dsf_patched_ground_omp_.setNumberOfThreads(6);
+  dsf_patched_ground_omp_.setLeafSize (0.1, 0.1, 0.1);
+  dsf_patched_ground_omp_.setSaveLeafLayout(false);
+
+  dsf_patched_ground_edge_omp_.setNumberOfThreads(6);
+  dsf_patched_ground_edge_omp_.setLeafSize (0.1, 0.1, 0.1);
+  dsf_patched_ground_edge_omp_.setSaveLeafLayout(false);
+
   yolo_labelled_point_cloud_.reset(new pcl::PointCloud<PointType>());
 }
 
@@ -301,7 +314,7 @@ bool ImageProjection::allEssentialTFReady(std::string sensor_frame){
     try
     {
       trans_b2s_ = tf2Buffer_->lookupTransform(
-          baselink_frame_, sensor_frame_, tf2::TimePointZero);
+          base_ground_frame_, sensor_frame_, tf2::TimePointZero);
       
       tf2_trans_b2s_.setRotation(tf2::Quaternion(trans_b2s_.transform.rotation.x, trans_b2s_.transform.rotation.y, trans_b2s_.transform.rotation.z, trans_b2s_.transform.rotation.w));
       tf2_trans_b2s_.setOrigin(tf2::Vector3(trans_b2s_.transform.translation.x, trans_b2s_.transform.translation.y, trans_b2s_.transform.translation.z));
@@ -316,8 +329,10 @@ bool ImageProjection::allEssentialTFReady(std::string sensor_frame){
       tf2::Quaternion qm2ci;
       tf2::Matrix3x3 m(tf2_trans_b2s_.getRotation());
       double sensor_install_roll, sensor_install_yaw;
+      //@ When pitch is greater than 1.5707, getRPY will return roll factor due to shortest angle
       m.getRPY(sensor_install_roll, sensor_install_pitch_, sensor_install_yaw);
-      qm2ci.setRPY(1.570795 + sensor_install_pitch_, 0.0, 1.570795);
+      //RCLCPP_INFO(this->get_logger(), "%.2f, %.2f, %.2f", sensor_install_roll, sensor_install_pitch_, sensor_install_yaw);
+      qm2ci.setRPY(1.570795 + sensor_install_pitch_, sensor_install_roll, 1.570795);
       trans_m2ci_.transform.translation.x = 0.0; trans_m2ci_.transform.translation.y = 0.0; trans_m2ci_.transform.translation.z = 0.0;
       trans_m2ci_.transform.rotation.x = qm2ci.x(); trans_m2ci_.transform.rotation.y = qm2ci.y();
       trans_m2ci_.transform.rotation.z = qm2ci.z(); trans_m2ci_.transform.rotation.w = qm2ci.w();
@@ -813,6 +828,17 @@ void ImageProjection::zPitchRollFeatureRemoval() {
           continue;
         }
 
+        //@ filter by z from ground to sensor, this is only useful when in a flat environment.
+        if(use_sensor_height_to_filter_out_ground_){
+          if(trans_b2s_.transform.translation.z+lowerInd_left_pt_no_pitch.z>0.1 || 
+            trans_b2s_.transform.translation.z+lowerInd_right_pt_no_pitch.z>0.1 || 
+            trans_b2s_.transform.translation.z+lowerInd_pt_no_pitch.z>0.1 ){
+            do_patch = false;
+            continue;
+          }
+        }
+
+
         if(i<closest_ring_edge) //we dont casting the last one
           closest_ring_edge = i;
 
@@ -898,11 +924,17 @@ void ImageProjection::zPitchRollFeatureRemoval() {
   pcl::removeNaNFromPointCloud(*patched_ground_, *patched_ground_, tmp_indices);
   pcl::removeNaNFromPointCloud(*patched_ground_edge_, *patched_ground_edge_, tmp_indices2);
   
-  dsf_patched_ground_.setInputCloud(patched_ground_);
-  dsf_patched_ground_.filter(*patched_ground_);
-  dsf_patched_ground_.setInputCloud(patched_ground_edge_);
-  dsf_patched_ground_.filter(*patched_ground_edge_); 
+  //dsf_patched_ground_.setInputCloud(patched_ground_);
+  //dsf_patched_ground_.filter(*patched_ground_);
+  dsf_patched_ground_omp_.setInputCloud(patched_ground_);
+  dsf_patched_ground_omp_.setFinalFilter(true);
+  dsf_patched_ground_omp_.filter(*patched_ground_);
 
+  //dsf_patched_ground_.setInputCloud(patched_ground_edge_);
+  //dsf_patched_ground_.filter(*patched_ground_edge_); 
+  dsf_patched_ground_edge_omp_.setInputCloud(patched_ground_edge_);
+  dsf_patched_ground_edge_omp_.setFinalFilter(true);
+  dsf_patched_ground_edge_omp_.filter(*patched_ground_edge_); 
 }
 
 void ImageProjection::cloudSegmentation() {
@@ -1062,7 +1094,7 @@ void ImageProjection::publishClouds() {
     if (true) {
       pcl::toROSMsg(*cloud, laserCloudTemp);
       laserCloudTemp.header = cloudHeader;
-      laserCloudTemp.header.stamp = clock_->now();
+      laserCloudTemp.header.stamp = _seg_msg.header.stamp;
       pub->publish(laserCloudTemp);
     }
   };

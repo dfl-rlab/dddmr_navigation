@@ -59,8 +59,8 @@ class SharedData{
     pcl::PointCloud<pcl::PointXYZI> pcl_prune_plan_;
 
     //@ Variable that loaded in static layer for other layer to use
-    pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_map_;
-    pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_ground_;
+    pcl::search::KdTree<pcl::PointXYZI>::Ptr kdtree_map_; //thread safe kdtree
+    pcl::search::KdTree<pcl::PointXYZI>::Ptr kdtree_ground_; //thread safe kdtree
     pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_ground_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_map_;
     bool is_static_layer_ready_;

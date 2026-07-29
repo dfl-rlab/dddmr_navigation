@@ -36,6 +36,8 @@ find_package(cv_bridge REQUIRED)
 find_package(image_geometry REQUIRED)
 find_package(dddmr_trt REQUIRED)
 find_package(dddmr_sys_core REQUIRED)
+find_package(dddmr_pcl REQUIRED)
+find_package(OpenMP REQUIRED)
 
 set(dependencies
   rclcpp
@@ -84,6 +86,8 @@ if(TRT_ENABLED)
     ${OpenCV_INCLUDE_DIRS}
     ${dddmr_trt_INCLUDE_DIRS}
     ${dddmr_sys_core_INCLUDE_DIRS}
+    ${dddmr_pcl_INCLUDE_DIRS}
+    ${OpenMP_CXX_INCLUDE_DIRS}
   )
 else()
     message(STATUS "TensorRT is disabled.")
@@ -93,10 +97,10 @@ else()
       ${GTSAM_INCLUDE_DIRS}
       ${OpenCV_INCLUDE_DIRS}
       ${dddmr_sys_core_INCLUDE_DIRS}
+      ${dddmr_pcl_INCLUDE_DIRS}
+      ${OpenMP_CXX_INCLUDE_DIRS}
     )
 endif()
-
-
 
 # opt_icp_gn
 add_library(opt_icp_gn SHARED
@@ -104,6 +108,7 @@ add_library(opt_icp_gn SHARED
 )
 target_link_libraries(opt_icp_gn
   ${PCL_LIBRARIES}
+  OpenMP::OpenMP_CXX
 )
 ament_target_dependencies(opt_icp_gn
   ${dependencies}
@@ -121,6 +126,7 @@ if(TRT_ENABLED)
     ${OpenCV_LIBRARIES}
     ${dddmr_trt_LIBRARIES}
     CUDA::cudart
+    ${dddmr_pcl_LIBRARIES}
   )
   target_include_directories(image_projection 
     PRIVATE ${CUDAToolkit_INCLUDE_DIRS}
@@ -136,6 +142,7 @@ else()
   target_link_libraries(image_projection
     ${PCL_LIBRARIES}
     ${OpenCV_LIBRARIES}
+    ${dddmr_pcl_LIBRARIES}
   )
   ament_target_dependencies(image_projection
     ${dependencies}
@@ -148,6 +155,7 @@ add_library(feature_association SHARED
 )
 target_link_libraries(feature_association
   ${PCL_LIBRARIES}
+  ${dddmr_pcl_LIBRARIES}
 )
 ament_target_dependencies(feature_association
   ${dependencies}
@@ -161,6 +169,7 @@ target_link_libraries(map_optimization
   ${PCL_LIBRARIES}
   ${GTSAM_LIBRARIES}
   opt_icp_gn
+  ${dddmr_pcl_LIBRARIES}
 )
 ament_target_dependencies(map_optimization
   ${dependencies}
@@ -172,6 +181,7 @@ add_library(lego_loam_map_visualization SHARED
 )
 target_link_libraries(lego_loam_map_visualization
   ${PCL_LIBRARIES}
+  ${dddmr_pcl_LIBRARIES}
 )
 ament_target_dependencies(lego_loam_map_visualization
   ${dependencies}
@@ -284,16 +294,29 @@ ament_target_dependencies(pointcloud2occupancy
 )
 
 #optimized icp gn playground
-add_executable(optimized_icp_gn_playground
-  src/opt_icp_gn/optimized_ICP_GN_playground.cpp
+add_executable(optimized_icp_gn_playground_key2key
+  src/opt_icp_gn/optimized_ICP_GN_playground_key2key.cpp
 )
-target_link_libraries(optimized_icp_gn_playground
+target_link_libraries(optimized_icp_gn_playground_key2key
   opt_icp_gn
   ${PCL_LIBRARIES}
 )
-ament_target_dependencies(optimized_icp_gn_playground
+ament_target_dependencies(optimized_icp_gn_playground_key2key
   ${dependencies}
 )
+
+#optimized icp gn playground
+add_executable(optimized_icp_gn_playground_key2target
+  src/opt_icp_gn/optimized_ICP_GN_playground_key2target.cpp
+)
+target_link_libraries(optimized_icp_gn_playground_key2target
+  opt_icp_gn
+  ${PCL_LIBRARIES}
+)
+ament_target_dependencies(optimized_icp_gn_playground_key2target
+  ${dependencies}
+)
+
 
 #lego loam lidar2depth_img node
 add_executable(lego_loam_bag_lidar2depthimg_node
@@ -330,6 +353,7 @@ if(TRT_ENABLED)
     ${GTSAM_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
     ${dddmr_trt_INCLUDE_DIRS}
+    ${dddmr_pcl_INCLUDE_DIRS}
   )
 
   #yolo ros2 test node
@@ -386,7 +410,8 @@ install(TARGETS
   lego_loam_bag
   pose_graph_editor_node
   pointcloud2occupancy
-  optimized_icp_gn_playground
+  optimized_icp_gn_playground_key2key
+  optimized_icp_gn_playground_key2target
   lego_loam_bag_lidar2depthimg_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
@@ -445,8 +470,6 @@ if(TEST_ENABLED)
   )
 
 endif()
-
-
 
 # --- Everything CI/CD test finish here ---
 

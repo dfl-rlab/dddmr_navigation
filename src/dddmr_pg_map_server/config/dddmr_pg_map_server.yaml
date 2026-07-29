@@ -1,0 +1,12 @@
+dddmr_pg_map_server_manager:
+  ros__parameters:
+    maps: ["map1", "map2"]
+
+map1:
+  ros__parameters:
+    pose_graph_dir: "/root/dddmr_bags/cicdtest/mapping_mid360_t180/pg"
+    complete_map_voxel_size: 0.3
+map2:
+  ros__parameters:
+    pose_graph_dir: "/root/dddmr_bags/cicdtest/mapping_mid360_t180/pg"
+    complete_map_voxel_size: 0.3

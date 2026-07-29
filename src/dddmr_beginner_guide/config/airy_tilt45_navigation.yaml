@@ -18,7 +18,7 @@ mcl_ip:
     # leishen16
     laser:
         odom_type: "wheel_odometry"         #wheel_odometry/laser_odometry 
-        baselink_frame: "base_link"
+        base_ground_frame: "base_link"
         num_vertical_scans: 100
         num_horizontal_scans: 400
         vertical_angle_bottom: 0.0          # degrees
@@ -53,13 +53,22 @@ mcl_fa:
         edge_threshold: 0.1
         surf_threshold: 0.1
         nearest_feature_search_distance: 3.0
-        
-sub_maps:
+
+dddmr_pg_map_server_manager:
+  ros__parameters:
+    maps: ["map1"]
+
+map1:
   ros__parameters:
     pose_graph_dir: "/root/dddmr_bags/2026_03_28_19_25_15"
+    complete_map_voxel_size: 0.4
+
+sub_maps:
+  ros__parameters:
+    pg_map_server_name: "map1" #options from line#59
     sub_map_search_radius: 50.0
     sub_map_warmup_trigger_distance: 20.0
-    complete_map_voxel_size: 0.4
+
 mcl_3dl:
   ros__parameters:
     init_x: 0.0
@@ -80,7 +89,6 @@ mcl_3dl:
     map_downsample_x: 0.1
     map_downsample_y: 0.1
     map_downsample_z: 0.1
-    map_update_interval_sec: 2 #int
     num_particles: 60
 
     resample_var_x: 0.2
@@ -272,8 +280,8 @@ perception_3d_local:
       plugin: "perception_3d::StaticLayer"
       is_local_planner: true
       mapping_mode: false
-      map_topic: "mapcloud"
-      ground_topic: "mapground"
+      map_topic: "map1/mapcloud"
+      ground_topic: "map1/mapground"
     path_blocked_strategy:
       plugin: "perception_3d::PathBlockedStrategy"
       check_radius: 0.3
@@ -315,8 +323,8 @@ perception_3d_global:
       intensity_search_radius: 1.0 #this value is suggested to be 1.0 meters, because if it is too large, the narrow passage will be miscalculated
       intensity_search_punish_weight: 0.1 #the weight for a node. Set this value higher means we dont like path planning cross a orphan node.
       static_imposing_radius: 1.5 #use map to add weight on each ground node
-      map_topic: "mapcloud"
-      ground_topic: "mapground"
+      map_topic: "map1/mapcloud"
+      ground_topic: "map1/mapground"
       support:
         mapping_mode: false
           #if mapping mode is true, edge detection is automatically disabled

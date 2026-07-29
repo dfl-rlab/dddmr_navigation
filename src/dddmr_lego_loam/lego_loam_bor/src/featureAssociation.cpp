@@ -122,6 +122,9 @@ void FeatureAssociation::initializeValue() {
   cloudSmoothness.resize(cloud_size);
 
   downSizeFilter.setLeafSize(0.2, 0.2, 0.2);
+  downSizeFilter_omp.setNumberOfThreads(6);
+  downSizeFilter_omp.setLeafSize (0.2, 0.2, 0.2);
+  downSizeFilter_omp.setSaveLeafLayout(false);
 
   segmentedCloud.reset(new pcl::PointCloud<PointType>());
   outlierCloud.reset(new pcl::PointCloud<PointType>());
@@ -538,9 +541,12 @@ void FeatureAssociation::extractFeatures() {
     // surfPointsFlat = surfPointsFlatFiltered;
 
     surfPointsLessFlatScanDS->clear();
-    downSizeFilter.setInputCloud(surfPointsLessFlatScan);
-    downSizeFilter.filter(*surfPointsLessFlatScanDS);
-
+    //downSizeFilter.setInputCloud(surfPointsLessFlatScan);
+    //downSizeFilter.filter(*surfPointsLessFlatScanDS);
+    downSizeFilter_omp.setInputCloud(surfPointsLessFlatScan);
+    downSizeFilter_omp.setFinalFilter(true);
+    downSizeFilter_omp.filter(*surfPointsLessFlatScanDS);
+    
     *surfPointsLessFlat += *surfPointsLessFlatScanDS;
   }
 }
@@ -1494,7 +1500,7 @@ void FeatureAssociation::runFeatureAssociation() {
   segInfo = std::move(projection.seg_msg);
 
   cloudHeader = segInfo.header;
-  cloudHeader.stamp = clock_->now();
+  cloudHeader.stamp = segInfo.header.stamp;
   trans_c2s_ = projection.trans_c2s;
   tf2_trans_b2s_.setOrigin(tf2::Vector3(projection.trans_b2s.transform.translation.x, 
                               projection.trans_b2s.transform.translation.y, projection.trans_b2s.transform.translation.z));

@@ -225,7 +225,8 @@ class MCL3dlNode : public rclcpp::Node
     rclcpp::Time match_output_last_;
     rclcpp::Time odom_last_;
     bool has_odom_;
-    bool use_sim_time_;
+    std_msgs::msg::Header laser_header_;
+    std_msgs::msg::Header odom_header_;
     State6DOF odom_;
     State6DOF odom_prev_;
     State6DOF state_prev_;

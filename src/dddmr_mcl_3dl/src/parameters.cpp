@@ -82,12 +82,6 @@ Parameters::Parameters(const rclcpp::node_interfaces::NodeLoggingInterface::Shar
           std::max(map_downsample_x_, map_downsample_y_),
           map_downsample_z_);
 
-  parameter_->declare_parameter("map_update_interval_sec", rclcpp::ParameterValue(0));
-  rclcpp::Parameter map_update_interval_sec = parameter_->get_parameter("map_update_interval_sec");
-  map_update_interval_sec_ = map_update_interval_sec.as_int();
-  RCLCPP_INFO(logger_->get_logger(), "map_update_interval_sec: %d", map_update_interval_sec_);  
-  map_update_interval_ = std::chrono::seconds(map_update_interval_sec_);
-
   parameter_->declare_parameter("num_particles", rclcpp::ParameterValue(0));
   rclcpp::Parameter num_particles = parameter_->get_parameter("num_particles");
   num_particles_ = num_particles.as_int();

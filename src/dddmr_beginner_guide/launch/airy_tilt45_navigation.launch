@@ -10,6 +10,11 @@
   <!--- TF -->
   <node pkg="tf2_ros" exec="static_transform_publisher" name="baselink2footprint"  args="0.0 0 -0.24 0.0 0.0 0 base_link base_footprint" />
   <node pkg="tf2_ros" exec="static_transform_publisher" name="baselink2c16"  args="0.2 0 0.22 0.0 0.78539815 0 base_link airy" />
+  
+  <!--Map server-->
+  <node pkg="dddmr_pg_map_server" exec="dddmr_pg_map_server_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share dddmr_beginner_guide)/config/airy_tilt45_navigation.yaml" />
+  </node>
 
   <!--- mcl -->
   <node pkg="mcl_3dl" exec="mcl_3dl" output="screen" respawn="false">

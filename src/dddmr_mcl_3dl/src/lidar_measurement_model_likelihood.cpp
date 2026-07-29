@@ -198,17 +198,19 @@ LidarMeasurementResult LidarMeasurementModelLikelihood::measure(
   for (auto& p : pc_flat_new_type->points)
   {
     if(is_ground_health){
-      kdtree_ground.radiusSearch(p, match_dist_min_, id, sqdist, 1);
+      //kdtree_ground.radiusSearch(p, match_dist_min_, id, sqdist, 1);
+      kdtree_ground.nearestKSearch(p, 1, id, sqdist);
     }
     else{
-      kdtree.radiusSearch(p, match_dist_min_, id, sqdist, 1);
+      //kdtree.radiusSearch(p, match_dist_min_, id, sqdist, 1);
+      kdtree_ground.nearestKSearch(p, 1, id, sqdist);
     }
 
     if (sqdist.size()>0)
     {
-      const float dist = match_dist_min_ - std::max(std::sqrt(sqdist[0]), match_dist_flat_);
+      float dist = match_dist_min_ - std::sqrt(sqdist[0]);
       if (dist < 0.0)
-        continue;
+        dist = 0.001;
 
       score_like += dist * dist;
       num++;
@@ -236,15 +238,15 @@ LidarMeasurementResult LidarMeasurementModelLikelihood::measure(
   {
     float pt_segmentation_weight = p.intensity;
 
-    if (kdtree.radiusSearch(p, match_dist_min_, id, sqdist, 1))
-    {
-      const float dist = match_dist_min_ - std::max(std::sqrt(sqdist[0]), match_dist_flat_);
-      if (dist < 0.0)
-        continue;
+    //kdtree.radiusSearch(p, match_dist_min_, id, sqdist, 1)
+    kdtree.nearestKSearch(p, 1, id, sqdist);
+    float dist = match_dist_min_ - std::sqrt(sqdist[0]);
+    if (dist < 0.0)
+      dist = 0.001;
 
-      score_like += dist * dist / pt_segmentation_weight;
-      num++;
-    }
+    score_like += dist * dist / pt_segmentation_weight;
+    num++;
+    
   }
   const float match_ratio = static_cast<float>(num) / (pc_flat_new_type->points.size() + pc_less_sharp_new_type->points.size());
 

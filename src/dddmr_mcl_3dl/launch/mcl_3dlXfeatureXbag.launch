@@ -2,6 +2,10 @@
   
   <include file="$(find-pkg-share lego_loam_bor)/launch/mcl_feature.launch" />
 
+  <node pkg="dddmr_pg_map_server" exec="dddmr_pg_map_server_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share mcl_3dl)/config/mcl_3dl.yaml" />
+  </node>
+  
   <!--name argument is not required, because it will overwrite all node name in the exec-->
   <node pkg="mcl_3dl" exec="mcl_3dl" output="screen" respawn="false">
     <param from="$(find-pkg-share mcl_3dl)/config/mcl_3dl.yaml" />

@@ -1,5 +1,10 @@
 int32 key_frame_number
 ---
 sensor_msgs/PointCloud2 key_frame_cloud
+sensor_msgs/PointCloud2 key_frame_surface
 sensor_msgs/PointCloud2 key_frame_ground
 sensor_msgs/PointCloud2 key_frame_ground_edge
+sensor_msgs/PointCloud2 key_frame_cloud_base_link
+sensor_msgs/PointCloud2 key_frame_surface_base_link
+sensor_msgs/PointCloud2 key_frame_ground_base_link
+sensor_msgs/PointCloud2 key_frame_ground_edge_base_link

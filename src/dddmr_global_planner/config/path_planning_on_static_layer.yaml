@@ -48,4 +48,5 @@ perception_3d_global:
 global_planner:
   ros__parameters:
     turning_weight: 0.1 #Punish the zig-zag path
-    a_star_expanding_radius: 0.5
+    a_star_expanding_radius: 3.0
+    use_pre_graph: false

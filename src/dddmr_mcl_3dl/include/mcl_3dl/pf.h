@@ -38,6 +38,9 @@
 
 #include <mcl_3dl/noise_generators/diagonal_noise_generator.h>
 
+// Required OpenMP header
+#include <omp.h> 
+
 namespace mcl_3dl
 {
 namespace pf
@@ -248,11 +251,22 @@ public:
   {
     auto particles_prev = particles_;  // backup old
     FLT_TYPE sum = 0;
-    for (auto& p : particles_)
+    std::vector<FLT_TYPE> prob(particles_.size());
+    
+    //@ omp for particles rating. Test 200 particles total rating time from 0.14 to 0.03 at i9-11950h 2.6Ghz computer
+    //@ However, increase total cpu usage since we are now able to process in real time without losing frame.
+    #pragma omp parallel for
+    for (size_t i=0; i<particles_.size(); i++)
     {
-      p.probability_ *= likelihood(p.state_);
-      sum += p.probability_;
+      particles_[i].probability_ *= likelihood(particles_[i].state_);
+      prob[i] = particles_[i].probability_;
     }
+
+    for (size_t i=0; i<particles_.size(); i++)
+    {
+      sum+=prob[i];
+    }
+
     if (sum > 0.0)
     {
       for (auto& p : particles_)

@@ -31,9 +31,9 @@
 
 
 /*
-This trajectory generator take shared_data_->ref_twist_for_generate_trajectory_ to
+This trajectory generator take shared_data_->ref_twist_for_trajectory_generation_ to
 generate a trahectory.
-shared_data_->ref_twist_for_generate_trajectory_ is set by recovery behavior or planner
+shared_data_->ref_twist_for_trajectory_generation_ is set by recovery behavior or planner
 */
 
 #include <trajectory_generators/one_state_trajectory_generator_theory.h>
@@ -174,9 +174,9 @@ void OneStateTrajectoryGeneratorTheory::initialise(){
   sample_params_.clear();
 
   Eigen::Vector3f vel_samp = Eigen::Vector3f::Zero();
-  vel_samp[0] = shared_data_->ref_twist_for_generate_trajectory_.twist.linear.x;
-  vel_samp[1] = shared_data_->ref_twist_for_generate_trajectory_.twist.linear.y;
-  vel_samp[2] = shared_data_->ref_twist_for_generate_trajectory_.twist.angular.z;
+  vel_samp[0] = shared_data_->ref_twist_for_trajectory_generation_.twist.linear.x;
+  vel_samp[1] = shared_data_->ref_twist_for_trajectory_generation_.twist.linear.y;
+  vel_samp[2] = shared_data_->ref_twist_for_trajectory_generation_.twist.angular.z;
   sample_params_.push_back(vel_samp);
   
 }

@@ -62,7 +62,7 @@ lego_loam_mo:
         enable_loop_closure: true
 
         surrounding_keyframe_search_num: 20
-        history_keyframe_search_radius: 12.0
+        history_keyframe_search_radius: 20.0
         history_keyframe_search_num: 5
         history_keyframe_fitness_score: 0.5
         

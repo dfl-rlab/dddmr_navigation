@@ -40,9 +40,11 @@
 #include "tf2_ros/message_filter.h"
 #include "tf2_ros/transform_broadcaster.h"
 
-/*For normal markers*/
+/*For ros msg*/
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
+#include <dddmr_sys_core/srv/get_key_frame_cloud.hpp>
+#include <geometry_msgs/msg/pose_array.hpp>
 
 // This is for euclidean distance segmentation
 #include <pcl/segmentation/sac_segmentation.h>
@@ -56,6 +58,9 @@
 #include <pcl/common/common.h>
 #include <pcl/search/kdtree.h>
 
+// omp voxel
+#include "dddmr_pcl/voxel_omp/voxel_grid_omp.h"
+
 // chrono_literals handles user-defined time durations (e.g. 500ms) 
 using namespace std::chrono_literals;
 
@@ -65,36 +70,42 @@ class SubMaps  : public rclcpp::Node
 {
 
 private:
+  
+  void keyPosesCb(const geometry_msgs::msg::PoseArray::SharedPtr msg);
+  void syncMapThread();
 
-  std::string pose_graph_dir_;
+  std::string pg_map_server_name_;
   rclcpp::Clock::SharedPtr clock_;
 
   rclcpp::CallbackGroup::SharedPtr timer_group_;
+  rclcpp::CallbackGroup::SharedPtr srv_group_;
   rclcpp::TimerBase::SharedPtr warm_up_timer_;
+  rclcpp::TimerBase::SharedPtr sync_map_timer_;
 
-  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_map_;
-  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_ground_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_sub_map_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_sub_ground_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_sub_map_warmup_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_sub_ground_warmup_;
+  
+  rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr sub_key_poses_;
+  rclcpp::Client<dddmr_sys_core::srv::GetKeyFrameCloud>::SharedPtr get_key_frame_cloud_client_;
 
   geometry_msgs::msg::PoseWithCovarianceStamped robot_pose_;
   geometry_msgs::msg::PoseWithCovarianceStamped warm_up_pose_;
   geometry_msgs::msg::PoseWithCovarianceStamped current_sub_map_pose_;
   
-  pcl::PointCloud<PointTypePose>::Ptr pcd_poses_; //original poses from files
-  pcl::PointCloud<PointTypePose> poses_; //Operating poses, we maitain this poses all the time
   std::vector<pcl::PointCloud<pcl_t>::Ptr> cornerCloudKeyFrames_; //this frame is converted to global using poses_
   std::vector<pcl::PointCloud<pcl_t>::Ptr> cornerCloudKeyFrames_baselink_; //original frame from files are base_link
   std::vector<pcl::PointCloud<pcl_t>::Ptr> surfCloudKeyFrames_; //this frame is converted to global using poses_
   std::vector<pcl::PointCloud<pcl_t>::Ptr> surfCloudKeyFrames_baselink_; //original frame from files are base_link
-  
-  void readPoseGraph();
+  std::vector<pcl::PointCloud<pcl_t>::Ptr> groundCloudKeyFrames_; //this frame is converted to global using poses_
+  std::vector<pcl::PointCloud<pcl_t>::Ptr> groundCloudKeyFrames_baselink_; //original frame from files are base_link
   
   //@
   bool is_initial_;
   bool is_current_ready_;
+  bool key_poses_received_;
+  pcl::PointCloud<pcl_t>::Ptr poses_pcl_t_;
   pcl::KdTreeFLANN<mcl_3dl::pcl_t>::Ptr kdtree_poses_;
 
   pcl::PointCloud<pcl_t>::Ptr map_warmup_;
@@ -105,8 +116,10 @@ private:
   bool is_warm_up_ready_;
   double sub_map_search_radius_;
   double sub_map_warmup_trigger_distance_;
-  float complete_map_voxel_size_;
   
+  pcl::VoxelGridOMP map_voxel_omp_;
+  pcl::VoxelGridOMP ground_voxel_omp_;
+
 public:
 
   SubMaps(std::string name);
@@ -138,7 +151,8 @@ public:
   pcl::KdTreeFLANN<mcl_3dl::pcl_t> kdtree_map_warmup_;
   pcl::KdTreeFLANN<mcl_3dl::pcl_t> kdtree_ground_warmup_;
   pcl::PointCloud<pcl::Normal> normals_ground_warmup_;
-
+  
+  int knn_num_of_ground_normals_;
 };
 }  // namespace mcl_3dl
 

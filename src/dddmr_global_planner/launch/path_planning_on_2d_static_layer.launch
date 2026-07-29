@@ -2,7 +2,7 @@
 <launch>
 
   <node pkg="global_planner" exec="occupancy2ground" output="screen" respawn="false">
-    <param from="$(find-pkg-share p2p_move_base)/config/p2p_wo_mcl.yaml" />
+    <param from="$(find-pkg-share global_planner)/config/path_planning_on_2d_static_layer.yaml" />
   </node>
 
   <!--name argument is not required, because it will overwrite all node name in the exec-->

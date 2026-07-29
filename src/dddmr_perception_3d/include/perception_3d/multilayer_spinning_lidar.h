@@ -153,6 +153,7 @@ class MultiLayerSpinningLidar: public Sensor{
     double scan_effective_negative_start_, scan_effective_negative_end_;
     double resolution_, height_resolution_;
     double marking_height_;
+    double marking_minimum_height_;
     double perception_window_size_; 
     double segmentation_ignore_ratio_;
     bool pub_gbl_marking_for_visualization_;
@@ -186,6 +187,8 @@ class MultiLayerSpinningLidar: public Sensor{
 
     //@ list of pointcloud sticher for non-repetitive scan lidar
     std::list<pcl::PointCloud<pcl::PointXYZ>> pcl_stitcher_;
+
+    std_msgs::msg::Header last_sensor_receiving_time_;
 };
 
 }//end of name space

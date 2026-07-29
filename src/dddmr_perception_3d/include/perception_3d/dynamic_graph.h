@@ -46,8 +46,8 @@ class DynamicGraph{
 
   public:
 
-    void setValue(unsigned key, double distance);
-    void clearValue(unsigned key, double distance);
+    void setValue(unsigned int key, double distance);
+    void clearValue(unsigned int key, double distance);
     double getValue(const unsigned int index);
     void clear();
     void initial(std::size_t n, double max_obstacle_distance);

@@ -1,8 +1,8 @@
 bag_reader:
   ros__parameters:
     use_sim_time: true
-    bag_file_dir: "/root/dddmr_bags/mid360_upside_down_motion"
-    point_cloud_topic: "/utlidar/cloud_livox_mid360"
+    bag_file_dir: "/root/dddmr_bags/upside_down"
+    point_cloud_topic: "/livox/lidar"
     odometry_topic: "/odom"
     skip_frame: 2
 
@@ -12,7 +12,7 @@ lego_loam_ip:
     # leishen16
     laser:
         odom_type: "laser_odometry"         #wheel_odometry/laser_odometry 
-        baselink_frame: "base_link"
+        base_ground_frame: "base_link"
         num_vertical_scans: 32
         num_horizontal_scans: 1000
         vertical_angle_bottom: -7.0          # degrees
@@ -26,12 +26,12 @@ lego_loam_ip:
         minimum_detection_range: 0.5
         maximum_detection_range: 100.0            # point cloud within this range will be used to project image
         distance_for_patch_between_rings: 1.0    # patch ground between rings within this range, i.e. ring0 and ring1 is smaller than 1 meter, patch them
-        stitcher_num: 3                          # for non-repetitive scan lidar use 2~4 (i.e. mid360)
+        stitcher_num: 1                          # for non-repetitive scan lidar use 2~4 (i.e. mid360)
         trt_model_path: ""                       # provide trt engine for yolo
         projected_image_stack_size: 1            # Stack this number of image for yolo11n to inference as time elapsed yolo (only work when TRT is loaded)
         
-        ground_fov_bottom: -0.2617994 # -15deg
-        ground_fov_top: -0.087266 # -5deg
+        ground_fov_bottom: 0.2617994 # 15deg
+        ground_fov_top: 0.90757 # 52deg
         ground_positive_start: 0.0
         ground_positive_stop: 3.1415926
         ground_negative_start: 0.0

@@ -40,6 +40,9 @@
 /*Debug*/
 #include <chrono>
 
+// Required OpenMP header
+#include <omp.h> 
+
 namespace perception_3d
 {
 

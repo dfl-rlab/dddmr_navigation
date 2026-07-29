@@ -85,7 +85,7 @@ class StaticLayer: public Sensor{
     void ptrInitial();
     void radiusSearchConnection();
     void generateStaticGraph();
-
+    
     /*call back of the ground*/
     void cbGround(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
     /*call back of the map*/
@@ -117,6 +117,7 @@ class StaticLayer: public Sensor{
     bool is_ground_and_map_being_initialized_once_;
     bool enable_edge_detection_;
     bool generate_static_graph_;
+    
 };
 
 }//end of name space

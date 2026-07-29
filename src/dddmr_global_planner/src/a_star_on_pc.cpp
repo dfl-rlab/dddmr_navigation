@@ -201,7 +201,7 @@ void A_Star_on_Graph::getPath(
   unsigned int start, unsigned int goal,
   std::vector<unsigned int>& path){
 
-  //RCLCPP_DEBUG(rclcpp::get_logger("astar"),"Start: %u, Goal: %u", start, goal);
+  //RCLCPP_INFO(rclcpp::get_logger("astar"),"Start: %u, Goal: %u", start, goal);
 
   /*
   Create the first node which is start and add into frontier
@@ -232,7 +232,7 @@ void A_Star_on_Graph::getPath(
     /*Pop minimum F, we leverage prior queue, so we dont need to loop frontier everytime*/
     current_node = ASLS_->getNode_wi_MinimumF();
 
-    //RCLCPP_DEBUG(rclcpp::get_logger("astar"), "Expand node: %u", current_node.self_index);
+    //RCLCPP_INFO(rclcpp::get_logger("astar"), "Expand node: %u", current_node.self_index);
     /*Get successors*/
     pcl::PointXYZI pcl_now = pc_original_z_up_->points[current_node.self_index];
     std::vector<int> pointIdxRadiusSearch;

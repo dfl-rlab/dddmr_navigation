@@ -59,7 +59,7 @@ def generate_test_description():
   return LaunchDescription([
       s2b,
       lego_loam_bag_node,
-#      rviz,
+      rviz,
       TimerAction(period=5.0, actions=[test_node]),
       launch_testing.actions.ReadyToTest()
   ]), {'test_node': test_node}

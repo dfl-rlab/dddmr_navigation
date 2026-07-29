@@ -58,7 +58,7 @@ void PositionControlBehavior::onInitialize(){
   node_->get_parameter(name_ + ".distance_tolerance", distance_tolerance_);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "distance_tolerance %.2f", distance_tolerance_);
 
-  node_->declare_parameter(name_ + ".trajectory_generator_name", rclcpp::ParameterValue("omni_drive_one_step"));
+  node_->declare_parameter(name_ + ".trajectory_generator_name", rclcpp::ParameterValue("one_state_trajectory"));
   node_->get_parameter(name_ + ".trajectory_generator_name", trajectory_generator_name_);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "trajectory_generator_name: %s", trajectory_generator_name_.c_str());  
 
@@ -442,7 +442,7 @@ dddmr_sys_core::RecoveryState PositionControlBehavior::runBehavior(
     //Below assignment of variables is useful when migrate to ROS2
     trajectory_generators_ros_->getSharedDataPtr()->robot_pose_ = trans_gbl2b;
     trajectory_generators_ros_->getSharedDataPtr()->robot_state_ = shared_data_->robot_state_;
-    trajectory_generators_ros_->getSharedDataPtr()->ref_twist_for_generate_trajectory_ = cmd_vel_stamped_;
+    trajectory_generators_ros_->getSharedDataPtr()->ref_twist_for_trajectory_generation_ = cmd_vel_stamped_;
     trajectory_generators_ros_->initializeTheories_wi_Shared_data();
 
     geometry_msgs::msg::PoseArray pose_arr;

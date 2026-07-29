@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(pose_graph_editor_panel LANGUAGES CXX)
+project(pose_graph_editor_panel LANGUAGES C CXX)
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
@@ -24,7 +24,7 @@ find_package(rclcpp REQUIRED)
 find_package(rviz_assimp_vendor REQUIRED)
 find_package(rviz_rendering REQUIRED)
 find_package(rviz_common REQUIRED)
-
+find_package(MPI REQUIRED COMPONENTS C CXX)
 ament_package_xml()
 set(ROS_DISTRO "ROS 2")
 set(OGRE_PLUGIN_PATH "rviz_ogre_vendor")

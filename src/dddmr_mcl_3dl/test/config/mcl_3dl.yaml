@@ -1,0 +1,124 @@
+mcl_ip:
+  ros__parameters:
+    # leishen16
+    laser:
+        odom_type: "laser_odometry"         #wheel_odometry/laser_odometry 
+        base_ground_frame: "base_link"
+        num_vertical_scans: 16
+        num_horizontal_scans: 1000
+        vertical_angle_bottom: -15.0          # degrees
+        vertical_angle_top: 15.0            # degrees
+        scan_period: 0.1                   # seconds
+
+
+    imageProjection:
+        segment_valid_point_num: 5
+        segment_valid_line_num: 2
+        segment_theta: 60.0                      # decrese this value may improve accuracy
+        minimum_detection_range: 0.5
+        maximum_detection_range: 100.0            # point cloud within this range will be used to project image
+        distance_for_patch_between_rings: 1.0    # patch ground between rings within this range, i.e. ring0 and ring1 is smaller than 1 meter, patch them
+        stitcher_num: 0                          # for non-repetitive scan lidar use 2~4 (i.e. mid360)
+        trt_model_path: ""                       # provide trt engine for yolo
+        projected_image_stack_size: 1            # Stack this number of image for yolo11n to inference as time elapsed yolo (only work when TRT is loaded)
+        
+        ground_fov_bottom: -0.2617994 # -15deg
+        ground_fov_top: -0.087266 # -5deg
+        ground_positive_start: 0.0
+        ground_positive_stop: 3.1415926
+        ground_negative_start: 0.0
+        ground_negative_stop: -3.1415926
+        
+mcl_fa:
+  ros__parameters:
+
+    featureAssociation:
+        edge_threshold: 0.1
+        surf_threshold: 0.1
+        nearest_feature_search_distance: 3.0
+        
+dddmr_pg_map_server_manager:
+  ros__parameters:
+    maps: ["map1"]
+
+map1:
+  ros__parameters:
+    pose_graph_dir: "/root/dddmr_bags/benanli_detention_basin_pg"
+    complete_map_voxel_size: 0.3
+
+sub_maps:
+  ros__parameters:
+    pg_map_server_name: "map1" #options from line#3
+    sub_map_search_radius: 50.0
+    sub_map_warmup_trigger_distance: 20.0
+    
+mcl_3dl:
+  ros__parameters:
+    init_x: 0.0
+    init_y: 0.0
+    init_z: 0.0
+    init_roll: 0.0
+    init_pitch: 0.0
+    init_yaw: 0.0
+    init_var_x: 2.0
+    init_var_y: 2.0
+    init_var_z: 0.5
+    init_var_roll: 0.1
+    init_var_pitch: 0.1
+    init_var_yaw: 0.5
+    map_frame: "map"
+    robot_frame: "base_link"
+    odom_frame: "odom"
+    map_downsample_x: 0.1
+    map_downsample_y: 0.1
+    map_downsample_z: 0.1
+    num_particles: 60
+
+    resample_var_x: 0.1
+    resample_var_y: 0.1
+    resample_var_z: 0.1
+    resample_var_yaw: 0.1
+    resample_var_pitch: 0.1
+    resample_var_roll: 0.1
+    expansion_var_x: 0.3
+    expansion_var_y: 0.05
+    expansion_var_z: 0.05
+    expansion_var_roll: 0.01
+    expansion_var_pitch: 0.01
+    expansion_var_yaw: 0.05
+    match_ratio_thresh: 0.65
+
+    euc_cluster_distance: 0.8
+    euc_cluster_min_size: 3
+    euc_cluster_max_size: 2400
+
+    knn_num_of_ground_normals: 20
+
+    update_min_d: 0.1
+    update_min_a: 0.1
+
+    odom_err_lin_lin: 0.6
+    odom_err_lin_ang: 0.3
+    odom_err_ang_lin: 0.3
+    odom_err_ang_ang: 0.6
+
+    odom_err_integ_lin_tc: 5.0
+    odom_err_integ_ang_tc: 10.0
+
+    lpf_step: 2.0
+    acc_lpf_step: 128.0
+
+    jump_dist: 1.0
+    jump_ang: 1.57
+
+    bias_var_dist: 2.0
+    bias_var_ang: 1.57
+    tf_tolerance: 0.1
+    publish_tf: true
+
+    likelihood:
+      num_points_global: 8
+      match_dist_min: 0.5
+      match_dist_flat: 0.05
+      threshold_for_trusted_ground: 6
+      radius_of_ground_search: 1.0

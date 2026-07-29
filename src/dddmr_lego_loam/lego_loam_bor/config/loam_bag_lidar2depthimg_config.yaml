@@ -12,7 +12,7 @@ lego_loam_ip:
     # leishen16
     laser:
         odom_type: "laser_odometry"         #wheel_odometry/laser_odometry 
-        baselink_frame: "base_link"
+        base_ground_frame: "base_link"
         num_vertical_scans: 100
         num_horizontal_scans: 400
         vertical_angle_bottom: 0.0          # degrees
@@ -67,4 +67,9 @@ lego_loam_mo:
         history_keyframe_fitness_score: 0.5
         
         ground_voxel_size: 0.3
-        ground_edge_threshold_num: 50
+
+lego_loam_map_visualization:
+  ros__parameters:
+    use_sim_time: false
+    ground_voxel_size: 0.3
+    ground_edge_threshold_num: 50

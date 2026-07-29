@@ -1,0 +1,11 @@
+<launch>
+
+  <!--name argument is not required, because it will overwrite all node name in the exec-->
+  <node pkg="dddmr_pg_map_server" exec="dddmr_pg_map_server_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share dddmr_pg_map_server)/config/dddmr_pg_map_server.yaml" />
+  </node>
+
+  <let name="rviz_config" value="$(find-pkg-share dddmr_pg_map_server)/rviz/dddmr_pg_map_server.rviz"/>
+  <node name="rviz2" pkg="rviz2" exec="rviz2" args="-d $(var rviz_config)"/>
+
+</launch>

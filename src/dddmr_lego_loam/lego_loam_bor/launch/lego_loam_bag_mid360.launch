@@ -10,6 +10,6 @@
 
   <!--- TF -->
 
-  <node pkg="tf2_ros" exec="static_transform_publisher" name="sensor2baselink"  args="0.3 0 0.38 0.0 3.1415926 0 base_link livox_frame" />
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="sensor2baselink"  args="0.0 0 1.0 3.1415926 3.1415926535 0 base_link livox_frame" />
 
 </launch>
