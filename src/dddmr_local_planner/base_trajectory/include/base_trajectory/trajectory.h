@@ -37,6 +37,9 @@
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 
+//@in enum state, specify the actuator type: motor/steering
+#include <dddmr_sys_core/dddmr_enum_states.h>
+
 namespace base_trajectory {
 
   typedef std::pair<pcl::PointXYZ, pcl::PointXYZ> cuboid_min_max_t;
@@ -59,7 +62,9 @@ namespace base_trajectory {
        */
       Trajectory(double xv, double yv, double thetav, double time_delta, unsigned int num_pts);
 
-      double xv_, yv_, thetav_; ///< @brief The x, y, and theta velocities of the trajectory
+      double xv_, yv_, thetav_, steering_angle_;
+      
+      dddmr_sys_core::ActuatorType actuator_type_;
 
       double cost_; ///< @brief The cost/score of the trajectory
 

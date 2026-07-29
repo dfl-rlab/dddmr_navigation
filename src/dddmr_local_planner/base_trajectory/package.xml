@@ -25,6 +25,7 @@
   <depend>tf2_ros</depend>
   <depend>rosidl_default_generators</depend>
   <depend>pcl_conversions</depend>
+  <depend>dddmr_sys_core</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

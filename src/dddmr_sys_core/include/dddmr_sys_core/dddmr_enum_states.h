@@ -62,6 +62,11 @@ namespace dddmr_sys_core {
     RECOVERY_FAIL
   };
 
+  enum ActuatorType{
+    MOTOR,
+    STEERING
+  };
+
   class dddmr_enum_states
   {
   private:
