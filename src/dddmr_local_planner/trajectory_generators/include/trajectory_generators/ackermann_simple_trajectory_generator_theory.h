@@ -62,7 +62,8 @@ class AckermannSimpleTrajectoryGeneratorTheory: public TrajectoryGeneratorTheory
   protected:
 
     virtual void onInitialize();
-
+    virtual void configurateActuatorType();
+    
     std::shared_ptr<trajectory_generators::AckermannTrajectoryGeneratorLimits> limits_;
     std::shared_ptr<trajectory_generators::AckermannTrajectoryGeneratorParams> params_;
 

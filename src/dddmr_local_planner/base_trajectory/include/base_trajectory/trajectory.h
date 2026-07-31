@@ -62,7 +62,7 @@ namespace base_trajectory {
        */
       Trajectory(double xv, double yv, double thetav, double time_delta, unsigned int num_pts);
 
-      double xv_, yv_, thetav_, steering_angle_;
+      double xv_, yv_, thetav_, steering_angle_, steering_angle_velocity_;
       
       dddmr_sys_core::ActuatorType actuator_type_;
 

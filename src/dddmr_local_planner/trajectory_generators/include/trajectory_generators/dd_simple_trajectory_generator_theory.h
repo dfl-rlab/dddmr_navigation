@@ -62,7 +62,8 @@ class DDSimpleTrajectoryGeneratorTheory: public TrajectoryGeneratorTheory{
   protected:
 
     virtual void onInitialize();
-
+    virtual void configurateActuatorType();
+    
     std::shared_ptr<trajectory_generators::DDTrajectoryGeneratorLimits> limits_;
     std::shared_ptr<trajectory_generators::DDTrajectoryGeneratorParams> params_;
 

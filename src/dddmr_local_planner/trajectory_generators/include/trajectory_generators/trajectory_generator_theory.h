@@ -66,9 +66,10 @@ class TrajectoryGeneratorTheory{
     rclcpp::Node::SharedPtr node_;
     //@onInitialize is used to read ros param for the generator
     virtual void onInitialize() = 0;
+    virtual void configurateActuatorType() = 0;
     std::shared_ptr<trajectory_generators::TrajectoryGeneratorSharedData> shared_data_;
     std::string name_;
-
+    dddmr_sys_core::ActuatorType actuator_type_;
 
 };
 

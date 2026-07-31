@@ -39,6 +39,11 @@ DDSimpleTrajectoryGeneratorTheory::DDSimpleTrajectoryGeneratorTheory(){
   return;
 }
 
+void DDSimpleTrajectoryGeneratorTheory::configurateActuatorType(){
+  actuator_type_ = dddmr_sys_core::ActuatorType::MOTOR;
+}
+
+
 void DDSimpleTrajectoryGeneratorTheory::onInitialize(){
 
   //@initialize trajectory generator
@@ -352,6 +357,10 @@ bool DDSimpleTrajectoryGeneratorTheory::generateTrajectory(
       Eigen::Vector3f sample_target_vel,
       base_trajectory::Trajectory& traj) {
 
+  //@ assign actuator type to trajectory, so that when move base publishing the cmd_vel,
+  //@ the correct publisher will be used i.e., geometry/twist or ackermann
+  traj.actuator_type_ = actuator_type_;
+  
   Eigen::Affine3d pos_af3 = tf2::transformToEigen(shared_data_->robot_pose_);
   double vmag = fabs(sample_target_vel[0]);
   double eps = 1e-4;
