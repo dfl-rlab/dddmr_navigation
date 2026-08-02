@@ -11,5 +11,5 @@ docker run -it \
     --volume="/dev:/dev" \
     --volume="${HOME}/dddmr_navigation:/root/dddmr_navigation" \
     --volume="${HOME}/dddmr_bags:/root/dddmr_bags" \
-    --name="dddmr_x64_navigation" \
-    dddmr:x64
+    --name="dddmr_humble_navigation" \
+    dddmr:humble

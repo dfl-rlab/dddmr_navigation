@@ -66,6 +66,10 @@ set(dependencies
   dddmr_sys_core
 )
 
+if("$ENV{ROS_DISTRO}" STREQUAL "jazzy")
+    add_compile_definitions(ROS_JAZZY=1)
+endif()
+
 #Check yolo build flag
 if(NOT TRT_ENABLED)
     set(TRT_ENABLED OFF CACHE BOOL "Enable or disable TensorRT")

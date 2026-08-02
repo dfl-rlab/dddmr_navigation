@@ -458,7 +458,7 @@ pcl::VoxelGridOMP::applyFilter(PointCloud &output)
     size_t final_num = 0;
     for(auto& cloud: final_clouds){
         if((cloud == nullptr)){
-            RCLCPP_DEBUG(rclcpp::get_logger("dddmr_pcl"), "null ptr of a segment");
+            RCLCPP_ERROR(rclcpp::get_logger("dddmr_pcl"), "null ptr of a segment, compile dddmr_pcl using Debug mode first: -DCMAKE_BUILD_TYPE=Debug --packages-up-to dddmr_pcl ");
         }
         else{
             final_num += cloud->size();
@@ -469,7 +469,7 @@ pcl::VoxelGridOMP::applyFilter(PointCloud &output)
     size_t offset = 0;
     for(auto& cloud: final_clouds){
         if((cloud == nullptr)){
-            RCLCPP_DEBUG(rclcpp::get_logger("dddmr_pcl"), "null ptr of a segment");
+            RCLCPP_ERROR(rclcpp::get_logger("dddmr_pcl"), "null ptr of a segment, compile dddmr_pcl using Debug mode first: -DCMAKE_BUILD_TYPE=Debug --packages-up-to dddmr_pcl ");
         }
         else{
             size_t copy_size = cloud->size()*sizeof(PointT);

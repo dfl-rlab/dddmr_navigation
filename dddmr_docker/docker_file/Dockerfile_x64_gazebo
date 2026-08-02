@@ -1,4 +1,4 @@
-FROM dddmr:x64
+FROM dddmr:humble
 
 #install ROS2-based gz dependencies
 RUN apt update && apt install -y ros-humble-gazebo-ros2-control

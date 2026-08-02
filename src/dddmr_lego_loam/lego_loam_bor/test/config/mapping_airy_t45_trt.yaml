@@ -1,0 +1,70 @@
+bag_reader:
+  ros__parameters:
+    use_sim_time: true
+    bag_file_dir: "/root/dddmr_bags/cicdtest/mapping_airy_t45_trt"
+    point_cloud_topic: "/airy_points"
+    odometry_topic: "/odom"
+    skip_frame: 1
+
+lego_loam_ip:
+  ros__parameters:
+    use_sim_time: true
+    laser:
+        odom_type: "wheel_odometry"         #wheel_odometry/laser_odometry 
+        baselink_frame: "base_link"
+        num_vertical_scans: 100
+        num_horizontal_scans: 400
+        vertical_angle_bottom: 0.0          # degrees
+        vertical_angle_top: 90.0            # degrees
+        scan_period: 0.0                   # seconds
+
+    imageProjection:
+        segment_valid_point_num: 5
+        segment_valid_line_num: 2
+        segment_theta: 60.0                      # decrese this value may improve accuracy
+        minimum_detection_range: 0.05
+        maximum_detection_range: 60.0            # point cloud within this range will be used to project image
+        distance_for_patch_between_rings: 1.0    # patch ground between rings within this range, i.e. ring0 and ring1 is smaller than 1 meter, patch them
+        stitcher_num: 0                          # for non-repetitive scan lidar use 2~4 (i.e. mid360)
+        trt_model_path: "/root/dddmr_navigation/src/dddmr_lego_loam/lego_loam_bor/engine/yolo11n_dddmr.trt"                       # provide trt engine for yolo
+        projected_image_stack_size: 4            # Stack this number of image for yolo11n to inference as time elapsed yolo (only work when TRT is loaded)
+        patch_first_ring_to_baselink: false      
+        ground_slope_tolerance: 0.3
+        
+        ground_fov_bottom: 0.0
+        ground_fov_top: 0.61086
+        ground_positive_start: 0.0
+        ground_positive_stop: 1.5707
+        ground_negative_start: 0.0
+        ground_negative_stop: -1.5707
+
+
+lego_loam_fa:
+  ros__parameters:
+    use_sim_time: true
+    featureAssociation:                              
+        edge_threshold: 0.1
+        surf_threshold: 0.1
+        nearest_feature_search_distance: 3.0
+
+    mapping:
+        to_map_optimization: true
+
+lego_loam_mo:
+  ros__parameters:
+    use_sim_time: true
+    mapping:
+
+        distance_between_key_frame: 0.5
+        angle_between_key_frame: 0.5
+
+        enable_loop_closure: true
+
+        surrounding_keyframe_search_num: 20
+        history_keyframe_search_radius: 12.0
+        history_keyframe_search_num: 5
+        history_keyframe_fitness_score: 0.2
+        
+        ground_voxel_size: 0.3
+        ground_edge_threshold_num: 8
+        generate_testing_pg: true

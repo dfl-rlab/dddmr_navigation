@@ -9,5 +9,5 @@ docker run -it \
     --env="QT_X11_NO_MITSHM=1" \
     --volume="/tmp:/tmp" \
     --volume="/dev:/dev" \
-    --name="dddmr_x64_gazebo" \
-    dddmr_gz:x64
+    --name="dddmr_humble_gazebo" \
+    dddmr_gz:humble
