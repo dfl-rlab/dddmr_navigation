@@ -142,7 +142,7 @@ void LegoLoamVisualization::pubMapThread()
   size_t cnt = 0;
   for(auto it=key_frame_clouds_.begin();it!=key_frame_clouds_.end();it++){
     pcl::PointCloud<PointType> one_frame_map_cloud;
-    one_frame_map_cloud= *transformPointCloud(*it, &cloudKeyPoses6D->points[cnt]);
+    one_frame_map_cloud = *transformPointCloud(*it, &cloudKeyPoses6D->points[cnt]);
     pcl::transformPointCloud(one_frame_map_cloud, one_frame_map_cloud, trans_m2ci_af3_);
     map_cloud+=one_frame_map_cloud;
     cnt++;

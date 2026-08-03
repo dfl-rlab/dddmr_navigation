@@ -21,6 +21,8 @@ These bag files come directly from user-reported issues—the DDDMR Navigation S
 cd ~/dddmr_navigation/CICD_setup/
 ./download_CI_bags.bash
 ```
+
 SLAM->
+
 MCL->
 ## CD Setup

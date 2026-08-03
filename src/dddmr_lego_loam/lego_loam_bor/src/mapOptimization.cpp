@@ -240,9 +240,13 @@ void MapOptimization::pcdSaver(const std::shared_ptr<std_srvs::srv::Empty::Reque
 
   // save map
   for (int i = 0; i < cloudKeyPoses3D->points.size(); ++i) {
+
     int thisKeyInd = (int)cloudKeyPoses3D->points[i].intensity;
-    *completeGlobalStitch += *transformPointCloud(
-        cornerCloudKeyFrames[thisKeyInd], &cloudKeyPoses6D->points[thisKeyInd]);
+    pcl::PointCloud<PointType> one_frame_map_cloud;
+    one_frame_map_cloud = *transformPointCloud(cornerCloudKeyFrames[thisKeyInd], &cloudKeyPoses6D->points[thisKeyInd]);
+    pcl::transformPointCloud(one_frame_map_cloud, one_frame_map_cloud, trans_m2ci_af3_);
+
+    *completeGlobalStitch += one_frame_map_cloud;
     //*completeGlobalStitch += *transformPointCloud(
     //    surfCloudKeyFrames[thisKeyInd], &cloudKeyPoses6D->points[thisKeyInd]);
     //*completeGlobalStitch +=
@@ -252,19 +256,20 @@ void MapOptimization::pcdSaver(const std::shared_ptr<std_srvs::srv::Empty::Reque
 
   downSizeFilterFinalStitch.setInputCloud(completeGlobalStitch);
   downSizeFilterFinalStitch.filter(*completeGlobalStitch);
-  pcl::transformPointCloud(*completeGlobalStitch, *completeGlobalStitch, trans_s2c_af3_);
   pcl::io::savePCDFileASCII(mapping_dir_string + "/map.pcd", *completeGlobalStitch);
   
   //save surface
   completeGlobalStitch.reset(new pcl::PointCloud<PointType>());
   for (int i = 0; i < cloudKeyPoses3D->points.size(); ++i) {
     int thisKeyInd = (int)cloudKeyPoses3D->points[i].intensity;
-    *completeGlobalStitch += *transformPointCloud(
-        patchedGroundKeyFrames[thisKeyInd], &cloudKeyPoses6D->points[thisKeyInd]);
+    pcl::PointCloud<PointType> one_frame_map_cloud;
+    one_frame_map_cloud = *transformPointCloud(patchedGroundKeyFrames[thisKeyInd], &cloudKeyPoses6D->points[thisKeyInd]);
+    pcl::transformPointCloud(one_frame_map_cloud, one_frame_map_cloud, trans_m2ci_af3_);
+
+    *completeGlobalStitch += one_frame_map_cloud;
   }
   downSizeFilterFinalStitch.setInputCloud(completeGlobalStitch);
   downSizeFilterFinalStitch.filter(*completeGlobalStitch);
-  pcl::transformPointCloud(*completeGlobalStitch, *completeGlobalStitch, trans_s2c_af3_);
   pcl::io::savePCDFileASCII(mapping_dir_string + "/ground.pcd", *completeGlobalStitch);
   
   completeGlobalStitch.reset(new pcl::PointCloud<PointType>());

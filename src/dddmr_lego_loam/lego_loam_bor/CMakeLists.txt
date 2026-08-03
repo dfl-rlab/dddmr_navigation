@@ -462,6 +462,18 @@ if(TEST_ENABLED)
     ${dependencies}
   )
 
+  #trt testing node
+  add_executable(mapping_trt_test_node
+    test/test_node/mapping_trt_test_node.cpp
+  )
+  target_link_libraries(mapping_trt_test_node 
+    opt_icp_gn
+    ${PCL_LIBRARIES}
+  )
+  ament_target_dependencies(mapping_test_node
+    ${dependencies}
+  )
+
   install(PROGRAMS
     test/test_node/mapping_test_node.py
     DESTINATION lib/${PROJECT_NAME}
@@ -470,6 +482,7 @@ if(TEST_ENABLED)
   #install testing node
   install(TARGETS
     mapping_test_node
+    mapping_trt_test_node
     RUNTIME DESTINATION lib/${PROJECT_NAME}
   )
 

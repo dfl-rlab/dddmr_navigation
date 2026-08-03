@@ -75,7 +75,7 @@ def generate_test_description():
   #for test node
   test_node = Node(
     package="lego_loam_bor",
-    executable="mapping_test_node",
+    executable="mapping_trt_test_node",
     name=test_name,
     output="screen"
   )  
