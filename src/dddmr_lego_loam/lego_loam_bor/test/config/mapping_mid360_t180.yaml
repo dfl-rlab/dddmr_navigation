@@ -2,6 +2,7 @@ bag_reader:
   ros__parameters:
     use_sim_time: true
     bag_file_dir: "/root/dddmr_bags/cicdtest/mapping_mid360_t180"
+    bag_format: "mcap"
     point_cloud_topic: "/livox/lidar"
     odometry_topic: "/odom"
     skip_frame: 2

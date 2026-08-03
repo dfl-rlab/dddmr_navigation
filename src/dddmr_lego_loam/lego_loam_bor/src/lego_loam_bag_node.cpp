@@ -38,6 +38,7 @@ class BagReader : public rclcpp::Node
     bool save_current_map_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr raw_point_cloud_pub_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr raw_odom_pub_;
+    std::string bag_format_;
 
   private:
 
@@ -62,6 +63,10 @@ BagReader::BagReader():Node("bag_reader"), pause_mapping_(true), save_current_ma
   declare_parameter("bag_file_dir", rclcpp::ParameterValue(""));
   this->get_parameter("bag_file_dir", bag_file_dir_);
   RCLCPP_INFO(this->get_logger(), "bag_file_dir: %s", bag_file_dir_.c_str());
+
+  declare_parameter("bag_format", rclcpp::ParameterValue("sqlite3"));
+  this->get_parameter("bag_format", bag_format_);
+  RCLCPP_INFO(this->get_logger(), "bag_format: %s", bag_format_.c_str());
 
   declare_parameter("point_cloud_topic", rclcpp::ParameterValue(""));
   this->get_parameter("point_cloud_topic", point_cloud_topic_);
@@ -132,7 +137,7 @@ int main(int argc, char** argv) {
 
   rosbag2_storage::StorageOptions storage_options{};
   storage_options.uri = BR->getBagFilePath();
-  storage_options.storage_id = "sqlite3";
+  storage_options.storage_id = BR->bag_format_;
 
   rosbag2_cpp::ConverterOptions converter_options{};
   converter_options.input_serialization_format = "cdr";

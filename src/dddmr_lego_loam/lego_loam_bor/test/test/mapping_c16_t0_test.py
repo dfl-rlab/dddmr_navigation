@@ -7,6 +7,13 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
 from launch.actions import TimerAction
+from launch.actions import RegisterEventHandler
+from launch.actions import EmitEvent
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
+from launch.substitutions import LaunchConfiguration
 
 import launch_testing
 import launch_testing.actions
@@ -17,6 +24,24 @@ import pytest
 
 @pytest.mark.launch_test
 def generate_test_description():
+
+  ### Argument for rviz
+  enable_rviz_arg = DeclareLaunchArgument(
+    'enable_rviz',
+    default_value='true',
+    description='Enable Rviz for developer, otherwise for CI'
+  )
+  # 2. Reference the config string
+  enable_rviz_config = LaunchConfiguration('enable_rviz')
+
+  # for debug
+  rviz = Node(
+          package="rviz2",
+          executable="rviz2",
+          output="screen",
+          arguments=['-d', os.path.join(get_package_share_directory('lego_loam_bor'), 'rviz', 'lego_loam.rviz')], # <-- FIXED CLOSING BRACKET HERE
+          condition=IfCondition(enable_rviz_config)
+  )  
 
   ### Change test name and TF only
   test_name = 'mapping_c16_t0'
@@ -39,6 +64,13 @@ def generate_test_description():
     output="screen",
     parameters = [the_yaml]
   )  
+
+  shutdown_on_crash = RegisterEventHandler(
+      event_handler=OnProcessExit(
+          target_action=lego_loam_bag_node,
+          on_exit=lambda event, context: EmitEvent(event=Shutdown(reason='lego_loam_bag node crashed')) if event.returncode != 0 else None
+      )
+  )
   
   #for test node
   test_node = Node(
@@ -47,22 +79,15 @@ def generate_test_description():
     name=test_name,
     output="screen"
   )  
-  
-  # for debug
-  rviz = Node(
-          package="rviz2",
-          executable="rviz2",
-          output="screen",
-          arguments=['-d', os.path.join(get_package_share_directory('lego_loam_bor'), 'rviz', 'lego_loam.rviz')]
-  )  
 
   return LaunchDescription([
       s2b,
       lego_loam_bag_node,
+      shutdown_on_crash,
       rviz,
       TimerAction(period=5.0, actions=[test_node]),
       launch_testing.actions.ReadyToTest()
-  ]), {'test_node': test_node}
+  ]), {'test_node': test_node, 'lego_loam_bag_node': lego_loam_bag_node}
 
 # These tests will run concurrently with the dut process.  After all these tests are done,
 # the launch system will shut down the processes that it started up
@@ -82,3 +107,7 @@ class TestStdOutput(unittest.TestCase):
             "Success", 
             process=test_node
         )
+
+    def test_lego_loam_bag_node_exit_code(self, proc_info, lego_loam_bag_node):
+        # Trigger a failure if lego_loam_bag node crashes (exits with non-zero code)
+        launch_testing.asserts.assertExitCodes(proc_info, process=lego_loam_bag_node)
