@@ -38,6 +38,7 @@ class BagReader : public rclcpp::Node
     bool save_current_map_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr raw_point_cloud_pub_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr raw_odom_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr play_state_pub_;
     std::string bag_format_;
 
   private:
@@ -82,6 +83,7 @@ BagReader::BagReader():Node("bag_reader"), pause_mapping_(true), save_current_ma
 
   raw_point_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(point_cloud_topic_, 1);  
   raw_odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(odometry_topic_, 1);  
+  play_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("is_bag_playing", 1); 
 
   sub_pause_ = this->create_subscription<std_msgs::msg::Bool>(
         "lego_loam_bag_pause", 1,
@@ -157,7 +159,7 @@ int main(int argc, char** argv) {
   last_global_map_pub_time = start.tv_sec + double(start.tv_usec) / 1e6;
   while (rclcpp::ok() && reader.has_next())
   {
-    
+    std_msgs::msg::Bool playing;
     if(BR->pause_mapping_){
       rclcpp::spin_some(BR);
       rclcpp::spin_some(IPGE);
@@ -168,9 +170,13 @@ int main(int argc, char** argv) {
         MO->pcdSaver(request, response);
         BR->save_current_map_ = false;
       }
+      playing.data = false;
+      BR->play_state_pub_->publish(playing);
       continue;
     }
-    
+
+    playing.data = true;
+    BR->play_state_pub_->publish(playing);    
     //assign interactive values
     MO->_history_keyframe_fitness_score = BR->icp_score_;
     MO->_history_keyframe_search_radius = BR->history_keyframe_search_radius_;

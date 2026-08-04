@@ -18,6 +18,9 @@ public:
   MappingTestNode() : Node("mapping_test_node") {
     trigger_bag_mapping_pub_ =
         this->create_publisher<std_msgs::msg::Bool>("lego_loam_bag_pause", 2);
+    sub_playing_state_ = this->create_subscription<std_msgs::msg::Bool>(
+        "is_bag_playing", 1,
+        std::bind(&MappingTestNode::playingStateCb, this, std::placeholders::_1));
     timer_ = this->create_wall_timer(
         100ms, std::bind(&MappingTestNode::testCb, this));
     RCLCPP_INFO(this->get_logger(), "MappingTestNode: %s has been started.", this->get_name());
@@ -28,6 +31,7 @@ public:
 
 private:
   OptimizedICPGN icp_opti_;
+  bool is_playing_ = false;
   enum class State {
     TRIGGER_MAPPING,
     WAIT_MAPPING_DONE,
@@ -41,11 +45,18 @@ private:
     switch (current_state_) {
     case State::TRIGGER_MAPPING: {
       std_msgs::msg::Bool pause_mapping;
+      pause_mapping.data = false;
       trigger_bag_mapping_pub_->publish(pause_mapping);
-      std::filesystem::remove_all("/tmp/testing_pg");
-      RCLCPP_INFO(this->get_logger(), "Changing state to WAIT_MAPPING_DONE");
-      current_state_ = State::WAIT_MAPPING_DONE;
-      break;
+      if(!is_playing_){
+        break;
+      }
+      else{
+        std::filesystem::remove_all("/tmp/testing_pg");
+        RCLCPP_INFO(this->get_logger(), "Changing state to WAIT_MAPPING_DONE");
+        current_state_ = State::WAIT_MAPPING_DONE;
+        break;
+      }
+
     }
     case State::WAIT_MAPPING_DONE:
       // Implement dir scan mechanism
@@ -158,6 +169,10 @@ private:
   }
 
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr trigger_bag_mapping_pub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_playing_state_;
+  void playingStateCb(const std_msgs::msg::Bool::SharedPtr msg){
+    is_playing_ = msg->data;
+  }
   rclcpp::TimerBase::SharedPtr timer_;
   State current_state_ = State::TRIGGER_MAPPING;
 };

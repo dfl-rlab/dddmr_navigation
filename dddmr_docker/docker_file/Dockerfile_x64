@@ -29,6 +29,8 @@ RUN apt-get update && apt-get install -y git
 RUN apt install -y ros-humble-desktop
 # --- Humble has been installed
 
+# ROS2 that are not included in Desktop but required for DDDMR
+RUN apt install -y ros-humble-ackermann-msgs ros-humble-rqt-tf-tree ros-humble-rosbag2-storage-mcap ros-humble-apriltag-msgs
 
 #install some tool
 RUN apt install -y nano openssh-server usbutils
@@ -78,14 +80,10 @@ RUN apt install -y libfreeimage-dev
 RUN apt install -y gdb
 
 #install apriltag
-RUN apt install -y ros-humble-apriltag-msgs
 RUN cd /tmp && git clone https://github.com/AprilRobotics/apriltag.git && cd apriltag && git checkout 3806edf38ac4400153677e510c9f9dcb81f472c8 && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target install
 
 #install can stuff for scout
 RUN apt install -y libasio-dev can-utils
-
-#install ackermann msg to support ackermann drive
-RUN apt install -y ros-humble-ackermann-msgs ros-humble-rqt-tf-tree
 
 RUN echo "function ws_build_dddmr_pcl(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Debug --packages-up-to dddmr_pcl\n}" >> ~/.bashrc
 RUN echo "function ws_build(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release\n}" >> ~/.bashrc
