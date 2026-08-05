@@ -1,4 +1,34 @@
 # DDDMR LeGO LOAM BOR
+
+## 🚀 Big update - Deep Lego Loam with YOLO11+TensorRT!
+<p align='center'>
+    <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_lego_loam_bor/yolo_lego_loam.gif" width="400" height="260"/><p align='center'>Lego Loam + YOLOV11 using TensorRT</p>
+</p>
+<table align='center'>
+  <tr width="40%">
+    <td width="40%"><img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_lego_loam_bor/no_yolo_lego_loam.png" width="400" height="260"/><p align='center'>Human being SLAMed in the map (without YOLO)</p></td>
+    <td width="40%"><img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_lego_loam_bor/yolo_lego_loam.png" width="400" height="260"/><p align='center'>Human being detected and not used in SLAM (with YOLO)</p></td>
+  </tr>
+</table>
+
+> [!NOTE]
+> Our current trained model only support RoboSense Airy with 45 deg tilting. We suggest using dense lidar such as Airy/Jt128/Mid360/E1R to get a better performance in YOLO.
+> Original labelled data and training setup can be found: [DDDMR_YOLO_Training](https://github.com/dddmobilerobot/dddmr_yolo)
+
+
+## 🚀 Example Configuration of Different Lidar and Setup
+We provide multiple bags file for users to quickly configirate their Lidar TF setup. Current tested bag including:
+| Lidar | Tilting (degree) | Yaw (Degree) | Note |
+| :--- | :--- | :--- | :--- |
+| Leishen C16 | 0 | 180 | similar to hesai XT16 |
+| Robosense Airy | 45 | 0 | |
+| Mid360 | 13 | 0 | |
+| Mid360 | 180 | 180 | Same as rolling=180, usually used in humanoid |
+| Hesai JT128 | x | x | coming soon|
+
+Found the details in our [CICD docs](https://github.com/dfl-rlab/dddmr_navigation/tree/main/CICD_setup#dddmr-lego-loam-ci)
+
+## DDDMR LEGO LOAM
 This repo is based on the [LeGO-LOAM-BOR](https://github.com/facontidavide/LeGO-LOAM-BOR), and has been modified for ground vehicles. We did not fork the repo due to significant modifications, variant features and frameworks are implemented.
 
 The original authors deserve all the credits, we just stand on the shoulders of giants.
