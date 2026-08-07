@@ -15,6 +15,9 @@ if(DEFINED ENV{DISPLAY})
   set(DISPLAYPRESENT TRUE)
 endif()
 
+if("$ENV{ROS_DISTRO}" STREQUAL "jazzy")
+    add_compile_definitions(ROS_JAZZY=1)
+endif()
 
 # We specifically don't turn on CMAKE_AUTOMOC, since it generates one huge
 # mocs_compilation.cpp file that takes a lot of memory to compile.  Instead
@@ -30,7 +33,18 @@ find_package(Qt5 REQUIRED COMPONENTS Widgets Test)
 
 find_package(geometry_msgs REQUIRED)
 
-find_package(ignition-math6 REQUIRED)
+# Attempt to find gz-math7 (Jazzy / Gazebo Harmonic)
+find_package(gz-math7 QUIET)
+
+if(gz-math7_FOUND)
+  message(STATUS "Building for Gazebo Harmonic (gz-math7)")
+  find_package(gz_math_vendor REQUIRED)
+  set(MATH_LIBRARIES gz-math7::gz-math7)
+else()
+  message(STATUS "Building for Ignition (ignition-math6)")
+  find_package(ignition-math6 REQUIRED)
+  set(MATH_LIBRARIES ignition-math6::ignition-math6)
+endif()
 
 find_package(image_transport REQUIRED)
 find_package(interactive_markers REQUIRED)
@@ -112,7 +126,7 @@ target_link_libraries(dddmr_rviz_default_plugins PUBLIC
 )
 
 target_link_libraries(dddmr_rviz_default_plugins PRIVATE
-  ignition-math6
+  ${MATH_LIBRARIES}
 )
 
 # Causes the visibility macros to use dllexport rather than dllimport,

@@ -1,0 +1,105 @@
+FROM dddmr:jazzy
+
+#install cuda 13.3
+#see: https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=24.04&target_type=deb_local
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-ubuntu2404.pin
+RUN mv cuda-ubuntu2404.pin /etc/apt/preferences.d/cuda-repository-pin-600
+RUN /bin/bash -c "cd /tmp && wget https://developer.download.nvidia.com/compute/cuda/13.3.1/local_installers/cuda-repo-ubuntu2404-13-3-local_13.3.1-610.43.02-1_amd64.deb"
+RUN /bin/bash -c "cd /tmp && dpkg -i cuda-repo-ubuntu2404-13-3-local_13.3.1-610.43.02-1_amd64.deb"
+RUN /bin/bash -c "cd /tmp && cp /var/cuda-repo-ubuntu2404-13-3-local/cuda-*-keyring.gpg /usr/share/keyrings/"
+RUN /bin/bash -c "apt-get update"
+RUN /bin/bash -c "apt-get -y install cuda-toolkit-13-3"
+
+#install cudnn 9.25
+#see: https://developer.nvidia.com/cudnn-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=24.04&target_type=deb_local
+RUN /bin/bash -c "cd /tmp && wget https://developer.download.nvidia.com/compute/cudnn/9.25.0/local_installers/cudnn-local-repo-ubuntu2404-9.25.0_1.0-1_amd64.deb"
+RUN /bin/bash -c "cd /tmp && dpkg -i cudnn-local-repo-ubuntu2404-9.25.0_1.0-1_amd64.deb"
+RUN /bin/bash -c "cd /tmp && cp /var/cudnn-local-repo-ubuntu2404-9.25.0/cudnn-*-keyring.gpg /usr/share/keyrings/"
+RUN /bin/bash -c "apt-get update"
+RUN /bin/bash -c "apt-get -y install cudnn"
+
+#install pytorch
+RUN pip3 install pip-versions --break-system-packages
+RUN pip-versions list torch
+RUN pip3 install torch==2.11.0 --break-system-packages
+RUN pip3 install torchvision==0.28.0 --break-system-packages
+RUN pip3 install torchaudio==2.11.0 --break-system-packages
+RUN /bin/bash -c "export PATH=${PATH}:/usr/local/cuda/bin && export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/cuda/lib64 && pip3 install pycuda==2026.1 --break-system-packages"
+RUN /bin/bash -c "echo 'export PATH=\${PATH}:/usr/local/cuda/bin' >> ~/.bashrc"
+RUN /bin/bash -c "echo 'export LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:/usr/local/cuda/lib64' >> ~/.bashrc"
+
+#install tensorrt for c++ API
+#see: https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html
+#see for download: https://developer.nvidia.com/tensorrt/download/10x
+RUN /bin/bash -c "cd /tmp && wget https://developer.download.nvidia.com/compute/tensorrt/10.16.0/local_installers/nv-tensorrt-local-repo-ubuntu2404-10.16.0-cuda-13.2_1.0-1_amd64.deb"
+RUN /bin/bash -c "cd /tmp && dpkg -i nv-tensorrt-local-repo-ubuntu2404-10.16.0-cuda-13.2_1.0-1_amd64.deb"
+RUN /bin/bash -c "cd /tmp && cp /var/nv-tensorrt-local-repo-ubuntu2404-10.16.0-cuda-13.2/*-keyring.gpg /usr/share/keyrings/ && apt-get update"
+RUN apt-get install -y tensorrt
+#install tensorrt python
+RUN python3 -m pip install tensorrt==11.1.0.106 --break-system-packages
+RUN python3 -m pip install onnx==1.21.0 --break-system-packages
+
+#TODO install customized opencv 
+RUN pip3 install matplotlib --break-system-packages
+
+#install cv2
+WORKDIR /usr/local/src 
+
+# OpenCV version definition
+ARG OPENCV_VERSION=4.x
+
+# Target CUDA Architectures for multi-GPU SASS support:
+# 7.5 (Turing - RTX 20xx/T4), 8.0 (Ampere - A100), 
+# 8.6 (Ampere - RTX 30xx/A10), 8.7 (Orin AGX/NX), 8.9 (Ada - RTX 40xx/L4/L40), 9.0 (Hopper - H100)
+ARG CUDA_ARCH_BIN="7.5 8.0 8.6 8.7 8.9 9.0 12.0"
+
+# PTX assembly support for future unlisted GPU architectures
+ARG CUDA_ARCH_PTX="12.0"
+
+# Install Dependencies (consolidated layers & cleaned apt cache)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    unzip \
+    flex \
+    bison \
+    meson \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    libgstreamer-plugins-bad1.0-dev \
+    libgtk-3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download OpenCV & Contrib sources
+RUN curl -L -o opencv.zip https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip \
+    && curl -L -o opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/${OPENCV_VERSION}.zip \
+    && unzip -q opencv.zip \
+    && unzip -q opencv_contrib.zip \
+    && rm opencv.zip opencv_contrib.zip
+
+# Configure, Build, and Install OpenCV
+WORKDIR /usr/local/src/opencv-${OPENCV_VERSION}/build
+RUN cmake -D CMAKE_BUILD_TYPE=RELEASE \
+    -D CMAKE_INSTALL_PREFIX=/usr/local/opencv-${OPENCV_VERSION} \
+    -D ENABLE_FAST_MATH=1 \
+    -D CUDA_FAST_MATH=1 \
+    -D WITH_CUBLAS=1 \
+    -D WITH_CUDA=ON \
+    -D BUILD_opencv_cudacodec=OFF \
+    -D WITH_OPENMP=ON \
+    -D WITH_PNG=ON -D WITH_JPEG=ON -D WITH_TIFF=ON -D WITH_WEBP=OFF -D WITH_OPENJPEG=OFF \
+    -D WITH_V4L=OFF -D WITH_JASPER=OFF -D WITH_OPENEXR=OFF -D WITH_FFMPEG=ON -D WITH_GTK=ON \
+    -D WITH_QT=OFF -D WITH_GSTREAMER=ON -D BUILD_opencv_hdf=OFF \
+    -D BUILD_TESTS=OFF -D BUILD_opencv_apps=OFF -D BUILD_PERF_TESTS=OFF \
+    -D BUILD_opencv_python3=ON \
+    -D OPENCV_PYTHON3_INSTALL_PATH=/usr/lib/python3/dist-packages \
+    -D PYTHON_EXECUTABLE=/usr/bin/python3 \
+    -D OPENCV_EXTRA_MODULES_PATH=/usr/local/src/opencv_contrib-${OPENCV_VERSION}/modules \
+    -D CUDA_BIN_PATH=/usr/local/cuda \
+    -D CUDA_ARCH_BIN="${CUDA_ARCH_BIN}" \
+    -D CUDA_ARCH_PTX="${CUDA_ARCH_PTX}" \
+    .. \
+    && make -j$(nproc) \
+    && make install
+
+WORKDIR /root
+CMD ["bash"]

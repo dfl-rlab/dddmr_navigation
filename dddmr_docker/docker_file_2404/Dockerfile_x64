@@ -1,0 +1,89 @@
+FROM ubuntu:24.04
+
+RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+
+RUN apt-get update
+
+RUN apt-get install -y apt-utils && apt-get install -y curl gnupg2 && apt-get install -y lsb-release && apt-get clean all
+
+# --- ROS2 Jazzy Installation
+RUN locale  # check for UTF-8
+
+RUN apt update && apt install -y locales
+RUN locale-gen en_US en_US.UTF-8
+RUN update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+
+RUN echo "export LANG=en_US.UTF-8" >> /root/.bashrc
+
+RUN locale  # verify settings
+
+RUN apt install -y software-properties-common
+RUN add-apt-repository universe
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+
+RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
+
+RUN apt-get update && apt-get install -y git
+
+RUN apt install -y ros-jazzy-desktop
+# --- Jazzy has been installed
+
+# ROS2 that are not included in Desktop but required for DDDMR
+RUN apt install -y ros-jazzy-ackermann-msgs ros-jazzy-rqt-tf-tree ros-jazzy-rosbag2-storage-mcap ros-jazzy-apriltag-msgs
+
+#install some tool
+RUN apt install -y nano openssh-server usbutils
+#for ping hardware etc...
+RUN apt-get install -y iputils-ping net-tools htop build-essential
+
+#upgrade gcc to 13
+RUN add-apt-repository ppa:ubuntu-toolchain-r/test 
+RUN apt update && apt install -y gcc-13 g++-13 && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+
+# --- gtsam ---
+RUN apt install -y zip
+RUN apt install -y libmetis-dev
+RUN cd /tmp && git clone https://github.com/borglab/gtsam.git && cd gtsam && git checkout 4.2a9
+RUN cd /tmp/gtsam && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DGTSAM_USE_SYSTEM_EIGEN=ON -DGTSAM_USE_SYSTEM_METIS=ON -DPCL_ENABLE_MARCHNATIVE=OFF .. && make install -j$(nproc)
+# --- end of gtsam
+
+# --- PCL --- 
+RUN apt install -y libpcap-dev
+RUN apt install -y libusb-1.0-0-dev
+RUN cd /tmp && git clone https://github.com/PointCloudLibrary/pcl.git && cd pcl && git checkout pcl-1.15.0
+RUN cd /tmp/pcl && mkdir build && cd build && cmake -DPCL_ENABLE_AVX=OFF -DPCL_ENABLE_SSE=OFF -DPCL_ENABLE_MARCHNATIVE=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr .. && make install -j$(nproc)
+# --- end of PCL
+
+RUN apt update
+
+# Install pip
+RUN apt install -y python3-pip
+
+RUN apt install -y libopencv-dev python3-opencv
+
+# Install colcon
+RUN apt install -y python3-colcon-common-extensions
+
+#gst
+RUN apt install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio
+
+# fix map tool
+RUN apt install -y libfreeimage-dev
+
+#install GDB
+RUN apt install -y gdb
+
+#install can stuff for scout
+RUN apt install -y libasio-dev can-utils
+
+#install apriltag
+RUN cd /tmp && git clone https://github.com/AprilRobotics/apriltag.git && cd apriltag && git checkout 3806edf38ac4400153677e510c9f9dcb81f472c8 && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target install
+
+RUN echo "function ws_build_dddmr_pcl(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Debug --packages-up-to dddmr_pcl\n}" >> ~/.bashrc
+RUN echo "function ws_build(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release\n}" >> ~/.bashrc
+RUN echo "function ws_build_wi_test(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=OFF -DTEST_ENABLED=ON\n}" >> ~/.bashrc
+RUN echo "function ws_build_wi_test_trt(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON\n}" >> ~/.bashrc
+
+WORKDIR /root
+
+CMD ["bash"]

@@ -2,7 +2,7 @@
 <?xml-model
   href="http://download.ros.org/schema/package_format2.xsd"
   schematypens="http://www.w3.org/2001/XMLSchema"?>
-<package format="2">
+<package format="3">
   <name>dddmr_rviz_default_plugins</name>
   <version>0.0.0</version>
   <description>
@@ -28,8 +28,11 @@
   <exec_depend>libqt5-widgets</exec_depend>
   <exec_depend>rviz_ogre_vendor</exec_depend>
 
+
+  <depend condition="$ROS_DISTRO == 'jazzy' or $ROS_DISTRO == 'rolling'">gz_math_vendor</depend>
+  <depend condition="$ROS_DISTRO == 'humble' or $ROS_DISTRO == 'iron'">ignition-math6</depend>
+
   <depend>geometry_msgs</depend>
-  <depend>ignition_math6_vendor</depend>
   <depend>image_transport</depend>
   <depend>interactive_markers</depend>
   <depend>laser_geometry</depend>
