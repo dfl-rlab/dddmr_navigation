@@ -228,6 +228,12 @@ int main(int argc, char** argv) {
       nav_msgs::msg::Odometry::SharedPtr mapping_odom;
       mapping_odom = std::make_shared<nav_msgs::msg::Odometry>();
       *mapping_odom = FA->mappingOdometry;
+
+      std::shared_ptr<dddmr_sys_core::srv::GetKeyFrameCloud::Request> request_key_frame(new dddmr_sys_core::srv::GetKeyFrameCloud::Request());
+      request_key_frame->key_frame_number = LLV->corner_key_frame_clouds_.size();
+      std::shared_ptr<dddmr_sys_core::srv::GetKeyFrameCloud::Response> response_key_frame(new dddmr_sys_core::srv::GetKeyFrameCloud::Response());
+      MO->getKeyFrameCloud(request_key_frame, response_key_frame);
+      LLV->processKeyFrameCloudResult(response_key_frame);
       if(FA_ready && cycle_cnt%BR->skip_frame_==0){
 
         MO->run();
@@ -235,9 +241,7 @@ int main(int argc, char** argv) {
         LLV->has_m2ci_ = true;
         *(LLV->cloudKeyPoses3D) = *(MO->cloudKeyPoses3D);
         *(LLV->cloudKeyPoses6D) = *(MO->cloudKeyPoses6D);
-        LLV->key_frame_clouds_ = MO->cornerCloudKeyFrames;
-        LLV->patchedGroundKeyFrames = MO->patchedGroundKeyFrames;
-        LLV->patchedGroundEdgeKeyFrames = MO->patchedGroundEdgeKeyFrames;
+
         gettimeofday(&inloop, NULL);
         double inloop_t = inloop.tv_sec + double(inloop.tv_usec) / 1e6;
         if(inloop_t - last_global_map_pub_time > 1.0){
@@ -281,14 +285,6 @@ int main(int argc, char** argv) {
   std::shared_ptr<std_srvs::srv::Empty::Response> response;
 
   MO->pcdSaver(request, response);
-  /*
-  rclcpp::executors::MultiThreadedExecutor executor;
-  executor.add_node(IP);
-  executor.add_node(FA);
-  executor.add_node(MO);
-  executor.add_node(TF);
-  executor.spin();
-  */
   rclcpp::shutdown();
 
   return 0;

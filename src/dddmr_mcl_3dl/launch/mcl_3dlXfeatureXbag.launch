@@ -7,7 +7,7 @@
   </node>
   
   <!--name argument is not required, because it will overwrite all node name in the exec-->
-  <node pkg="mcl_3dl" exec="mcl_3dl" output="screen" respawn="false">
+  <node pkg="mcl_3dl" exec="mcl_3dl" output="screen" respawn="false" launch-prefix="xterm -e gdb -ex run --args" >
     <param from="$(find-pkg-share mcl_3dl)/config/mcl_3dl.yaml" />
   </node>
 

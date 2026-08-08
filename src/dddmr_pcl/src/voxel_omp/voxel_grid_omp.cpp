@@ -400,10 +400,10 @@ pcl::VoxelGridOMP::applyFilter(PointCloud &output)
     std::vector<std::vector<std::pair<int, int>>> tasks;
     size_t total = AssignTask(index_all_threads, threads_, &tasks);
     std::vector<PointCloudPtr> final_clouds(threads_);
-#pragma omp parallel num_threads(threads_)
+#pragma omp parallel for num_threads(threads_) schedule(static, 1)
+    for(size_t t = 0; t < threads_; ++t)
     {
-        int thread_id = omp_get_thread_num();
-        auto& task = tasks[thread_id];
+        auto& task = tasks[t];
         std::vector<int> cur(task.size());
         for(size_t i=0; i<cur.size(); ++i){
             cur[i]=task[i].first;
@@ -451,7 +451,7 @@ pcl::VoxelGridOMP::applyFilter(PointCloud &output)
         }
 #pragma omp critical
         {
-            final_clouds[thread_id] = cloud;
+            final_clouds[t] = cloud;
         }
     }
    
@@ -485,8 +485,8 @@ void pcl::VoxelGridOMP::getMinMax3DOMP(const pcl::PointCloud<PointT> &cloud, con
 {
 //    TicToc t_para;
     // prepare momery for all threads
-    std::vector<Eigen::Vector4f> voxel_mins(threads_);
-    std::vector<Eigen::Vector4f> voxel_maxs(threads_);
+    std::vector<Eigen::Vector4f> voxel_mins(threads_, Eigen::Vector4f::Constant(FLT_MAX));
+    std::vector<Eigen::Vector4f> voxel_maxs(threads_, Eigen::Vector4f::Constant(-FLT_MAX));
 
     // If the data is dense, we don't need to check for NaN
     if (cloud.is_dense)

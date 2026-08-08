@@ -183,13 +183,21 @@ void MapOptimization::getKeyFrameCloud(const std::shared_ptr<dddmr_sys_core::srv
 
   pcl::PointCloud<PointType>::Ptr keyFrameBaseLink;
   keyFrameBaseLink.reset(new pcl::PointCloud<PointType>());
-  pcl::toROSMsg(*keyFrameBaseLink, response->key_frame_cloud);
+  pcl::toROSMsg(*keyFrameBaseLink, response->key_frame_corner);
+  pcl::toROSMsg(*keyFrameBaseLink, response->key_frame_surface);
+  pcl::toROSMsg(*keyFrameBaseLink, response->key_frame_outlier);
   pcl::toROSMsg(*keyFrameBaseLink, response->key_frame_ground);
   pcl::toROSMsg(*keyFrameBaseLink, response->key_frame_ground_edge);
   
   if(!has_m2ci_af3_) return;
   
   if(request->key_frame_number>=cornerCloudKeyFrames.size())
+    return;
+
+  if(request->key_frame_number>=surfCloudKeyFrames.size())
+    return;
+
+  if(request->key_frame_number>=outlierCloudKeyFrames.size())
     return;
 
   if(request->key_frame_number>=patchedGroundKeyFrames.size())
@@ -201,9 +209,10 @@ void MapOptimization::getKeyFrameCloud(const std::shared_ptr<dddmr_sys_core::srv
   if(request->key_frame_number>=cloudKeyPoses6D->size())
     return;
 
-  *keyFrameBaseLink = *cornerCloudKeyFrames[request->key_frame_number] + *outlierCloudKeyFrames[request->key_frame_number];
-  
-  pcl::toROSMsg(*keyFrameBaseLink, response->key_frame_cloud);
+          
+  pcl::toROSMsg(*cornerCloudKeyFrames[request->key_frame_number], response->key_frame_corner);
+  pcl::toROSMsg(*surfCloudKeyFrames[request->key_frame_number], response->key_frame_surface);
+  pcl::toROSMsg(*outlierCloudKeyFrames[request->key_frame_number], response->key_frame_outlier);
   pcl::toROSMsg(*patchedGroundKeyFrames[request->key_frame_number], response->key_frame_ground);
   pcl::toROSMsg(*patchedGroundEdgeKeyFrames[request->key_frame_number], response->key_frame_ground_edge);
 
@@ -1857,7 +1866,6 @@ void MapOptimization::saveKeyFramesAndFactor() {
     RCLCPP_ERROR(this->get_logger(), "It is not possible! We are inserting the same edge in ISAM.");
   }
 
-  
   pcl::PointCloud<PointType>::Ptr thisCornerKeyFrame(
       new pcl::PointCloud<PointType>());
   pcl::PointCloud<PointType>::Ptr thisSurfKeyFrame(
@@ -1868,13 +1876,13 @@ void MapOptimization::saveKeyFramesAndFactor() {
       new pcl::PointCloud<PointType>());
   pcl::PointCloud<PointType>::Ptr thisPatchedGroundEdgeKeyFrame(
       new pcl::PointCloud<PointType>());
-
+  
   pcl::copyPointCloud(*laserCloudCornerLastDS, *thisCornerKeyFrame);
   pcl::copyPointCloud(*laserCloudSurfLastDS, *thisSurfKeyFrame);
   pcl::copyPointCloud(*laserCloudPatchedGroundLast, *thisPatchedGroundKeyFrame);
   pcl::copyPointCloud(*laserCloudOutlierLastDS, *thisOutlierKeyFrame);
   pcl::copyPointCloud(*laserCloudPatchedGroundEdgeLast, *thisPatchedGroundEdgeKeyFrame);
-
+  
   cornerCloudKeyFrames.push_back(thisCornerKeyFrame);
   surfCloudKeyFrames.push_back(thisSurfKeyFrame);
   patchedGroundKeyFrames.push_back(thisPatchedGroundKeyFrame);
@@ -1926,7 +1934,7 @@ void MapOptimization::run() {
   
   AssociationOut association;
   _input_channel.receive(association);
-
+  
   laserCloudCornerLast = association.cloud_corner_last;
   laserCloudSurfLast = association.cloud_surf_last;
   laserCloudOutlierLast = association.cloud_outlier_last;
@@ -1983,7 +1991,7 @@ void MapOptimization::runWoLO(){
   
   AssociationOut association;
   _input_channel.receive(association);
-
+  
   laserCloudCornerLast = association.cloud_corner_last;
   laserCloudSurfLast = association.cloud_surf_last;
   laserCloudOutlierLast = association.cloud_outlier_last;

@@ -112,7 +112,7 @@ void SubMaps::syncMapThread(){
 
   if(!key_poses_received_)
     return;
-
+  
   auto request = std::make_shared<dddmr_sys_core::srv::GetKeyFrameCloud::Request>();
   request->key_frame_number = cornerCloudKeyFrames_.size();
   
@@ -140,7 +140,7 @@ void SubMaps::syncMapThread(){
         pcl::PointCloud<pcl_t> pcl_surface_cloud;
         pcl::PointCloud<pcl_t> pcl_ground_cloud;
 
-        pcl::fromROSMsg(result->key_frame_cloud, pcl_cloud);
+        pcl::fromROSMsg(result->key_frame_corner, pcl_cloud);
         if(pcl_cloud.points.size()<1){
           RCLCPP_DEBUG(this->get_logger(), "Empty key frame cloud");
         }
@@ -158,16 +158,16 @@ void SubMaps::syncMapThread(){
         pcl::PointCloud<pcl_t> pcl_surface_cloud_base_link;
         pcl::PointCloud<pcl_t> pcl_ground_cloud_base_link;
 
-        pcl::fromROSMsg(result->key_frame_cloud, pcl_cloud_base_link);
+        pcl::fromROSMsg(result->key_frame_cloud_base_link, pcl_cloud_base_link);
         if(pcl_cloud_base_link.points.size()<1){
           RCLCPP_DEBUG(this->get_logger(), "Empty key frame cloud base_link");
         }
-        pcl::fromROSMsg(result->key_frame_surface, pcl_surface_cloud_base_link);
-        if(pcl_surface_cloud.points.size()<1){
+        pcl::fromROSMsg(result->key_frame_surface_base_link, pcl_surface_cloud_base_link);
+        if(pcl_surface_cloud_base_link.points.size()<1){
           RCLCPP_DEBUG(this->get_logger(), "Empty key frame surface base_link");
         }
 
-        pcl::fromROSMsg(result->key_frame_ground, pcl_ground_cloud_base_link);
+        pcl::fromROSMsg(result->key_frame_ground_base_link, pcl_ground_cloud_base_link);
         if(pcl_ground_cloud_base_link.points.size()<1){
           RCLCPP_DEBUG(this->get_logger(), "Empty key frame ground base_link");
         }
@@ -192,6 +192,11 @@ void SubMaps::warmUpThread(){
   if(!is_initial_)
     return;
   
+  if(poses_pcl_t_->size()<1){
+    RCLCPP_ERROR(this->get_logger(), "Poses size is 0, check your pg map server setup!");
+    return;
+  }
+
   if(!is_current_ready_){
     mcl_3dl::pcl_t target_pose;
     std::vector<int> pointIdxRadiusSearch;

@@ -253,11 +253,11 @@ void DDDMRPGMapServer::getKeyFrameCloud(const std::shared_ptr<dddmr_sys_core::sr
   if(request->key_frame_number>=cornerCloudKeyFrames_.size()){
     pcl::PointCloud<dddmr_pg_map_server::pcl_t>::Ptr emptyFrame;
     emptyFrame.reset(new pcl::PointCloud<dddmr_pg_map_server::pcl_t>());
-    pcl::toROSMsg(*emptyFrame, response->key_frame_cloud);
+    pcl::toROSMsg(*emptyFrame, response->key_frame_corner);
     pcl::toROSMsg(*emptyFrame, response->key_frame_cloud_base_link);
   }
   else{
-    pcl::toROSMsg(*cornerCloudKeyFrames_[request->key_frame_number], response->key_frame_cloud);
+    pcl::toROSMsg(*cornerCloudKeyFrames_[request->key_frame_number], response->key_frame_corner);
     pcl::toROSMsg(*cornerCloudKeyFrames_baselink_[request->key_frame_number], response->key_frame_cloud_base_link);
   }
 

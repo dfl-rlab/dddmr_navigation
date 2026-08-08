@@ -76,6 +76,9 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
   this->get_parameter("laser.num_horizontal_scans", _horizontal_scans);
   RCLCPP_INFO(this->get_logger(), "laser.num_horizontal_scans: %d", _horizontal_scans);
   
+  //@get this assign as earliest
+  cloud_size_ = _vertical_scans * _horizontal_scans;
+
   declare_parameter("laser.scan_period", rclcpp::ParameterValue(0.1));
   this->get_parameter("laser.scan_period", _scan_period);
   RCLCPP_INFO(this->get_logger(), "laser.scan_period: %.2f", _scan_period);
@@ -230,8 +233,6 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
   }
 #endif
 
-  const size_t cloud_size = _vertical_scans * _horizontal_scans;
-
   _laser_cloud_in.reset(new pcl::PointCloud<PointType>());
   _full_cloud.reset(new pcl::PointCloud<PointType>());
   _full_info_cloud.reset(new pcl::PointCloud<PointType>());
@@ -243,8 +244,8 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
   patched_ground_.reset(new pcl::PointCloud<PointType>());
   patched_ground_edge_.reset(new pcl::PointCloud<PointType>());
 
-  _full_cloud->points.resize(cloud_size);
-  _full_info_cloud->points.resize(cloud_size);
+  _full_cloud->points.resize(cloud_size_);
+  _full_info_cloud->points.resize(cloud_size_);
   
   dsf_patched_ground_.setLeafSize(0.1, 0.1, 0.1);
   
@@ -261,7 +262,7 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
 
 
 void ImageProjection::resetParameters() {
-  const size_t cloud_size = _vertical_scans * _horizontal_scans;
+
   PointType nanPoint;
   nanPoint.x = std::numeric_limits<float>::quiet_NaN();
   nanPoint.y = std::numeric_limits<float>::quiet_NaN();
@@ -289,9 +290,9 @@ void ImageProjection::resetParameters() {
   _seg_msg.start_ring_index.assign(_vertical_scans, 0);
   _seg_msg.end_ring_index.assign(_vertical_scans, 0);
 
-  _seg_msg.segmented_cloud_ground_flag.assign(cloud_size, false);
-  _seg_msg.segmented_cloud_col_ind.assign(cloud_size, 0);
-  _seg_msg.segmented_cloud_range.assign(cloud_size, 0);
+  _seg_msg.segmented_cloud_ground_flag.assign(cloud_size_, false);
+  _seg_msg.segmented_cloud_col_ind.assign(cloud_size_, 0);
+  _seg_msg.segmented_cloud_range.assign(cloud_size_, 0);
 }
 
 void ImageProjection::tfInitial(){
@@ -1003,10 +1004,9 @@ void ImageProjection::labelComponents(int row, int col) {
   const float segmentThetaThreshold = tan(_segment_theta);
 
   std::vector<bool> lineCountFlag(_vertical_scans, false);
-  const size_t cloud_size = _vertical_scans * _horizontal_scans;
   using Coord2D = Eigen::Vector2i;
-  boost::circular_buffer<Coord2D> queue(cloud_size);
-  boost::circular_buffer<Coord2D> all_pushed(cloud_size);
+  boost::circular_buffer<Coord2D> queue(cloud_size_);
+  boost::circular_buffer<Coord2D> all_pushed(cloud_size_);
 
   queue.push_back({ row,col } );
   all_pushed.push_back({ row,col } );

@@ -87,7 +87,8 @@ class ImageProjection : public rclcpp::Node
     pcl::VoxelGrid<PointType> dsf_patched_ground_;
     pcl::VoxelGridOMP dsf_patched_ground_omp_;
     pcl::VoxelGridOMP dsf_patched_ground_edge_omp_;
-
+    
+    size_t cloud_size_;
     int _vertical_scans;
     int _horizontal_scans;
     double _scan_period;

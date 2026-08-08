@@ -105,6 +105,8 @@ public:
 
   // move following to public for interactive pose graph editor
   std::vector<pcl::PointCloud<PointType>::Ptr> cornerCloudKeyFrames;
+  std::vector<pcl::PointCloud<PointType>::Ptr> surfCloudKeyFrames;
+  std::vector<pcl::PointCloud<PointType>::Ptr> outlierCloudKeyFrames;
   std::vector<pcl::PointCloud<PointType>::Ptr> patchedGroundKeyFrames;
   std::vector<pcl::PointCloud<PointType>::Ptr> patchedGroundEdgeKeyFrames;
 
@@ -201,11 +203,8 @@ private:
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr srvSavePCD;
   rclcpp::Service<dddmr_sys_core::srv::GetKeyFrameCloud>::SharedPtr
       srvGetKeyFrameCloud;
-
-  std::vector<pcl::PointCloud<PointType>::Ptr> surfCloudKeyFrames;
-  std::vector<pcl::PointCloud<PointType>::Ptr> outlierCloudKeyFrames;
-  std::vector<pcl::PointCloud<PointType>::Ptr>
-      patchedGroundEdgeProcessedKeyFrames;
+  
+  std::vector<pcl::PointCloud<PointType>::Ptr> patchedGroundEdgeProcessedKeyFrames;
 
   std::deque<pcl::PointCloud<PointType>::Ptr> recentCornerCloudKeyFrames;
   std::deque<pcl::PointCloud<PointType>::Ptr> recentSurfCloudKeyFrames;
@@ -229,10 +228,10 @@ private:
       laserCloudPatchedGroundEdgeLast; // for ground pcd stitching
   pcl::PointCloud<PointType>::Ptr
       laserCloudCornerLastDS; // downsampled corner featuer set from
-                              // odoOptimization
+                              
   pcl::PointCloud<PointType>::Ptr
       laserCloudSurfLastDS; // downsampled surf featuer set from
-                            // odoOptimization
+                            
 
   pcl::PointCloud<PointType>::Ptr
       laserCloudOutlierLast; // corner feature set from odoOptimization
@@ -243,7 +242,7 @@ private:
       laserCloudSurfTotalLast; // surf feature set from odoOptimization
   pcl::PointCloud<PointType>::Ptr
       laserCloudSurfTotalLastDS; // downsampled corner featuer set from
-                                 // odoOptimization
+                                 
 
   pcl::PointCloud<PointType>::Ptr laserCloudOri;
   pcl::PointCloud<PointType>::Ptr coeffSel;

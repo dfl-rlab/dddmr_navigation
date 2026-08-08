@@ -1567,11 +1567,11 @@ void FeatureAssociation::runFeatureAssociation() {
     out.cloud_corner_last.reset(new pcl::PointCloud<PointType>());
     out.cloud_surf_last.reset(new pcl::PointCloud<PointType>());
     out.cloud_outlier_last.reset(new pcl::PointCloud<PointType>());
-
+    
     *out.cloud_corner_last = *laserCloudCornerLast;
     *out.cloud_surf_last = *laserCloudSurfLast;
     *out.cloud_outlier_last = *outlierCloud;
-
+    
     out.cloud_patched_ground_last.reset(new pcl::PointCloud<PointType>());
     out.cloud_patched_ground_edge_last.reset(new pcl::PointCloud<PointType>());
 
