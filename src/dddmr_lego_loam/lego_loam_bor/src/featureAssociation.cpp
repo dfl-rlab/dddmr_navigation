@@ -122,9 +122,6 @@ void FeatureAssociation::initializeValue() {
   cloudSmoothness.resize(cloud_size);
 
   downSizeFilter.setLeafSize(0.2, 0.2, 0.2);
-  downSizeFilter_omp.setNumberOfThreads(6);
-  downSizeFilter_omp.setLeafSize (0.2, 0.2, 0.2);
-  downSizeFilter_omp.setSaveLeafLayout(false);
 
   segmentedCloud.reset(new pcl::PointCloud<PointType>());
   outlierCloud.reset(new pcl::PointCloud<PointType>());
@@ -540,13 +537,10 @@ void FeatureAssociation::extractFeatures() {
     
     // surfPointsFlat = surfPointsFlatFiltered;
 
-    surfPointsLessFlatScanDS->clear();
+    //surfPointsLessFlatScanDS->clear();
     //downSizeFilter.setInputCloud(surfPointsLessFlatScan);
     //downSizeFilter.filter(*surfPointsLessFlatScanDS);
-    downSizeFilter_omp.setInputCloud(surfPointsLessFlatScan);
-    downSizeFilter_omp.setFinalFilter(true);
-    downSizeFilter_omp.filter(*surfPointsLessFlatScanDS);
-    
+    surfPointsLessFlatScanDS = small_gicp::voxelgrid_sampling_omp(*surfPointsLessFlatScan, 0.2, 6);
     *surfPointsLessFlat += *surfPointsLessFlatScanDS;
   }
 }

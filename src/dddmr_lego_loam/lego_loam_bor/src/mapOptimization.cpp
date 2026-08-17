@@ -87,37 +87,7 @@ MapOptimization::MapOptimization(std::string name,
   downSizeFilterCorner.setLeafSize(0.2, 0.2, 0.2);
   downSizeFilterSurf.setLeafSize(0.4, 0.4, 0.4);
   downSizeFilterOutlier.setLeafSize(0.4, 0.4, 0.4);
-
-  downSizeFilterCorner_omp.setNumberOfThreads(6);
-  downSizeFilterCorner_omp.setLeafSize (0.2, 0.2, 0.2);
-  downSizeFilterCorner_omp.setSaveLeafLayout(false);
-
-  downSizeFilterCornerKeyFrame_omp.setNumberOfThreads(6);
-  downSizeFilterCornerKeyFrame_omp.setLeafSize (0.2, 0.2, 0.2);
-  downSizeFilterCornerKeyFrame_omp.setSaveLeafLayout(false);
-
-  downSizeFilterSurf_omp.setNumberOfThreads(6);
-  downSizeFilterSurf_omp.setLeafSize (0.4, 0.4, 0.4);
-  downSizeFilterSurf_omp.setSaveLeafLayout(false);
-
-  downSizeFilterSurfKeyFrame_omp.setNumberOfThreads(6);
-  downSizeFilterSurfKeyFrame_omp.setLeafSize (0.4, 0.4, 0.4);
-  downSizeFilterSurfKeyFrame_omp.setSaveLeafLayout(false);
-
-  downSizeFilterOutlier_omp.setNumberOfThreads(6);
-  downSizeFilterOutlier_omp.setLeafSize (0.4, 0.4, 0.4);
-  downSizeFilterOutlier_omp.setSaveLeafLayout(false);
-
-  downSizeFilterSurfTotal_omp.setNumberOfThreads(6);
-  downSizeFilterSurfTotal_omp.setLeafSize (0.4, 0.4, 0.4);
-  downSizeFilterSurfTotal_omp.setSaveLeafLayout(false);
-
-
   downSizeFilterHistoryKeyFrames.setLeafSize(0.4, 0.4, 0.4);
-
-  downSizeFilterHistoryKeyFrames_omp.setNumberOfThreads(6);
-  downSizeFilterHistoryKeyFrames_omp.setLeafSize (0.4, 0.4, 0.4);
-  downSizeFilterHistoryKeyFrames_omp.setSaveLeafLayout(false);
 
   // DS for final stitch
   downSizeFilterFinalStitch.setLeafSize(0.1, 0.1, 0.1);
@@ -475,11 +445,6 @@ void MapOptimization::allocateMemory() {
 
   isDegenerate = false;
   matP.setZero();
-
-  laserCloudCornerFromMapDSNum = 0;
-  laserCloudSurfFromMapDSNum = 0;
-  laserCloudSurfLastDSNum = 0;
-  laserCloudOutlierLastDSNum = 0;
 
   potentialLoopFlag = false;
   aLoopIsClosed = false;
@@ -1030,9 +995,7 @@ bool MapOptimization::detectLoopClosure() {
   
   //downSizeFilterHistoryKeyFrames.setInputCloud(nearHistorySurfKeyFrameCloud);
   //downSizeFilterHistoryKeyFrames.filter(*nearHistorySurfKeyFrameCloudDS);
-  downSizeFilterHistoryKeyFrames_omp.setInputCloud(nearHistorySurfKeyFrameCloud);
-  downSizeFilterHistoryKeyFrames_omp.setFinalFilter(true);
-  downSizeFilterHistoryKeyFrames_omp.filter(*nearHistorySurfKeyFrameCloudDS);
+  nearHistorySurfKeyFrameCloudDS = small_gicp::voxelgrid_sampling_omp(*nearHistorySurfKeyFrameCloud, 0.4, 4);
   // publish history near key frames
   
   sensor_msgs::msg::PointCloud2 cloudMsgTemp;
@@ -1257,10 +1220,7 @@ void MapOptimization::extractSurroundingKeyFrames() {
   pcl::removeNaNFromPointCloud(*laserCloudCornerFromMap, *laserCloudCornerFromMap, indices_tmp1);
   //downSizeFilterCorner.setInputCloud(laserCloudCornerFromMap);
   //downSizeFilterCorner.filter(*laserCloudCornerFromMapDS);
-  downSizeFilterCornerKeyFrame_omp.setInputCloud(laserCloudCornerFromMap);
-  downSizeFilterCornerKeyFrame_omp.setFinalFilter(true);
-  downSizeFilterCornerKeyFrame_omp.filter(*laserCloudCornerFromMapDS);
-  laserCloudCornerFromMapDSNum = laserCloudCornerFromMapDS->points.size();
+  laserCloudCornerFromMapDS = small_gicp::voxelgrid_sampling_omp(*laserCloudCornerFromMap, 0.2, 4);
 
   // Downsample the surrounding surf key frames (or map)
   std::vector<int> indices_tmp2;
@@ -1268,10 +1228,7 @@ void MapOptimization::extractSurroundingKeyFrames() {
   pcl::removeNaNFromPointCloud(*laserCloudSurfFromMap, *laserCloudSurfFromMap, indices_tmp2);
   //downSizeFilterSurf.setInputCloud(laserCloudSurfFromMap);
   //downSizeFilterSurf.filter(*laserCloudSurfFromMapDS);
-  downSizeFilterSurfKeyFrame_omp.setInputCloud(laserCloudSurfFromMap);
-  downSizeFilterSurfKeyFrame_omp.setFinalFilter(true);
-  downSizeFilterSurfKeyFrame_omp.filter(*laserCloudSurfFromMapDS);
-  laserCloudSurfFromMapDSNum = laserCloudSurfFromMapDS->points.size();
+  laserCloudSurfFromMapDS = small_gicp::voxelgrid_sampling_omp(*laserCloudSurfFromMap, 0.4, 4);
 
 }
 
@@ -1280,35 +1237,27 @@ void MapOptimization::downsampleCurrentScan() {
   laserCloudCornerLastDS->clear();
   //downSizeFilterCorner.setInputCloud(laserCloudCornerLast);
   //downSizeFilterCorner.filter(*laserCloudCornerLastDS);
-  downSizeFilterCorner_omp.setInputCloud(laserCloudCornerLast);
-  downSizeFilterCorner_omp.setFinalFilter(true);
-  downSizeFilterCorner_omp.filter(*laserCloudCornerLastDS);
-  
+  laserCloudCornerLastDS = small_gicp::voxelgrid_sampling_omp(*laserCloudCornerLast, 0.2, 2);
+
   laserCloudSurfLastDS->clear();
   //downSizeFilterSurf.setInputCloud(laserCloudSurfLast);
   //downSizeFilterSurf.filter(*laserCloudSurfLastDS);
-  downSizeFilterSurf_omp.setInputCloud(laserCloudSurfLast);
-  downSizeFilterSurf_omp.setFinalFilter(true);
-  downSizeFilterSurf_omp.filter(*laserCloudSurfLastDS);
-  laserCloudSurfLastDSNum = laserCloudSurfLastDS->points.size();
+  laserCloudSurfLastDS = small_gicp::voxelgrid_sampling_omp(*laserCloudSurfLast, 0.4, 2);
   
   laserCloudOutlierLastDS->clear();
   //downSizeFilterOutlier.setInputCloud(laserCloudOutlierLast);
   //downSizeFilterOutlier.filter(*laserCloudOutlierLastDS);
-  downSizeFilterOutlier_omp.setInputCloud(laserCloudOutlierLast);
-  downSizeFilterOutlier_omp.setFinalFilter(true);
-  downSizeFilterOutlier_omp.filter(*laserCloudOutlierLastDS);
-  laserCloudOutlierLastDSNum = laserCloudOutlierLastDS->points.size();
+  laserCloudOutlierLastDS = small_gicp::voxelgrid_sampling_omp(*laserCloudOutlierLast, 0.4, 2);
 
-  laserCloudSurfTotalLast->clear();
-  laserCloudSurfTotalLastDS->clear();
-  *laserCloudSurfTotalLast += *laserCloudSurfLastDS;
-  *laserCloudSurfTotalLast += *laserCloudOutlierLastDS;
+  //laserCloudSurfTotalLast->clear();
+  //laserCloudSurfTotalLastDS->clear();
+  //*laserCloudSurfTotalLast += *laserCloudSurfLastDS;
+  //*laserCloudSurfTotalLast += *laserCloudOutlierLastDS;
   //downSizeFilterSurf.setInputCloud(laserCloudSurfTotalLast);
   //downSizeFilterSurf.filter(*laserCloudSurfTotalLastDS);
-  downSizeFilterSurfTotal_omp.setInputCloud(laserCloudSurfTotalLast);
-  downSizeFilterSurfTotal_omp.setFinalFilter(true);
-  downSizeFilterOutlier_omp.filter(*laserCloudSurfTotalLastDS);
+  //laserCloudSurfTotalLastDS = small_gicp::voxelgrid_sampling_omp(*laserCloudSurfTotalLast, 0.4, 6);
+  //@Review this
+  //laserCloudSurfTotalLastDS = laserCloudSurfLastDS;
 }
 
 void MapOptimization::cornerOptimization(int iterCount) {
@@ -1433,8 +1382,8 @@ void MapOptimization::surfOptimization(int iterCount) {
   pcl::PointCloud<PointType> wall_pc;
   pcl::PointCloud<PointType> ground_coeff;
   pcl::PointCloud<PointType> wall_coeff;
-  for (size_t i = 0; i < laserCloudSurfTotalLastDS->points.size(); i++) {
-    pointOri = laserCloudSurfTotalLastDS->points[i];
+  for (size_t i = 0; i < laserCloudSurfLastDS->points.size(); i++) {
+    pointOri = laserCloudSurfLastDS->points[i];
     pointAssociateToMap(&pointOri, &pointSel);
     if(!pcl::isFinite(pointSel))
       continue;
@@ -1657,8 +1606,7 @@ bool MapOptimization::LMOptimization(int iterCount) {
 
 void MapOptimization::scan2MapOptimization() {
 
-  //RCLCPP_ERROR(this->get_logger(), "%lu, %lu", laserCloudCornerFromMapDSNum, laserCloudSurfFromMapDSNum);
-  if (laserCloudCornerFromMapDSNum > 10 && laserCloudSurfFromMapDSNum > 100) {
+  if (laserCloudCornerFromMapDS->points.size() > 10 && laserCloudSurfFromMapDS->points.size() > 100) {
     kdtreeCornerFromMap.setInputCloud(laserCloudCornerFromMapDS);
     kdtreeSurfFromMap.setInputCloud(laserCloudSurfFromMapDS);
 

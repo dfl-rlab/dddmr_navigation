@@ -31,12 +31,13 @@ find_package(pcl_conversions REQUIRED)
 find_package(Boost REQUIRED COMPONENTS filesystem serialization system thread date_time regex timer chrono)
 find_package(GTSAM REQUIRED)
 find_package(PCL 1.15 REQUIRED QUIET)
+find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_geometry REQUIRED)
 find_package(dddmr_trt REQUIRED)
 find_package(dddmr_sys_core REQUIRED)
-find_package(dddmr_pcl REQUIRED)
+find_package(small_gicp REQUIRED)
 find_package(OpenMP REQUIRED)
 
 set(dependencies
@@ -90,7 +91,6 @@ if(TRT_ENABLED)
     ${OpenCV_INCLUDE_DIRS}
     ${dddmr_trt_INCLUDE_DIRS}
     ${dddmr_sys_core_INCLUDE_DIRS}
-    ${dddmr_pcl_INCLUDE_DIRS}
     ${OpenMP_CXX_INCLUDE_DIRS}
   )
 else()
@@ -101,7 +101,6 @@ else()
       ${GTSAM_INCLUDE_DIRS}
       ${OpenCV_INCLUDE_DIRS}
       ${dddmr_sys_core_INCLUDE_DIRS}
-      ${dddmr_pcl_INCLUDE_DIRS}
       ${OpenMP_CXX_INCLUDE_DIRS}
     )
 endif()
@@ -112,6 +111,7 @@ add_library(opt_icp_gn SHARED
 )
 target_link_libraries(opt_icp_gn
   ${PCL_LIBRARIES}
+  small_gicp::small_gicp
   OpenMP::OpenMP_CXX
 )
 ament_target_dependencies(opt_icp_gn
@@ -130,7 +130,8 @@ if(TRT_ENABLED)
     ${OpenCV_LIBRARIES}
     ${dddmr_trt_LIBRARIES}
     CUDA::cudart
-    ${dddmr_pcl_LIBRARIES}
+    small_gicp::small_gicp
+    OpenMP::OpenMP_CXX
   )
   target_include_directories(image_projection 
     PRIVATE ${CUDAToolkit_INCLUDE_DIRS}
@@ -146,7 +147,8 @@ else()
   target_link_libraries(image_projection
     ${PCL_LIBRARIES}
     ${OpenCV_LIBRARIES}
-    ${dddmr_pcl_LIBRARIES}
+    small_gicp::small_gicp
+    OpenMP::OpenMP_CXX
   )
   ament_target_dependencies(image_projection
     ${dependencies}
@@ -159,7 +161,8 @@ add_library(feature_association SHARED
 )
 target_link_libraries(feature_association
   ${PCL_LIBRARIES}
-  ${dddmr_pcl_LIBRARIES}
+  small_gicp::small_gicp
+  OpenMP::OpenMP_CXX
 )
 ament_target_dependencies(feature_association
   ${dependencies}
@@ -173,7 +176,8 @@ target_link_libraries(map_optimization
   ${PCL_LIBRARIES}
   ${GTSAM_LIBRARIES}
   opt_icp_gn
-  ${dddmr_pcl_LIBRARIES}
+  small_gicp::small_gicp
+  OpenMP::OpenMP_CXX
 )
 ament_target_dependencies(map_optimization
   ${dependencies}
@@ -185,7 +189,8 @@ add_library(lego_loam_map_visualization SHARED
 )
 target_link_libraries(lego_loam_map_visualization
   ${PCL_LIBRARIES}
-  ${dddmr_pcl_LIBRARIES}
+  small_gicp::small_gicp
+  OpenMP::OpenMP_CXX
 )
 ament_target_dependencies(lego_loam_map_visualization
   ${dependencies}
@@ -357,7 +362,6 @@ if(TRT_ENABLED)
     ${GTSAM_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
     ${dddmr_trt_INCLUDE_DIRS}
-    ${dddmr_pcl_INCLUDE_DIRS}
   )
 
   #yolo ros2 test node

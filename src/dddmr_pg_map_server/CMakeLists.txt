@@ -29,7 +29,7 @@ find_package(PCL 1.15 REQUIRED QUIET)
 find_package(OpenMP REQUIRED)
 
 find_package(dddmr_sys_core REQUIRED)
-find_package(dddmr_pcl REQUIRED)
+find_package(small_gicp REQUIRED)
 
 set(dependencies
   rclcpp
@@ -58,7 +58,6 @@ include_directories(
   ${PCL_INCLUDE_DIRS}
   ${OpenMP_CXX_INCLUDE_DIRS}
   ${dddmr_sys_core_INCLUDE_DIRS}
-  ${dddmr_pcl_INCLUDE_DIRS}
 )
 
 # library
@@ -67,8 +66,8 @@ add_library(dddmr_pg_map_server
 )
 target_link_libraries(dddmr_pg_map_server
   ${PCL_LIBRARIES}
+  small_gicp::small_gicp
   OpenMP::OpenMP_CXX
-  ${dddmr_pcl_LIBRARIES}
 )
 ament_target_dependencies(dddmr_pg_map_server
   ${dependencies}

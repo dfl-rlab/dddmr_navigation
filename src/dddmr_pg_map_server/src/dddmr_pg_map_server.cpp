@@ -174,8 +174,6 @@ void DDDMRPGMapServer::readPoseGraph(){
   }
 
   RCLCPP_INFO(this->get_logger(), "\033[1;32mPose graph is loaded.\033[0m ");
-  RCLCPP_INFO(this->get_logger(), "Map pointcloud size: %lu", map_cloud->points.size());
-  RCLCPP_INFO(this->get_logger(), "Surface pointcloud size: %lu", map_surf->points.size());
   
   //@ euc to filter noisy data
   pcl::PointCloud<dddmr_pg_map_server::pcl_t>::Ptr map_cloud_after_euc (new pcl::PointCloud<dddmr_pg_map_server::pcl_t>);
@@ -199,43 +197,40 @@ void DDDMRPGMapServer::readPoseGraph(){
     } 
   }
 
-  pcl::VoxelGrid<dddmr_pg_map_server::pcl_t> sor_map;
-  sor_map.setInputCloud (map_cloud_after_euc);
-  sor_map.setLeafSize (complete_map_voxel_size_, complete_map_voxel_size_, complete_map_voxel_size_);
-  sor_map.filter (*map_cloud_after_euc);
   map_cloud_after_euc->is_dense = false;
   std::vector<int> ind_map;
   pcl::removeNaNFromPointCloud(*map_cloud_after_euc, *map_cloud_after_euc, ind_map);
-  RCLCPP_INFO(this->get_logger(), "Map pointcloud size after down size: %lu", map_cloud_after_euc->points.size());
+  pcl::PointCloud<dddmr_pg_map_server::pcl_t>::Ptr ds_map_cloud_after_euc (new pcl::PointCloud<dddmr_pg_map_server::pcl_t>);
+  ds_map_cloud_after_euc = small_gicp::voxelgrid_sampling_omp(*map_cloud_after_euc, complete_map_voxel_size_, 6);
+  RCLCPP_INFO(this->get_logger(), "Map pointcloud size: %lu", map_cloud->points.size());
+  RCLCPP_INFO(this->get_logger(), "Map pointcloud size after down size: %lu", ds_map_cloud_after_euc->points.size());
   sensor_msgs::msg::PointCloud2 map_pc;
-  pcl::toROSMsg(*map_cloud_after_euc, map_pc);
+  pcl::toROSMsg(*ds_map_cloud_after_euc, map_pc);
   map_pc.header.frame_id = "map";
   pub_map_->publish(map_pc);
 
-  pcl::VoxelGrid<dddmr_pg_map_server::pcl_t> sor_map_surf;
-  sor_map_surf.setInputCloud (map_surf);
-  sor_map_surf.setLeafSize (complete_map_voxel_size_, complete_map_voxel_size_, complete_map_voxel_size_);
-  sor_map_surf.filter (*map_surf);
+
   map_surf->is_dense = false;
   std::vector<int> ind_map_surf;
   pcl::removeNaNFromPointCloud(*map_surf, *map_surf, ind_map_surf);
-  RCLCPP_INFO(this->get_logger(), "Surf pointcloud size after down size: %lu", map_surf->points.size());
+  pcl::PointCloud<dddmr_pg_map_server::pcl_t>::Ptr ds_map_surf (new pcl::PointCloud<dddmr_pg_map_server::pcl_t>);
+  ds_map_surf = small_gicp::voxelgrid_sampling_omp(*map_surf, complete_map_voxel_size_, 6);
+  RCLCPP_INFO(this->get_logger(), "Surface pointcloud size: %lu", map_surf->points.size());
+  RCLCPP_INFO(this->get_logger(), "Surf pointcloud size after down size: %lu", ds_map_surf->points.size());
   sensor_msgs::msg::PointCloud2 surf_pc;
-  pcl::toROSMsg(*map_surf, surf_pc);
+  pcl::toROSMsg(*ds_map_surf, surf_pc);
   surf_pc.header.frame_id = "map";
   pub_surf_->publish(surf_pc);
 
-  RCLCPP_INFO(this->get_logger(), "Ground pointcloud size: %lu", map_ground->points.size());
-  pcl::VoxelGrid<dddmr_pg_map_server::pcl_t> sor_ground;
-  sor_ground.setInputCloud (map_ground);
-  sor_ground.setLeafSize (complete_map_voxel_size_, complete_map_voxel_size_, complete_map_voxel_size_);
-  sor_ground.filter (*map_ground);
   map_ground->is_dense = false;
   std::vector<int> ind_ground;
   pcl::removeNaNFromPointCloud(*map_ground, *map_ground, ind_ground);
-  RCLCPP_INFO(this->get_logger(), "Ground pointcloud size after down size: %lu", map_ground->points.size());
+  pcl::PointCloud<dddmr_pg_map_server::pcl_t>::Ptr ds_map_ground (new pcl::PointCloud<dddmr_pg_map_server::pcl_t>);
+  ds_map_ground = small_gicp::voxelgrid_sampling_omp(*map_ground, complete_map_voxel_size_, 6);
+  RCLCPP_INFO(this->get_logger(), "Ground pointcloud size: %lu", map_ground->points.size());
+  RCLCPP_INFO(this->get_logger(), "Ground pointcloud size after down size: %lu", ds_map_ground->points.size());
   sensor_msgs::msg::PointCloud2 ground_pc;
-  pcl::toROSMsg(*map_ground, ground_pc);
+  pcl::toROSMsg(*ds_map_ground, ground_pc);
   ground_pc.header.frame_id = "map";
   pub_ground_->publish(ground_pc);
   

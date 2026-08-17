@@ -243,19 +243,12 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
   _outlier_cloud.reset(new pcl::PointCloud<PointType>());
   patched_ground_.reset(new pcl::PointCloud<PointType>());
   patched_ground_edge_.reset(new pcl::PointCloud<PointType>());
-
+  ds_patched_ground_.reset(new pcl::PointCloud<PointType>());
+  ds_patched_ground_edge_.reset(new pcl::PointCloud<PointType>());
   _full_cloud->points.resize(cloud_size_);
   _full_info_cloud->points.resize(cloud_size_);
   
   dsf_patched_ground_.setLeafSize(0.1, 0.1, 0.1);
-  
-  dsf_patched_ground_omp_.setNumberOfThreads(6);
-  dsf_patched_ground_omp_.setLeafSize (0.1, 0.1, 0.1);
-  dsf_patched_ground_omp_.setSaveLeafLayout(false);
-
-  dsf_patched_ground_edge_omp_.setNumberOfThreads(6);
-  dsf_patched_ground_edge_omp_.setLeafSize (0.1, 0.1, 0.1);
-  dsf_patched_ground_edge_omp_.setSaveLeafLayout(false);
 
   yolo_labelled_point_cloud_.reset(new pcl::PointCloud<PointType>());
 }
@@ -927,15 +920,12 @@ void ImageProjection::zPitchRollFeatureRemoval() {
   
   //dsf_patched_ground_.setInputCloud(patched_ground_);
   //dsf_patched_ground_.filter(*patched_ground_);
-  dsf_patched_ground_omp_.setInputCloud(patched_ground_);
-  dsf_patched_ground_omp_.setFinalFilter(true);
-  dsf_patched_ground_omp_.filter(*patched_ground_);
+  ds_patched_ground_ = small_gicp::voxelgrid_sampling_omp(*patched_ground_, 0.1, 6);
 
   //dsf_patched_ground_.setInputCloud(patched_ground_edge_);
   //dsf_patched_ground_.filter(*patched_ground_edge_); 
-  dsf_patched_ground_edge_omp_.setInputCloud(patched_ground_edge_);
-  dsf_patched_ground_edge_omp_.setFinalFilter(true);
-  dsf_patched_ground_edge_omp_.filter(*patched_ground_edge_); 
+  ds_patched_ground_edge_ = small_gicp::voxelgrid_sampling_omp(*patched_ground_edge_, 0.1, 6);
+
 }
 
 void ImageProjection::cloudSegmentation() {
@@ -954,7 +944,9 @@ void ImageProjection::cloudSegmentation() {
         // outliers that will not be used for optimization (always continue)
         if (_label_mat(i, j) == 999999) {
           if (j % 5 == 0) {
-            _outlier_cloud->push_back(_full_cloud->points[j + i * _horizontal_scans]);
+            if (pcl::isFinite(_full_cloud->points[j + i * _horizontal_scans])) {
+              _outlier_cloud->push_back(_full_cloud->points[j + i * _horizontal_scans]);
+            }
           }
           continue;
         }
@@ -1101,7 +1093,7 @@ void ImageProjection::publishClouds() {
 
   //PublishCloud(_pub_outlier_cloud, _outlier_cloud);
   //PublishCloud(_pub_segmented_cloud, _segmented_cloud);
-  PublishCloud(_pub_ground_cloud, patched_ground_);
+  PublishCloud(_pub_ground_cloud, ds_patched_ground_);
   PublishCloud(_pub_segmented_cloud_pure, _segmented_cloud_pure);
   //PublishCloud(_pub_full_info_cloud, _full_info_cloud);
   if (_pub_segmented_cloud_info->get_subscription_count() != 0) {
@@ -1125,8 +1117,8 @@ void ImageProjection::publishClouds() {
   std::swap(out.seg_msg, _seg_msg);
   std::swap(out.outlier_cloud, _outlier_cloud);
   std::swap(out.segmented_cloud, _segmented_cloud);
-  std::swap(out.patched_ground, patched_ground_);
-  std::swap(out.patched_ground_edge, patched_ground_edge_);
+  std::swap(out.patched_ground, ds_patched_ground_);
+  std::swap(out.patched_ground_edge, ds_patched_ground_edge_);
   if(to_fa_)
     _output_channel.send( std::move(out) );
   first_frame_processed_++;

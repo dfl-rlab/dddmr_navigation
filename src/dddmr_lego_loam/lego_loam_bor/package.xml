@@ -37,7 +37,6 @@
   <depend>cv_bridge</depend>
   <depend>dddmr_trt</depend>
   <depend>dddmr_sys_core</depend>
-  <depend>dddmr_pcl</depend>
   
   <test_depend>ament_lint_common</test_depend>
   <test_depend>ament_lint_auto</test_depend>

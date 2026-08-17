@@ -49,7 +49,8 @@
 #include "tf2_ros/static_transform_broadcaster.h"
 
 // omp voxel
-#include "dddmr_pcl/voxel_omp/voxel_grid_omp.h"
+#include <small_gicp/util/downsampling_omp.hpp>
+#include <small_gicp/pcl/pcl_point_traits.hpp>
 
 using namespace std::placeholders;
 
@@ -286,21 +287,8 @@ private:
   pcl::VoxelGrid<PointType> downSizeFilterSurf;
   pcl::VoxelGrid<PointType> downSizeFilterOutlier;
 
-  pcl::VoxelGridOMP downSizeFilterCorner_omp;
-  pcl::VoxelGridOMP downSizeFilterSurf_omp;
-  pcl::VoxelGridOMP downSizeFilterOutlier_omp;
-  pcl::VoxelGridOMP downSizeFilterSurfTotal_omp;
-  pcl::VoxelGridOMP downSizeFilterCornerKeyFrame_omp;
-  pcl::VoxelGridOMP downSizeFilterSurfKeyFrame_omp;
-
   pcl::VoxelGrid<PointType> downSizeFilterHistoryKeyFrames;
-
-  pcl::VoxelGridOMP downSizeFilterHistoryKeyFrames_omp;
-
-
   pcl::VoxelGrid<PointType> downSizeFilterFinalStitch; // DS for final stitch
-
-
 
   std_msgs::msg::Header timeLaserOdometry_header_;
   double timeLaserOdometry;
@@ -329,11 +317,6 @@ private:
   Eigen::Matrix<float, 6, 6> matP;
 
   bool isDegenerate;
-
-  int laserCloudCornerFromMapDSNum;
-  int laserCloudSurfFromMapDSNum;
-  int laserCloudSurfLastDSNum;
-  int laserCloudOutlierLastDSNum;
 
   bool potentialLoopFlag;
   double timeSaveFirstCurrentScanForLoopClosure;
