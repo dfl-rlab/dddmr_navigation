@@ -48,13 +48,17 @@ RUN cd /tmp && git clone https://github.com/borglab/gtsam.git && cd gtsam && git
 RUN cd /tmp/gtsam && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DGTSAM_USE_SYSTEM_EIGEN=ON -DGTSAM_USE_SYSTEM_METIS=ON -DPCL_ENABLE_MARCHNATIVE=OFF .. && make install -j$(nproc)
 # --- end of gtsam
 
-
 # --- PCL --- 
 RUN apt install -y libpcap-dev
 RUN apt install -y libusb-1.0-0-dev
 RUN cd /tmp && git clone https://github.com/PointCloudLibrary/pcl.git && cd pcl && git checkout pcl-1.15.0
 RUN cd /tmp/pcl && mkdir build && cd build && cmake -DPCL_ENABLE_AVX=OFF -DPCL_ENABLE_SSE=OFF -DPCL_ENABLE_MARCHNATIVE=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr .. && make install -j$(nproc)
 # --- end of PCL
+
+# --- SMALL GICP ---
+RUN cd /tmp && git clone https://github.com/koide3/small_gicp.git && cd pcl && git checkout v1.0.1
+RUN cd /tmp/small_gicp && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release && make install -j$(nproc)
+# --- end of SMALL GICP --- 
 
 # --- Serial lib ---
 COPY ./pkgs/serial-foxy.zip /tmp
@@ -85,7 +89,6 @@ RUN cd /tmp && git clone https://github.com/AprilRobotics/apriltag.git && cd apr
 #install can stuff for scout
 RUN apt install -y libasio-dev can-utils
 
-RUN echo "function ws_build_dddmr_pcl(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Debug --packages-up-to dddmr_pcl\n}" >> ~/.bashrc
 RUN echo "function ws_build(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release\n}" >> ~/.bashrc
 RUN echo "function ws_build_wi_test(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=OFF -DTEST_ENABLED=ON\n}" >> ~/.bashrc
 RUN echo "function ws_build_wi_test_trt(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON\n}" >> ~/.bashrc

@@ -54,6 +54,11 @@ RUN cd /tmp && git clone https://github.com/PointCloudLibrary/pcl.git && cd pcl 
 RUN cd /tmp/pcl && mkdir build && cd build && cmake -DPCL_ENABLE_AVX=OFF -DPCL_ENABLE_SSE=OFF -DPCL_ENABLE_MARCHNATIVE=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr .. && make install -j$(nproc)
 # --- end of PCL
 
+# --- SMALL GICP ---
+RUN cd /tmp && git clone https://github.com/koide3/small_gicp.git && cd pcl && git checkout v1.0.1
+RUN cd /tmp/small_gicp && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release && make install -j$(nproc)
+# --- end of SMALL GICP --- 
+
 RUN apt update
 
 # Install pip
@@ -79,7 +84,6 @@ RUN apt install -y libasio-dev can-utils
 #install apriltag
 RUN cd /tmp && git clone https://github.com/AprilRobotics/apriltag.git && cd apriltag && git checkout 3806edf38ac4400153677e510c9f9dcb81f472c8 && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target install
 
-RUN echo "function ws_build_dddmr_pcl(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Debug --packages-up-to dddmr_pcl\n}" >> ~/.bashrc
 RUN echo "function ws_build(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release\n}" >> ~/.bashrc
 RUN echo "function ws_build_wi_test(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=OFF -DTEST_ENABLED=ON\n}" >> ~/.bashrc
 RUN echo "function ws_build_wi_test_trt(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON\n}" >> ~/.bashrc
