@@ -225,6 +225,10 @@ int main(int argc, char** argv) {
       
       bool FA_ready = FA->systemInitedLM; //This line should come before FA->runFeatureAssociation()
       FA->runFeatureAssociation();
+      if(FA->odom_type_ == "wheel_odometry" && !FA->first_odom_prepared_){
+        continue;
+      }
+      
       nav_msgs::msg::Odometry::SharedPtr mapping_odom;
       mapping_odom = std::make_shared<nav_msgs::msg::Odometry>();
       *mapping_odom = FA->mappingOdometry;
