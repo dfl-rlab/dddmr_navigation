@@ -56,8 +56,8 @@ RUN cd /tmp/pcl && mkdir build && cd build && cmake -DPCL_ENABLE_AVX=OFF -DPCL_E
 # --- end of PCL
 
 # --- SMALL GICP ---
-RUN cd /tmp && git clone https://github.com/koide3/small_gicp.git && cd pcl && git checkout v1.0.1
-RUN cd /tmp/small_gicp && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release && make install -j$(nproc)
+RUN cd /tmp && git clone https://github.com/koide3/small_gicp.git && cd small_gicp && git checkout v1.0.1
+RUN cd /tmp/small_gicp && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make install -j$(nproc)
 # --- end of SMALL GICP --- 
 
 # --- Serial lib ---
