@@ -19,7 +19,7 @@ Open another terminal to run navigation stack (If you already have a dddmr devel
 cd dddmr_navigation/dddmr_docker/docker_file/
 ./run_x64.bash
 ```
-You shoule now in the dddmr_x64 container, now compile and then run:
+You shoule now in the dddmr_humble container, now compile and then run:
 ```
 cd dddmr_navigation
 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release

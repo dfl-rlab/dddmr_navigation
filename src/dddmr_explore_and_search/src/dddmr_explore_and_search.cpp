@@ -131,7 +131,7 @@ void DddmrExploreAndSearch::syncGroundCb()
         pcl::PointCloud<PointType> pcl_ground_cloud;
         pcl::PointCloud<PointType> pcl_ground_edge_cloud;
 
-        pcl::fromROSMsg(result->key_frame_cloud, pcl_cloud);
+        pcl::fromROSMsg(result->key_frame_corner, pcl_cloud);
         if(pcl_cloud.points.size()<1){
           //RCLCPP_INFO(this->get_logger(), "Empty key frame");
           return;

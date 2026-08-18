@@ -34,14 +34,6 @@ SubMaps::SubMaps(std::string name) : Node(name), is_current_ready_(false),
   prepare_warm_up_(false), is_warm_up_ready_(false), is_initial_(false), key_poses_received_(false),
   knn_num_of_ground_normals_(20){
 
-  map_voxel_omp_.setNumberOfThreads(4);
-  map_voxel_omp_.setLeafSize (0.2, 0.2, 0.2);
-  map_voxel_omp_.setSaveLeafLayout(false);
-
-  ground_voxel_omp_.setNumberOfThreads(4);
-  ground_voxel_omp_.setLeafSize (0.2, 0.2, 0.2);
-  ground_voxel_omp_.setSaveLeafLayout(false);
-
   map_current_ = std::make_shared<pcl::PointCloud<pcl_t>>();
   ground_current_ = std::make_shared<pcl::PointCloud<pcl_t>>();
   map_warmup_ = std::make_shared<pcl::PointCloud<pcl_t>>();
@@ -112,7 +104,7 @@ void SubMaps::syncMapThread(){
 
   if(!key_poses_received_)
     return;
-
+  
   auto request = std::make_shared<dddmr_sys_core::srv::GetKeyFrameCloud::Request>();
   request->key_frame_number = cornerCloudKeyFrames_.size();
   
@@ -140,7 +132,7 @@ void SubMaps::syncMapThread(){
         pcl::PointCloud<pcl_t> pcl_surface_cloud;
         pcl::PointCloud<pcl_t> pcl_ground_cloud;
 
-        pcl::fromROSMsg(result->key_frame_cloud, pcl_cloud);
+        pcl::fromROSMsg(result->key_frame_corner, pcl_cloud);
         if(pcl_cloud.points.size()<1){
           RCLCPP_DEBUG(this->get_logger(), "Empty key frame cloud");
         }
@@ -158,16 +150,16 @@ void SubMaps::syncMapThread(){
         pcl::PointCloud<pcl_t> pcl_surface_cloud_base_link;
         pcl::PointCloud<pcl_t> pcl_ground_cloud_base_link;
 
-        pcl::fromROSMsg(result->key_frame_cloud, pcl_cloud_base_link);
+        pcl::fromROSMsg(result->key_frame_cloud_base_link, pcl_cloud_base_link);
         if(pcl_cloud_base_link.points.size()<1){
           RCLCPP_DEBUG(this->get_logger(), "Empty key frame cloud base_link");
         }
-        pcl::fromROSMsg(result->key_frame_surface, pcl_surface_cloud_base_link);
-        if(pcl_surface_cloud.points.size()<1){
+        pcl::fromROSMsg(result->key_frame_surface_base_link, pcl_surface_cloud_base_link);
+        if(pcl_surface_cloud_base_link.points.size()<1){
           RCLCPP_DEBUG(this->get_logger(), "Empty key frame surface base_link");
         }
 
-        pcl::fromROSMsg(result->key_frame_ground, pcl_ground_cloud_base_link);
+        pcl::fromROSMsg(result->key_frame_ground_base_link, pcl_ground_cloud_base_link);
         if(pcl_ground_cloud_base_link.points.size()<1){
           RCLCPP_DEBUG(this->get_logger(), "Empty key frame ground base_link");
         }
@@ -192,6 +184,11 @@ void SubMaps::warmUpThread(){
   if(!is_initial_)
     return;
   
+  if(poses_pcl_t_->size()<1){
+    RCLCPP_ERROR(this->get_logger(), "Poses size is 0, check your pg map server setup!");
+    return;
+  }
+
   if(!is_current_ready_){
     mcl_3dl::pcl_t target_pose;
     std::vector<int> pointIdxRadiusSearch;
@@ -204,21 +201,17 @@ void SubMaps::warmUpThread(){
       is_current_ready_ = false;
       return;
     }
-    map_current_->clear();
-    ground_current_->clear();
+
+    pcl::PointCloud<pcl_t>::Ptr map_current_stacked (new pcl::PointCloud<pcl_t>);
+    pcl::PointCloud<pcl_t>::Ptr ground_current_stacked (new pcl::PointCloud<pcl_t>);
     for(auto it=pointIdxRadiusSearch.begin(); it!=pointIdxRadiusSearch.end(); it++){
-      *map_current_ += (*cornerCloudKeyFrames_[*it]);
+      *map_current_stacked += (*cornerCloudKeyFrames_[*it]);
       //*map_current_ += (*surfCloudKeyFrames_[*it]);
-      *ground_current_ += (*groundCloudKeyFrames_[*it]);
+      *ground_current_stacked += (*groundCloudKeyFrames_[*it]);
     }
-
-    map_voxel_omp_.setInputCloud(map_current_);
-    map_voxel_omp_.setFinalFilter(true);
-    map_voxel_omp_.filter(*map_current_);  
-
-    ground_voxel_omp_.setInputCloud(ground_current_);
-    ground_voxel_omp_.setFinalFilter(true);
-    ground_voxel_omp_.filter(*ground_current_);  
+    
+    map_current_ = small_gicp::voxelgrid_sampling_omp(*map_current_stacked, 0.2, 6);
+    ground_current_ = small_gicp::voxelgrid_sampling_omp(*ground_current_stacked, 0.2, 6);
 
     kdtree_ground_current_.setInputCloud(ground_current_);
     kdtree_map_current_.setInputCloud(map_current_);   
@@ -260,21 +253,17 @@ void SubMaps::warmUpThread(){
       prepare_warm_up_ = false;
       return;
     }
-    map_warmup_->clear();
-    ground_warmup_->clear();
+
+    pcl::PointCloud<pcl_t>::Ptr map_warmup_current_stacked (new pcl::PointCloud<pcl_t>);
+    pcl::PointCloud<pcl_t>::Ptr ground_warmup_current_stacked (new pcl::PointCloud<pcl_t>);
     for(auto it=pointIdxRadiusSearch.begin(); it!=pointIdxRadiusSearch.end(); it++){
-      *map_warmup_ += (*cornerCloudKeyFrames_[*it]);
+      *map_warmup_current_stacked += (*cornerCloudKeyFrames_[*it]);
       //*map_warmup_ += (*surfCloudKeyFrames_[*it]);
-      *ground_warmup_ += (*groundCloudKeyFrames_[*it]);
+      *ground_warmup_current_stacked += (*groundCloudKeyFrames_[*it]);
     }
-
-    map_voxel_omp_.setInputCloud(map_warmup_);
-    map_voxel_omp_.setFinalFilter(true);
-    map_voxel_omp_.filter(*map_warmup_);  
-
-    ground_voxel_omp_.setInputCloud(ground_warmup_);
-    ground_voxel_omp_.setFinalFilter(true);
-    ground_voxel_omp_.filter(*ground_warmup_);  
+    
+    map_warmup_ = small_gicp::voxelgrid_sampling_omp(*map_warmup_current_stacked, 0.2, 6);
+    ground_warmup_ = small_gicp::voxelgrid_sampling_omp(*ground_warmup_current_stacked, 0.2, 6);
 
     kdtree_ground_warmup_.setInputCloud(ground_warmup_);
     kdtree_map_warmup_.setInputCloud(map_warmup_);   

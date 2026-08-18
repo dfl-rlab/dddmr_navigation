@@ -49,7 +49,8 @@
 #include "tf2_ros/static_transform_broadcaster.h"
 
 // omp voxel
-#include "dddmr_pcl/voxel_omp/voxel_grid_omp.h"
+#include <small_gicp/util/downsampling_omp.hpp>
+#include <small_gicp/pcl/pcl_point_traits.hpp>
 
 using namespace std::placeholders;
 
@@ -105,6 +106,8 @@ public:
 
   // move following to public for interactive pose graph editor
   std::vector<pcl::PointCloud<PointType>::Ptr> cornerCloudKeyFrames;
+  std::vector<pcl::PointCloud<PointType>::Ptr> surfCloudKeyFrames;
+  std::vector<pcl::PointCloud<PointType>::Ptr> outlierCloudKeyFrames;
   std::vector<pcl::PointCloud<PointType>::Ptr> patchedGroundKeyFrames;
   std::vector<pcl::PointCloud<PointType>::Ptr> patchedGroundEdgeKeyFrames;
 
@@ -201,11 +204,8 @@ private:
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr srvSavePCD;
   rclcpp::Service<dddmr_sys_core::srv::GetKeyFrameCloud>::SharedPtr
       srvGetKeyFrameCloud;
-
-  std::vector<pcl::PointCloud<PointType>::Ptr> surfCloudKeyFrames;
-  std::vector<pcl::PointCloud<PointType>::Ptr> outlierCloudKeyFrames;
-  std::vector<pcl::PointCloud<PointType>::Ptr>
-      patchedGroundEdgeProcessedKeyFrames;
+  
+  std::vector<pcl::PointCloud<PointType>::Ptr> patchedGroundEdgeProcessedKeyFrames;
 
   std::deque<pcl::PointCloud<PointType>::Ptr> recentCornerCloudKeyFrames;
   std::deque<pcl::PointCloud<PointType>::Ptr> recentSurfCloudKeyFrames;
@@ -229,10 +229,10 @@ private:
       laserCloudPatchedGroundEdgeLast; // for ground pcd stitching
   pcl::PointCloud<PointType>::Ptr
       laserCloudCornerLastDS; // downsampled corner featuer set from
-                              // odoOptimization
+                              
   pcl::PointCloud<PointType>::Ptr
       laserCloudSurfLastDS; // downsampled surf featuer set from
-                            // odoOptimization
+                            
 
   pcl::PointCloud<PointType>::Ptr
       laserCloudOutlierLast; // corner feature set from odoOptimization
@@ -243,7 +243,7 @@ private:
       laserCloudSurfTotalLast; // surf feature set from odoOptimization
   pcl::PointCloud<PointType>::Ptr
       laserCloudSurfTotalLastDS; // downsampled corner featuer set from
-                                 // odoOptimization
+                                 
 
   pcl::PointCloud<PointType>::Ptr laserCloudOri;
   pcl::PointCloud<PointType>::Ptr coeffSel;
@@ -287,21 +287,8 @@ private:
   pcl::VoxelGrid<PointType> downSizeFilterSurf;
   pcl::VoxelGrid<PointType> downSizeFilterOutlier;
 
-  pcl::VoxelGridOMP downSizeFilterCorner_omp;
-  pcl::VoxelGridOMP downSizeFilterSurf_omp;
-  pcl::VoxelGridOMP downSizeFilterOutlier_omp;
-  pcl::VoxelGridOMP downSizeFilterSurfTotal_omp;
-  pcl::VoxelGridOMP downSizeFilterCornerKeyFrame_omp;
-  pcl::VoxelGridOMP downSizeFilterSurfKeyFrame_omp;
-
   pcl::VoxelGrid<PointType> downSizeFilterHistoryKeyFrames;
-
-  pcl::VoxelGridOMP downSizeFilterHistoryKeyFrames_omp;
-
-
   pcl::VoxelGrid<PointType> downSizeFilterFinalStitch; // DS for final stitch
-
-
 
   std_msgs::msg::Header timeLaserOdometry_header_;
   double timeLaserOdometry;
@@ -330,11 +317,6 @@ private:
   Eigen::Matrix<float, 6, 6> matP;
 
   bool isDegenerate;
-
-  int laserCloudCornerFromMapDSNum;
-  int laserCloudSurfFromMapDSNum;
-  int laserCloudSurfLastDSNum;
-  int laserCloudOutlierLastDSNum;
 
   bool potentialLoopFlag;
   double timeSaveFirstCurrentScanForLoopClosure;

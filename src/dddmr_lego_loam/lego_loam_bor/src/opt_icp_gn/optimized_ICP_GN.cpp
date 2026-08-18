@@ -36,107 +36,46 @@ bool OptimizedICPGN::Match(const pcl::PointCloud<pcl::PointXYZI>::Ptr &source_cl
         Eigen::Matrix<float, 6, 6> Hessian = Eigen::Matrix<float, 6, 6>::Zero();
         Eigen::Matrix<float, 6, 1> B = Eigen::Matrix<float, 6, 1>::Zero();
         
-        if(transformed_cloud->size()>10000){
-            //@ declare vector for omp
-            std::vector<bool> valid_points(transformed_cloud->size());
-            std::vector<Eigen::Matrix<float, 6, 6>> Hessians(transformed_cloud->size());
-            std::vector<Eigen::Matrix<float, 6, 1>> Bs(transformed_cloud->size());
+        for (unsigned int j = 0; j < transformed_cloud->size(); ++j) {
+            const pcl::PointXYZI &origin_point = source_cloud_ptr->points[j];
 
-            //@ Omp tested using 932139 points, icp time from 2.926 to 2.330 on i9-11950 2.6G Hz
-            //@ Omp tested using 371 points, tcp time from 0.001 to 0.008
-            //@ conclusion: chose omp when points number larger than 10000
-            #pragma omp parallel for
-            for (unsigned int j = 0; j < transformed_cloud->size(); ++j) {
-                const pcl::PointXYZI &origin_point = source_cloud_ptr->points[j];
-
-                //delete inf
-                if (!pcl::isFinite(origin_point)) {
-                    valid_points[i] = false;
-                    continue;
-                }
-
-                const pcl::PointXYZI &transformed_point = transformed_cloud->at(j);
-                std::vector<float> resultant_distances;
-                std::vector<int> indices;
-                //find nearest point from the target cloud
-                kdtree_flann_ptr_->nearestKSearch(transformed_point, 1, indices, resultant_distances);
-
-                //return if the distance exceeding max_correspond_distance
-                if (resultant_distances.front() > max_correspond_distance_) {
-                    valid_points[i] = false;
-                    continue;
-                }
-
-                Eigen::Vector3f nearest_point = Eigen::Vector3f(target_cloud_ptr_->at(indices.front()).x,
-                                                                target_cloud_ptr_->at(indices.front()).y,
-                                                                target_cloud_ptr_->at(indices.front()).z);
-
-                Eigen::Vector3f point_eigen(transformed_point.x, transformed_point.y, transformed_point.z);
-                Eigen::Vector3f origin_point_eigen(origin_point.x, origin_point.y, origin_point.z);
-                Eigen::Vector3f error = point_eigen - nearest_point;
-
-                Eigen::Matrix<float, 3, 6> Jacobian = Eigen::Matrix<float, 3, 6>::Zero();
-                //create jacobian matrix
-                Jacobian.leftCols(3) = Eigen::Matrix3f::Identity();
-                Jacobian.rightCols(3) = -T.block<3, 3>(0, 0) * Hat(origin_point_eigen);
-
-                //create hessian matrix
-                //Hessian += Jacobian.transpose() * Jacobian;
-                //B += -Jacobian.transpose() * error;
-                Hessians[i] = Jacobian.transpose() * Jacobian;
-                Bs[i] = -Jacobian.transpose() * error;
-                valid_points[i] = true;
+            //delete inf
+            if (!pcl::isFinite(origin_point)) {
+                continue;
             }
-            
-            for(unsigned int j = 0; j < transformed_cloud->size(); ++j){
-                if(valid_points[i]){
-                    Hessian+=Hessians[i];
-                    B+=Bs[i];
-                }
+
+            const pcl::PointXYZI &transformed_point = transformed_cloud->at(j);
+            std::vector<float> resultant_distances;
+            std::vector<int> indices;
+            //find nearest point from the target cloud
+            kdtree_flann_ptr_->nearestKSearch(transformed_point, 1, indices, resultant_distances);
+
+            //return if the distance exceeding max_correspond_distance
+            if (resultant_distances.front() > max_correspond_distance_) {
+                continue;
             }
-        }
-        else{
-            for (unsigned int j = 0; j < transformed_cloud->size(); ++j) {
-                const pcl::PointXYZI &origin_point = source_cloud_ptr->points[j];
 
-                //delete inf
-                if (!pcl::isFinite(origin_point)) {
-                    continue;
-                }
+            Eigen::Vector3f nearest_point = Eigen::Vector3f(target_cloud_ptr_->at(indices.front()).x,
+                                                            target_cloud_ptr_->at(indices.front()).y,
+                                                            target_cloud_ptr_->at(indices.front()).z);
 
-                const pcl::PointXYZI &transformed_point = transformed_cloud->at(j);
-                std::vector<float> resultant_distances;
-                std::vector<int> indices;
-                //find nearest point from the target cloud
-                kdtree_flann_ptr_->nearestKSearch(transformed_point, 1, indices, resultant_distances);
+            Eigen::Vector3f point_eigen(transformed_point.x, transformed_point.y, transformed_point.z);
+            Eigen::Vector3f origin_point_eigen(origin_point.x, origin_point.y, origin_point.z);
+            Eigen::Vector3f error = point_eigen - nearest_point;
 
-                //return if the distance exceeding max_correspond_distance
-                if (resultant_distances.front() > max_correspond_distance_) {
-                    continue;
-                }
+            Eigen::Matrix<float, 3, 6> Jacobian = Eigen::Matrix<float, 3, 6>::Zero();
+            //create jacobian matrix
+            Jacobian.leftCols(3) = Eigen::Matrix3f::Identity();
+            Jacobian.rightCols(3) = -T.block<3, 3>(0, 0) * Hat(origin_point_eigen);
 
-                Eigen::Vector3f nearest_point = Eigen::Vector3f(target_cloud_ptr_->at(indices.front()).x,
-                                                                target_cloud_ptr_->at(indices.front()).y,
-                                                                target_cloud_ptr_->at(indices.front()).z);
-
-                Eigen::Vector3f point_eigen(transformed_point.x, transformed_point.y, transformed_point.z);
-                Eigen::Vector3f origin_point_eigen(origin_point.x, origin_point.y, origin_point.z);
-                Eigen::Vector3f error = point_eigen - nearest_point;
-
-                Eigen::Matrix<float, 3, 6> Jacobian = Eigen::Matrix<float, 3, 6>::Zero();
-                //create jacobian matrix
-                Jacobian.leftCols(3) = Eigen::Matrix3f::Identity();
-                Jacobian.rightCols(3) = -T.block<3, 3>(0, 0) * Hat(origin_point_eigen);
-
-                //create hessian matrix
-                //@Weighted ICP, if weight of a point is introduced, then Hessian and B should include them.
-                //@Hessian += w[j]*Jacobian.transpose() * Jacobian;
-                //@B+=w[j]*-Jacobian.transpose() * error;
-                Hessian += Jacobian.transpose() * Jacobian;
-                B += -Jacobian.transpose() * error;
-            }         
-        }
-
+            //create hessian matrix
+            //@Weighted ICP, if weight of a point is introduced, then Hessian and B should include them.
+            //@Hessian += w[j]*Jacobian.transpose() * Jacobian;
+            //@B+=w[j]*-Jacobian.transpose() * error;
+            Hessian += Jacobian.transpose() * Jacobian;
+            B += -Jacobian.transpose() * error;
+        }         
+        
         if (Hessian.determinant() == 0) {
             continue;
         }

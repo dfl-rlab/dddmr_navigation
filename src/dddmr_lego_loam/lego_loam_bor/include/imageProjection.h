@@ -15,8 +15,14 @@
 
 #include "tf2_ros/static_transform_broadcaster.h"
 
-// ros
-#include <cv_bridge/cv_bridge.h>
+//auto detect cv bridge version to prepare for jazzy
+#ifdef ROS_JAZZY
+    // ROS 2 Iron, Jazzy, and newer use the .hpp extension
+    #include <cv_bridge/cv_bridge.hpp>
+#else
+    // ROS 2 Humble and older use the .h extension
+    #include <cv_bridge/cv_bridge.h>
+#endif
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -25,8 +31,8 @@
 #include <filesystem>
 
 // omp voxel
-#include "dddmr_pcl/voxel_omp/voxel_grid_omp.h"
-
+#include <small_gicp/util/downsampling_omp.hpp>
+#include <small_gicp/pcl/pcl_point_traits.hpp>
 #ifdef TRT_ENABLED
 #include "dddmr_trt/yolov8.h"
 #include <opencv2/cudaimgproc.hpp>
@@ -76,12 +82,13 @@ class ImageProjection : public rclcpp::Node
     pcl::PointCloud<PointType>::Ptr _outlier_cloud;
     pcl::PointCloud<PointType>::Ptr patched_ground_;
     pcl::PointCloud<PointType>::Ptr patched_ground_edge_;
+    pcl::PointCloud<PointType>::Ptr ds_patched_ground_;
+    pcl::PointCloud<PointType>::Ptr ds_patched_ground_edge_;
     pcl::PointCloud<PointType>::Ptr yolo_labelled_point_cloud_;
 
     pcl::VoxelGrid<PointType> dsf_patched_ground_;
-    pcl::VoxelGridOMP dsf_patched_ground_omp_;
-    pcl::VoxelGridOMP dsf_patched_ground_edge_omp_;
 
+    size_t cloud_size_;
     int _vertical_scans;
     int _horizontal_scans;
     double _scan_period;

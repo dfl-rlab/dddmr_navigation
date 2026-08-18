@@ -1,4 +1,4 @@
-FROM dddmr:x64
+FROM dddmr:humble
 
 #install cuda 12.6
 #see: https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=22.04&target_type=deb_local
@@ -43,29 +43,43 @@ RUN python3 -m pip install onnx==1.17.0
 RUN pip3 install matplotlib
 
 #install cv2
-WORKDIR /usr/local/src 
-# OpenCV
-ARG OPENCV_VERSION=4.11.0
-RUN curl -L -o opencv.zip https://github.com/opencv/opencv/archive/refs/tags/$OPENCV_VERSION.zip\
-    && curl -L -o opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/refs/tags/$OPENCV_VERSION.zip\
-    && unzip opencv.zip && unzip opencv_contrib.zip && cd opencv-$OPENCV_VERSION && mkdir build \
-    && cd .. && rm opencv.zip opencv_contrib.zip
+WORKDIR /usr/local/src
 
-#GSTREAMER/gtk for opencv
-RUN apt-get install -y flex bison meson
-RUN apt-get install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev
-RUN apt install -y libgtk-3-dev
+# OpenCV version definition
+ARG OPENCV_VERSION=4.x
 
-#GSTREAMER/gtk for opencv
-RUN apt-get install -y flex bison meson
-RUN apt-get install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev
-RUN apt install -y libgtk-3-dev
+# Target CUDA Architectures for multi-GPU SASS support:
+# 7.0 (Volta - V100), 7.5 (Turing - RTX 20xx/T4), 8.0 (Ampere - A100), 
+# 8.6 (Ampere - RTX 30xx/A10), 8.7 (Orin AGX/NX), 8.9 (Ada - RTX 40xx/L4/L40), 9.0 (Hopper - H100)
+ARG CUDA_ARCH_BIN="7.0 7.5 8.0 8.6 8.7 8.9 9.0"
 
-# check this for your gpu: https://developer.nvidia.com/cuda-gpus
-ARG CUDA_ARCH
-WORKDIR opencv-$OPENCV_VERSION/build
+# PTX assembly support for future unlisted GPU architectures
+ARG CUDA_ARCH_PTX="8.9"
+
+# Install Dependencies (consolidated layers & cleaned apt cache)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    unzip \
+    flex \
+    bison \
+    meson \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    libgstreamer-plugins-bad1.0-dev \
+    libgtk-3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download OpenCV & Contrib sources
+RUN curl -L -o opencv.zip https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip \
+    && curl -L -o opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/${OPENCV_VERSION}.zip \
+    && unzip -q opencv.zip \
+    && unzip -q opencv_contrib.zip \
+    && rm opencv.zip opencv_contrib.zip
+
+# Configure, Build, and Install OpenCV
+WORKDIR /usr/local/src/opencv-${OPENCV_VERSION}/build
 RUN cmake -D CMAKE_BUILD_TYPE=RELEASE \
-    -D CMAKE_INSTALL_PREFIX=/usr/local/opencv$OPENCV_VERSION \
+    -D CMAKE_INSTALL_PREFIX=/usr/local/opencv-${OPENCV_VERSION} \
     -D ENABLE_FAST_MATH=1 \
     -D CUDA_FAST_MATH=1 \
     -D WITH_CUBLAS=1 \
@@ -79,11 +93,13 @@ RUN cmake -D CMAKE_BUILD_TYPE=RELEASE \
     -D BUILD_opencv_python3=ON \
     -D OPENCV_PYTHON3_INSTALL_PATH=/usr/lib/python3/dist-packages \
     -D PYTHON_EXECUTABLE=/usr/bin/python3 \
-    -D OPENCV_EXTRA_MODULES_PATH=/usr/local/src/opencv_contrib-$OPENCV_VERSION/modules \
-    -D CUDA_BIN_PATH=/usr/local/cuda\
-    -D CUDA_ARCH_BIN=${CUDA_ARCH}\
-    ..\
-    && make -j$(nproc) && make install
+    -D OPENCV_EXTRA_MODULES_PATH=/usr/local/src/opencv_contrib-${OPENCV_VERSION}/modules \
+    -D CUDA_BIN_PATH=/usr/local/cuda \
+    -D CUDA_ARCH_BIN="${CUDA_ARCH_BIN}" \
+    -D CUDA_ARCH_PTX="${CUDA_ARCH_PTX}" \
+    .. \
+    && make -j$(nproc) \
+    && make install
 
 WORKDIR /root
 CMD ["bash"]

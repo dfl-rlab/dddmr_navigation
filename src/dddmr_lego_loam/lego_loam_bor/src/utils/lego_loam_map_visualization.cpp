@@ -12,18 +12,19 @@ LegoLoamVisualization::LegoLoamVisualization(std::string name) : Node(name)
   cloudKeyPoses6D.reset(new pcl::PointCloud<PointTypePose>());
   cloudKeyPoses3D.reset(new pcl::PointCloud<PointType>());
   clock_ = this->get_clock();
-  key_frame_clouds_.clear();
+  corner_key_frame_clouds_.clear();
+
+  declare_parameter("visualization_detail_level", rclcpp::ParameterValue(0));
+  this->get_parameter("visualization_detail_level", visualization_detail_level_);
+  RCLCPP_INFO(this->get_logger(), "visualization_detail_level: %d", visualization_detail_level_);
 
   declare_parameter("ground_voxel_size", rclcpp::ParameterValue(0.3f));
   this->get_parameter("ground_voxel_size", ground_voxel_size_);
   RCLCPP_INFO(this->get_logger(), "ground_voxel_size: %.2f", ground_voxel_size_);
-  downSizeFilterGlobalGroundKeyFrames_Copy_omp.setNumberOfThreads(6);
-  downSizeFilterGlobalGroundKeyFrames_Copy_omp.setLeafSize (ground_voxel_size_, ground_voxel_size_, ground_voxel_size_);
-  downSizeFilterGlobalGroundKeyFrames_Copy_omp.setSaveLeafLayout(false);
-  
-  ds_patched_ground_omp_.setLeafSize(0.1, 0.5, 0.1); //we are in camera frame, z pointing to moving direction, y pointing to sky 
-  ds_patched_ground_omp_.setNumberOfThreads(6);
-  ds_patched_ground_omp_.setSaveLeafLayout(false);
+
+  declare_parameter("map_voxel_size", rclcpp::ParameterValue(0.2f));
+  this->get_parameter("map_voxel_size", map_voxel_size_);
+  RCLCPP_INFO(this->get_logger(), "map_voxel_size: %.2f", map_voxel_size_);
 
   declare_parameter("ground_edge_threshold_num", rclcpp::ParameterValue(50));
   this->get_parameter("ground_edge_threshold_num", ground_edge_threshold_num_);
@@ -84,7 +85,7 @@ void LegoLoamVisualization::syncMapAndGroundThread()
 {
 
   auto request = std::make_shared<dddmr_sys_core::srv::GetKeyFrameCloud::Request>();
-  request->key_frame_number = key_frame_clouds_.size();
+  request->key_frame_number = corner_key_frame_clouds_.size();
   
   if(request->key_frame_number>=cloudKeyPoses6D->size())
   {
@@ -100,31 +101,7 @@ void LegoLoamVisualization::syncMapAndGroundThread()
     [this](rclcpp::Client<dddmr_sys_core::srv::GetKeyFrameCloud>::SharedFuture future) {
       try {
         auto result = future.get();
-        pcl::PointCloud<PointType> pcl_cloud;
-        pcl::PointCloud<PointType> pcl_ground_cloud;
-        pcl::PointCloud<PointType> pcl_ground_edge_cloud;
-
-        pcl::fromROSMsg(result->key_frame_cloud, pcl_cloud);
-        if(pcl_cloud.points.size()<1){
-          RCLCPP_INFO(this->get_logger(), "Empty key frame1");
-          return;
-        }
-        pcl::fromROSMsg(result->key_frame_ground, pcl_ground_cloud);
-        if(pcl_ground_cloud.points.size()<1){
-          RCLCPP_INFO(this->get_logger(), "Empty key frame2");
-          return;
-        }
-
-        pcl::fromROSMsg(result->key_frame_ground_edge, pcl_ground_edge_cloud);
-        if(pcl_ground_edge_cloud.points.size()<1){
-          RCLCPP_INFO(this->get_logger(), "Empty key frame3");
-          return;
-        }
-
-        RCLCPP_INFO_THROTTLE(this->get_logger(), *clock_, 1000, "Sync key frame number: %lu with total size: %lu", key_frame_clouds_.size(), cloudKeyPoses6D->size());
-        key_frame_clouds_.push_back(pcl_cloud.makeShared());
-        patchedGroundKeyFrames.push_back(pcl_ground_cloud.makeShared());
-        patchedGroundEdgeKeyFrames.push_back(pcl_ground_edge_cloud.makeShared());
+        processKeyFrameCloudResult(result);
       } catch (const std::exception &e) {
         RCLCPP_ERROR(this->get_logger(), "Service call failed: %s", e.what());
       }
@@ -132,20 +109,106 @@ void LegoLoamVisualization::syncMapAndGroundThread()
 
 }
 
+void LegoLoamVisualization::processKeyFrameCloudResult(dddmr_sys_core::srv::GetKeyFrameCloud::Response::SharedPtr result)
+{
+  pcl::PointCloud<PointType> pcl_corner;
+  pcl::PointCloud<PointType> pcl_surface;
+  pcl::PointCloud<PointType> pcl_outlier;
+  pcl::PointCloud<PointType> pcl_ground_cloud;
+  pcl::PointCloud<PointType> pcl_ground_edge_cloud;
+
+  pcl::fromROSMsg(result->key_frame_corner, pcl_corner);
+  if(pcl_corner.points.size()<1){
+    RCLCPP_DEBUG(this->get_logger(), "Empty pcl_corner");
+    return;
+  }
+  else{
+    auto ds_temp = small_gicp::voxelgrid_sampling_omp(pcl_corner, map_voxel_size_, 6);
+    pcl_corner.clear();
+    pcl_corner = *ds_temp;
+  }
+
+  pcl::fromROSMsg(result->key_frame_surface, pcl_surface);
+  if(pcl_surface.points.size()<1){
+    RCLCPP_DEBUG(this->get_logger(), "Empty pcl_surface");
+    return;
+  }
+  else{
+    auto ds_temp = small_gicp::voxelgrid_sampling_omp(pcl_surface, map_voxel_size_, 6);
+    pcl_surface.clear();
+    pcl_surface = *ds_temp;
+  }
+
+  pcl::fromROSMsg(result->key_frame_outlier, pcl_outlier);
+  if(pcl_outlier.points.size()<1){
+    RCLCPP_DEBUG(this->get_logger(), "Empty pcl_outlier");
+    return;
+  }
+  else{
+    auto ds_temp = small_gicp::voxelgrid_sampling_omp(pcl_outlier, map_voxel_size_, 6);
+    pcl_outlier.clear();
+    pcl_outlier = *ds_temp;
+  }
+
+  pcl::fromROSMsg(result->key_frame_ground, pcl_ground_cloud);
+  if(pcl_ground_cloud.points.size()<1){
+    RCLCPP_DEBUG(this->get_logger(), "Empty pcl_ground_cloud");
+    return;
+  }
+
+  pcl::fromROSMsg(result->key_frame_ground_edge, pcl_ground_edge_cloud);
+  if(pcl_ground_edge_cloud.points.size()<1){
+    RCLCPP_DEBUG(this->get_logger(), "Empty pcl_ground_edge_cloud");
+    return;
+  }
+
+  RCLCPP_INFO_THROTTLE(this->get_logger(), *clock_, 1000, "Sync key frame number: %lu with total size: %lu", corner_key_frame_clouds_.size(), cloudKeyPoses6D->size());
+  
+  corner_key_frame_clouds_.push_back(pcl_corner.makeShared());
+  surf_key_frame_clouds_.push_back(pcl_surface.makeShared());
+  outlier_key_frame_clouds_.push_back(pcl_outlier.makeShared());
+  patchedGroundKeyFrames.push_back(pcl_ground_cloud.makeShared());
+  patchedGroundEdgeKeyFrames.push_back(pcl_ground_edge_cloud.makeShared());
+}
+
 void LegoLoamVisualization::pubMapThread()
 {
   if(!has_m2ci_)
     return;
-
+  
   pcl::PointCloud<PointType> map_cloud;
   pcl::PointCloud<PointType> ground_cloud;
+
   size_t cnt = 0;
-  for(auto it=key_frame_clouds_.begin();it!=key_frame_clouds_.end();it++){
+  for(auto it=corner_key_frame_clouds_.begin();it!=corner_key_frame_clouds_.end();it++){
     pcl::PointCloud<PointType> one_frame_map_cloud;
-    one_frame_map_cloud= *transformPointCloud(*it, &cloudKeyPoses6D->points[cnt]);
+    one_frame_map_cloud = *transformPointCloud(*it, &cloudKeyPoses6D->points[cnt]);
     pcl::transformPointCloud(one_frame_map_cloud, one_frame_map_cloud, trans_m2ci_af3_);
     map_cloud+=one_frame_map_cloud;
     cnt++;
+  }
+  
+  if(visualization_detail_level_==1){
+    cnt = 0;
+    for(auto it=surf_key_frame_clouds_.begin();it!=surf_key_frame_clouds_.end();it++){
+      pcl::PointCloud<PointType> one_frame_map_cloud;
+      one_frame_map_cloud = *transformPointCloud(*it, &cloudKeyPoses6D->points[cnt]);
+      pcl::transformPointCloud(one_frame_map_cloud, one_frame_map_cloud, trans_m2ci_af3_);
+      map_cloud+=one_frame_map_cloud;
+      cnt++;
+    }
+  }
+
+  if(visualization_detail_level_==2)
+  {
+    cnt = 0;
+    for(auto it=outlier_key_frame_clouds_.begin();it!=outlier_key_frame_clouds_.end();it++){
+      pcl::PointCloud<PointType> one_frame_map_cloud;
+      one_frame_map_cloud = *transformPointCloud(*it, &cloudKeyPoses6D->points[cnt]);
+      pcl::transformPointCloud(one_frame_map_cloud, one_frame_map_cloud, trans_m2ci_af3_);
+      map_cloud+=one_frame_map_cloud;
+      cnt++;
+    }
   }
 
   for(size_t it=0;it<patchedGroundKeyFrames.size();it++){
@@ -161,21 +224,17 @@ void LegoLoamVisualization::pubMapThread()
     ground_cloud+=one_frame_map_cloud2;
   }
 
+  //@ voxelize final aggregated result to relief communication bandwith
+  auto ds_map_cloud_temp = small_gicp::voxelgrid_sampling_omp(map_cloud, map_voxel_size_, 6);
   sensor_msgs::msg::PointCloud2 cloud_msg_map;
-  pcl::toROSMsg(map_cloud, cloud_msg_map);
+  pcl::toROSMsg(*ds_map_cloud_temp, cloud_msg_map);
   cloud_msg_map.header.stamp = clock_->now();
   cloud_msg_map.header.frame_id = "map";
   pubMap->publish(cloud_msg_map);
-
+  
+  auto ds_ground_cloud_temp = small_gicp::voxelgrid_sampling_omp(ground_cloud, ground_voxel_size_, 6);
   sensor_msgs::msg::PointCloud2 cloud_msg_ground;
-  pcl::PointCloud<PointType>::Ptr content_ground_ptr(new pcl::PointCloud<PointType>(ground_cloud));
-  pcl::PointCloud<PointType> content_ground_filtered;
-  pcl::VoxelGrid<PointType> sor;
-  sor.setInputCloud(content_ground_ptr);
-  sor.setLeafSize(ground_voxel_size_, ground_voxel_size_, ground_voxel_size_);
-  sor.filter(content_ground_filtered);
-
-  pcl::toROSMsg(content_ground_filtered, cloud_msg_ground);
+  pcl::toROSMsg(*ds_ground_cloud_temp, cloud_msg_ground);
   cloud_msg_ground.header.stamp = clock_->now();
   cloud_msg_ground.header.frame_id = "map";
   pubGround->publish(cloud_msg_ground);
@@ -221,12 +280,10 @@ void LegoLoamVisualization::groundEdgeDetectionThread() {
   }
 
   //@ generate ground kdtree for edge to search
-
-  ds_patched_ground_omp_.setInputCloud(patched_ground);
-  ds_patched_ground_omp_.setFinalFilter(true);
-  ds_patched_ground_omp_.filter(*patched_ground);
+  
+  auto ds_patched_ground_cloud = small_gicp::voxelgrid_sampling_omp(*patched_ground, ground_voxel_size_, 6);
   pcl::KdTreeFLANN<PointType> kdtree_ground;
-  kdtree_ground.setInputCloud(patched_ground);
+  kdtree_ground.setInputCloud(ds_patched_ground_cloud);
   
   //@ reprocess old edge frame, because we had new ground information, so new edge will be pushed back to keypose frames
   pcl::PointCloud<PointType>::Ptr patched_ground_edge_camera_frame;
@@ -262,12 +319,12 @@ void LegoLoamVisualization::groundEdgeDetectionThread() {
         
         for(auto k=0;k!=pointIdxRadiusSearch.size();k++){
           auto index = pointIdxRadiusSearch[k];
-          double dx = patched_ground->points[index].x - patched_ground_edge_camera_frame->points[j].x;
+          double dx = ds_patched_ground_cloud->points[index].x - patched_ground_edge_camera_frame->points[j].x;
           //double dy = patched_ground->points[index].y - patched_ground_edge_camera_frame->points[j].y;
-          double dz = patched_ground->points[index].z - patched_ground_edge_camera_frame->points[j].z;
+          double dz = ds_patched_ground_cloud->points[index].z - patched_ground_edge_camera_frame->points[j].z;
           double distance = sqrt(dx*dx+dz*dz);
-          patched_ground->points[index].intensity = 100.0/(1.0+distance);
-          processed_ground_edge_last->push_back(patched_ground->points[index]);
+          ds_patched_ground_cloud->points[index].intensity = 100.0/(1.0+distance);
+          processed_ground_edge_last->push_back(ds_patched_ground_cloud->points[index]);
         }
         
       }
@@ -313,13 +370,9 @@ void LegoLoamVisualization::groundEdgeDetectionThread() {
   //@ transform to map frame --> z pointing to sky
   pcl::transformPointCloud(*globalGroundEdgeKeyFrames, *globalGroundEdgeKeyFrames, trans_m2ci_af3_);
   //RCLCPP_INFO(this->get_logger(),"%lu, %lu", ground_edge_processed_.size(), globalGroundEdgeKeyFrames->points.size());
-  //downSizeFilterGlobalGroundKeyFrames_Copy.setInputCloud(globalGroundEdgeKeyFrames);
-  //downSizeFilterGlobalGroundKeyFrames_Copy.filter(*globalGroundEdgeKeyFrames);
-  downSizeFilterGlobalGroundKeyFrames_Copy_omp.setInputCloud(globalGroundEdgeKeyFrames);
-  downSizeFilterGlobalGroundKeyFrames_Copy_omp.setFinalFilter(true);
-  downSizeFilterGlobalGroundKeyFrames_Copy_omp.filter(*globalGroundEdgeKeyFrames);
+  auto ds_ground_edge_cloud_temp = small_gicp::voxelgrid_sampling_omp(*globalGroundEdgeKeyFrames, ground_voxel_size_, 6);
   sensor_msgs::msg::PointCloud2 cloud_msg_ground_edge;
-  pcl::toROSMsg(*globalGroundEdgeKeyFrames, cloud_msg_ground_edge);
+  pcl::toROSMsg(*ds_ground_edge_cloud_temp, cloud_msg_ground_edge);
   cloud_msg_ground_edge.header.stamp = clock_->now();
   cloud_msg_ground_edge.header.frame_id = "map";
   pubGroundEdge->publish(cloud_msg_ground_edge);

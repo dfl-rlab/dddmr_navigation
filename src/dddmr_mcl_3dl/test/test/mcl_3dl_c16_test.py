@@ -4,10 +4,15 @@ import unittest
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch_ros.actions import Node, SetParameter
+from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
 from launch.actions import TimerAction
+from launch.actions import RegisterEventHandler
+from launch.actions import EmitEvent
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration
 
 import launch_testing
@@ -19,6 +24,24 @@ import pytest
 
 @pytest.mark.launch_test
 def generate_test_description():
+
+  ### Argument for rviz
+  enable_rviz_arg = DeclareLaunchArgument(
+    'enable_rviz',
+    default_value='true',
+    description='Enable Rviz for developer, otherwise for CI'
+  )
+  # 2. Reference the config string
+  enable_rviz_config = LaunchConfiguration('enable_rviz')
+
+  # for debug
+  rviz = Node(
+          package="rviz2",
+          executable="rviz2",
+          output="screen",
+          arguments=['-d', os.path.join(get_package_share_directory('mcl_3dl'), 'rviz', 'mcl_3dl_demo.rviz')], # <-- FIXED CLOSING BRACKET HERE
+          condition=IfCondition(enable_rviz_config)
+  )  
 
   # Declare the launch argument for simulation time
   use_sim_time_arg = DeclareLaunchArgument(
@@ -85,14 +108,6 @@ def generate_test_description():
       ],
       output="screen",
   )
-
-  # for debug
-  rviz = Node(
-          package="rviz2",
-          executable="rviz2",
-          output="screen",
-          arguments=['-d', os.path.join(get_package_share_directory('mcl_3dl'), 'rviz', 'mcl_3dl_demo.rviz')]
-  )  
 
   return LaunchDescription([
       use_sim_time_arg,

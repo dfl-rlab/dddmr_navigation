@@ -1,18 +1,24 @@
 # 🤖 dddmr_navigation
-## 🚀 Big update - Deep Lego Loam with YOLO11+TensorRT!
-<p align='center'>
-    <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_lego_loam_bor/yolo_lego_loam.gif" width="400" height="260"/><p align='center'>Lego Loam + YOLOV11 using TensorRT</p>
-</p>
+## 🧪 Automated CI/CD & Multi-LiDAR Test Suite
+
+Configuring 3D LiDARs with non-zero tilt angles (pitch/roll/yaw) is often a major headache for beginners—frequently causing corrupted maps, bad ground-plane filtering, or broken coordinate transforms.
+
+Our latest release introduces an automated **CI/CD Test Suite** that verifies sensor configurations and navigation compatibility before deployment:
+
+* **Angle & Pitch Validation:** Automatically tests flat, forward-tilted, and custom-angled LiDAR mount geometries.
+* **TF & Point Cloud Accuracy:** Ensures spatial transforms, ground projection, and obstacle clearing remain consistent across mounting angles.
+* **Beginner-Friendly Benchmarking:** Pre-configured test scenarios serve as reliable reference setups for custom robot builds.
+
+### 🔗 Quick Links
+- **Run Tests Locally:**
+Found the details in our [CICD docs](https://github.com/dfl-rlab/dddmr_navigation/tree/main/CICD_setup#dddmr-lego-loam-ci)
 <table align='center'>
-  <tr width="40%">
-    <td width="40%"><img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_lego_loam_bor/no_yolo_lego_loam.png" width="400" height="260"/><p align='center'>Human being SLAMed in the map (without YOLO)</p></td>
-    <td width="40%"><img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_lego_loam_bor/yolo_lego_loam.png" width="400" height="260"/><p align='center'>Human being detected and not used in SLAM (with YOLO)</p></td>
+  <tr width="100%">
+    <td width="33%"><img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/CICD_setup/airy_t45_2x.gif" width="256" height="157"/><p align='center'>Airy tilted 45 degree</p></td>
+    <td width="33%"><img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/CICD_setup/c16_t0_2x.gif" width="256" height="157"/><p align='center'>C16 with no tilting</p></td>
+    <td width="33%"><img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/CICD_setup/mid360_t180_2x.gif" width="256" height="157"/><p align='center'>Mid360 rolling 180</p></td>
   </tr>
 </table>
-
-> [!NOTE]
-> Our current trained model only support RoboSense Airy with 45 deg tilting. We suggest using dense lidar such as Airy/Jt128/Mid360/E1R to get a better performance in YOLO.
-> Original labelled data and training setup can be found: [DDDMR_YOLO_Training](https://github.com/dddmobilerobot/dddmr_yolo)
 
 ## 🚀 Go2 Simulator!
 We’ve just integrated a Gazebo models using Unitree-go2 with the DDDMR Navigation Stack, unlocking true 3D navigation for simulation and testing. Using the latest quadruped robots go2 combined with our advanced stack, you can explore navigation capabilities that go far beyond traditional 2D navigation frameworks.

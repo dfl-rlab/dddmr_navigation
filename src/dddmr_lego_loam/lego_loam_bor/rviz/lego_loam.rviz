@@ -27,7 +27,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: Map
+    SyncSource: Ground
   - Class: mapping_panel/MappingPanel
     Name: MappingPanel
   - Class: pose_graph_editor_panel/PoseGraphEditorPanel
@@ -59,7 +59,7 @@ Visualization Manager:
       Max Color: 255; 255; 255
       Max Intensity: 255
       Min Color: 0; 0; 0
-      Min Intensity: 6
+      Min Intensity: 0
       Name: Raw
       Position Transformer: XYZ
       Selectable: true
@@ -72,7 +72,7 @@ Visualization Manager:
         Filter size: 1
         History Policy: Keep Last
         Reliability Policy: Best Effort
-        Value: /lslidar_point_cloud
+        Value: /livox/lidar
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -571,25 +571,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 166.0067138671875
+      Distance: 58.44698715209961
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -37.360233306884766
-        Y: -6.221664905548096
-        Z: -7.497598648071289
+        X: 7.0255961418151855
+        Y: -13.875812530517578
+        Z: -4.147881507873535
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.834796667098999
+      Pitch: 0.5547976493835449
       Target Frame: map
       Value: Orbit (rviz_default_plugins)
-      Yaw: 1.4935647249221802
+      Yaw: 1.4385647773742676
     Saved: ~
 Window Geometry:
   Displays:
@@ -614,4 +614,4 @@ Window Geometry:
     collapsed: true
   Width: 1850
   X: 70
-  Y: 27
+  Y: 32

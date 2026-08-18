@@ -2,6 +2,7 @@ bag_reader:
   ros__parameters:
     use_sim_time: true
     bag_file_dir: "/root/dddmr_bags/cicdtest/mapping_mid360_t180"
+    bag_format: "mcap"
     point_cloud_topic: "/livox/lidar"
     odometry_topic: "/odom"
     skip_frame: 2
@@ -67,3 +68,10 @@ lego_loam_mo:
         ground_edge_threshold_num: 50
 
         generate_testing_pg: true
+
+lego_loam_map_visualization:
+  ros__parameters:
+    use_sim_time: true
+    visualization_detail_level: 0 #0~2, larger number means the map will be denser and detailed. Thist is just for visualization purpose
+    ground_voxel_size: 0.3 #Ground voxel size for path planning when using mapping and navigation together. This does not affect the mapping result when using bag files.
+    map_voxel_size: 0.2 #Only for visualization experience

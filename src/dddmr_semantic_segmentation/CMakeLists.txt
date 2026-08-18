@@ -35,6 +35,10 @@ set(dependencies
   image_geometry
 )
 
+if("$ENV{ROS_DISTRO}" STREQUAL "jazzy")
+    add_compile_definitions(ROS_JAZZY=1)
+endif()
+
 include_directories(
   include
   ${PCL_INCLUDE_DIRS}

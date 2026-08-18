@@ -8,7 +8,8 @@
 #include "transforms.hpp"
 
 // omp voxel
-#include "dddmr_pcl/voxel_omp/voxel_grid_omp.h"
+#include <small_gicp/util/downsampling_omp.hpp>
+#include <small_gicp/pcl/pcl_point_traits.hpp>
 
 class LegoLoamVisualization : public rclcpp::Node
 {
@@ -20,7 +21,11 @@ public:
   pcl::PointCloud<PointTypePose>::Ptr cloudKeyPoses6D;
   void pubMapThread();
   void groundEdgeDetectionThread();
-  std::vector<pcl::PointCloud<PointType>::Ptr> key_frame_clouds_;
+  void syncMapAndGroundThread();
+  void processKeyFrameCloudResult(dddmr_sys_core::srv::GetKeyFrameCloud::Response::SharedPtr result);
+  std::vector<pcl::PointCloud<PointType>::Ptr> corner_key_frame_clouds_;
+  std::vector<pcl::PointCloud<PointType>::Ptr> surf_key_frame_clouds_;
+  std::vector<pcl::PointCloud<PointType>::Ptr> outlier_key_frame_clouds_;
   std::vector<pcl::PointCloud<PointType>::Ptr> patchedGroundKeyFrames;
   std::vector<pcl::PointCloud<PointType>::Ptr> patchedGroundEdgeKeyFrames;
 
@@ -30,13 +35,13 @@ private:
 
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloudKeyPoses6D_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TransformStamped>::SharedPtr m2ci_sub_;
+
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubMap;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubGround;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubGroundEdge;
 
   void m2ci_callback(const geometry_msgs::msg::TransformStamped::SharedPtr msg);
   void cloudKeyPoses6D_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
-  void syncMapAndGroundThread();
   pcl::PointCloud<PointType>::Ptr transformPointCloud(pcl::PointCloud<PointType>::Ptr cloudIn, PointTypePose *transformIn);
   pcl::PointCloud<PointType>::Ptr transformPointCloudInverse(pcl::PointCloud<PointType>::Ptr cloudIn, PointTypePose *transformIn);
 
@@ -51,10 +56,12 @@ private:
   double ground_voxel_size_;
   std::vector<bool> ground_edge_processed_;
   int ground_edge_threshold_num_;
+  
+  double map_voxel_size_;
+  int visualization_detail_level_;
 
-  pcl::VoxelGridOMP downSizeFilterGlobalGroundKeyFrames_Copy_omp;  // for global map visualization
-  pcl::VoxelGridOMP ds_patched_ground_omp_;
 
+  
 };
 
 #endif  // LEGO_LOAM_VISUALIZATION_HPP_

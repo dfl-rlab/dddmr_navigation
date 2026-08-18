@@ -38,6 +38,8 @@ class BagReader : public rclcpp::Node
     bool save_current_map_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr raw_point_cloud_pub_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr raw_odom_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr play_state_pub_;
+    std::string bag_format_;
 
   private:
 
@@ -63,6 +65,10 @@ BagReader::BagReader():Node("bag_reader"), pause_mapping_(true), save_current_ma
   this->get_parameter("bag_file_dir", bag_file_dir_);
   RCLCPP_INFO(this->get_logger(), "bag_file_dir: %s", bag_file_dir_.c_str());
 
+  declare_parameter("bag_format", rclcpp::ParameterValue("sqlite3"));
+  this->get_parameter("bag_format", bag_format_);
+  RCLCPP_INFO(this->get_logger(), "bag_format: %s", bag_format_.c_str());
+
   declare_parameter("point_cloud_topic", rclcpp::ParameterValue(""));
   this->get_parameter("point_cloud_topic", point_cloud_topic_);
   RCLCPP_INFO(this->get_logger(), "point_cloud_topic: %s", point_cloud_topic_.c_str());
@@ -77,6 +83,7 @@ BagReader::BagReader():Node("bag_reader"), pause_mapping_(true), save_current_ma
 
   raw_point_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(point_cloud_topic_, 1);  
   raw_odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(odometry_topic_, 1);  
+  play_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("is_bag_playing", 1); 
 
   sub_pause_ = this->create_subscription<std_msgs::msg::Bool>(
         "lego_loam_bag_pause", 1,
@@ -132,7 +139,7 @@ int main(int argc, char** argv) {
 
   rosbag2_storage::StorageOptions storage_options{};
   storage_options.uri = BR->getBagFilePath();
-  storage_options.storage_id = "sqlite3";
+  storage_options.storage_id = BR->bag_format_;
 
   rosbag2_cpp::ConverterOptions converter_options{};
   converter_options.input_serialization_format = "cdr";
@@ -152,7 +159,7 @@ int main(int argc, char** argv) {
   last_global_map_pub_time = start.tv_sec + double(start.tv_usec) / 1e6;
   while (rclcpp::ok() && reader.has_next())
   {
-    
+    std_msgs::msg::Bool playing;
     if(BR->pause_mapping_){
       rclcpp::spin_some(BR);
       rclcpp::spin_some(IPGE);
@@ -163,9 +170,13 @@ int main(int argc, char** argv) {
         MO->pcdSaver(request, response);
         BR->save_current_map_ = false;
       }
+      playing.data = false;
+      BR->play_state_pub_->publish(playing);
       continue;
     }
-    
+
+    playing.data = true;
+    BR->play_state_pub_->publish(playing);    
     //assign interactive values
     MO->_history_keyframe_fitness_score = BR->icp_score_;
     MO->_history_keyframe_search_radius = BR->history_keyframe_search_radius_;
@@ -217,6 +228,12 @@ int main(int argc, char** argv) {
       nav_msgs::msg::Odometry::SharedPtr mapping_odom;
       mapping_odom = std::make_shared<nav_msgs::msg::Odometry>();
       *mapping_odom = FA->mappingOdometry;
+
+      std::shared_ptr<dddmr_sys_core::srv::GetKeyFrameCloud::Request> request_key_frame(new dddmr_sys_core::srv::GetKeyFrameCloud::Request());
+      request_key_frame->key_frame_number = LLV->corner_key_frame_clouds_.size();
+      std::shared_ptr<dddmr_sys_core::srv::GetKeyFrameCloud::Response> response_key_frame(new dddmr_sys_core::srv::GetKeyFrameCloud::Response());
+      MO->getKeyFrameCloud(request_key_frame, response_key_frame);
+      LLV->processKeyFrameCloudResult(response_key_frame);
       if(FA_ready && cycle_cnt%BR->skip_frame_==0){
 
         MO->run();
@@ -224,9 +241,7 @@ int main(int argc, char** argv) {
         LLV->has_m2ci_ = true;
         *(LLV->cloudKeyPoses3D) = *(MO->cloudKeyPoses3D);
         *(LLV->cloudKeyPoses6D) = *(MO->cloudKeyPoses6D);
-        LLV->key_frame_clouds_ = MO->cornerCloudKeyFrames;
-        LLV->patchedGroundKeyFrames = MO->patchedGroundKeyFrames;
-        LLV->patchedGroundEdgeKeyFrames = MO->patchedGroundEdgeKeyFrames;
+
         gettimeofday(&inloop, NULL);
         double inloop_t = inloop.tv_sec + double(inloop.tv_usec) / 1e6;
         if(inloop_t - last_global_map_pub_time > 1.0){
@@ -270,14 +285,6 @@ int main(int argc, char** argv) {
   std::shared_ptr<std_srvs::srv::Empty::Response> response;
 
   MO->pcdSaver(request, response);
-  /*
-  rclcpp::executors::MultiThreadedExecutor executor;
-  executor.add_node(IP);
-  executor.add_node(FA);
-  executor.add_node(MO);
-  executor.add_node(TF);
-  executor.spin();
-  */
   rclcpp::shutdown();
 
   return 0;

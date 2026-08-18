@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function build_x64(){
-    docker build --network host -t dddmr:x64 -f Dockerfile_x64 . --no-cache
+    docker build --network host -t dddmr:humble -f Dockerfile_x64 .
 }
 
 #-----select image
@@ -15,15 +15,7 @@ if [[ $image_type == "x64" ]]; then
         echo "----> Creating x64 image with cuda, the x64 image will be created first"
         build_x64
         echo "----> Starting second layer with CUDA"
-        cuda_arch_7=$(nvidia-smi --query-gpu=compute_cap --format=csv | grep '7' | cut -c1)
-        cuda_arch_8=$(nvidia-smi --query-gpu=compute_cap --format=csv | grep '8' | cut -c1)
-        if [[ $cuda_arch_8 == "8" ]]; then 
-            echo "Your GPU ARCH is: $(nvidia-smi --query-gpu=compute_cap --format=csv | grep '8' | cut -d" " -f3)"
-            docker build --network host -t dddmr:cuda -f Dockerfile_x64_cuda --build-arg CUDA_ARCH=$(nvidia-smi --query-gpu=compute_cap --format=csv | grep '8' | tr -s ' ' | cut -d" " -f3) .
-        elif [[ $cuda_arch_7 == "7" ]]; then
-            echo "Your GPU ARCH is: $(nvidia-smi --query-gpu=compute_cap --format=csv | grep '7' | cut -d" " -f3)"
-            docker build --network host -t dddmr:cuda -f Dockerfile_x64_cuda --build-arg CUDA_ARCH=$(nvidia-smi --query-gpu=compute_cap --format=csv | grep '7' | tr -s ' ' | cut -d" " -f3) .
-        fi
+        docker build --network host -t dddmr:humble-cuda -f Dockerfile_x64_cuda .
     else
         echo "----> Creating x64 image without cuda"
         build_x64
@@ -37,7 +29,7 @@ elif [[ $image_type == "x64_gz" ]]; then
     echo "----> Creating x64 image with cuda, the x64 image will be created first"
     build_x64
     echo "----> Starting second layer with gz"
-    docker build --network host -t dddmr_gz:x64 -f Dockerfile_x64_gazebo . --no-cache
+    docker build --network host -t dddmr_gz:humble -f Dockerfile_humble_gazebo . --no-cache
 
 else
     echo "Invalid image type. Please choose x64/l4t/gz"
