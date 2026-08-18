@@ -264,8 +264,8 @@ private:
   pcl::PointCloud<PointType>::Ptr nearHistorySurfKeyFrameCloudDS;
 
   pcl::PointCloud<PointType>::Ptr latestCornerKeyFrameCloud;
-  pcl::PointCloud<PointType>::Ptr latestSurfKeyFrameCloud;
-  pcl::PointCloud<PointType>::Ptr latestSurfKeyFrameCloudDS;
+  pcl::PointCloud<PointType>::Ptr latestSurfCornerKeyFrameCloud;
+  pcl::PointCloud<PointType>::Ptr latestSurfCornerKeyFrameCloudDS;
 
   pcl::PointCloud<PointType>::Ptr globalMapKeyPoses;
   pcl::PointCloud<PointType>::Ptr globalMapKeyPosesDS;
@@ -360,6 +360,7 @@ private:
   bool has_m2ci_af3_;
   size_t current_ground_size_;
   bool generate_testing_pg_;
+  double corner_voxel_size_, surface_voxel_size_, outlier_voxel_size_, surface_icp_voxel_size_;
 };
 
 #endif // MAPOPTIMIZATION_H
