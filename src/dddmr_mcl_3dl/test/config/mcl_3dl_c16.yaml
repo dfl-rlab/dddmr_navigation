@@ -1,6 +1,20 @@
+mcl_3dl_test_node:
+  ros__parameters:
+    use_sim_time: true
+    init_x: 1.1513099670410156
+    init_y: -2.90902042388916
+    init_z: -0.3209571838378906
+    init_ox: 0.0
+    init_oy: 0.0
+    init_oz: 0.9986889872489132
+    init_ow: 0.05118893188708095
+    target_x: 50.449
+    target_y: -92.092
+    target_z: -1.738
+
 mcl_ip:
   ros__parameters:
-    # leishen16
+    use_sim_time: true
     laser:
         odom_type: "laser_odometry"         #wheel_odometry/laser_odometry 
         base_ground_frame: "base_link"
@@ -31,7 +45,7 @@ mcl_ip:
         
 mcl_fa:
   ros__parameters:
-
+    use_sim_time: true
     featureAssociation:
         edge_threshold: 0.1
         surf_threshold: 0.1
@@ -48,12 +62,14 @@ map1:
 
 sub_maps:
   ros__parameters:
+    use_sim_time: true
     pg_map_server_name: "map1" #options from line#3
     sub_map_search_radius: 50.0
     sub_map_warmup_trigger_distance: 20.0
     
 mcl_3dl:
   ros__parameters:
+    use_sim_time: true
     init_x: 0.0
     init_y: 0.0
     init_z: 0.0
@@ -72,7 +88,7 @@ mcl_3dl:
     map_downsample_x: 0.1
     map_downsample_y: 0.1
     map_downsample_z: 0.1
-    num_particles: 60
+    num_particles: 100
 
     resample_var_x: 0.1
     resample_var_y: 0.1

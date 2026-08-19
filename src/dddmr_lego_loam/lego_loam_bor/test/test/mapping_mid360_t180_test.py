@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+import yaml
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -21,6 +22,72 @@ import launch_testing.asserts
 from launch_testing.asserts import assertInStdout
 
 import pytest
+
+
+class NoAliasDumper(yaml.SafeDumper):
+    def ignore_aliases(self, data):
+        return True
+
+
+def correct_yaml_format_by_ros2_version(metadata_path, ros_version=None):
+    """
+    Read metadata.yaml, convert offered_qos_profiles, version, and type_description_hash
+    based on ROS 2 version, and save the modified metadata.yaml.
+    If ros_version is jazzy or above, sets version to 9, offered_qos_profiles to [],
+    and ensures type_description_hash is present.
+    If ros_version is humble (or below), sets version to 5 and offered_qos_profiles to "".
+
+    :param metadata_path: Path to metadata.yaml file or directory containing it.
+    :param ros_version: ROS 2 distro version string (e.g. 'jazzy', 'humble'). Defaults to $ROS_DISTRO.
+    """
+    if not metadata_path:
+        return
+    if os.path.isdir(metadata_path):
+        metadata_file = os.path.join(metadata_path, 'metadata.yaml')
+    else:
+        metadata_file = metadata_path
+
+    if not os.path.exists(metadata_file):
+        return
+
+    if ros_version is None:
+        ros_version = os.environ.get('ROS_DISTRO', 'humble')
+
+    ros_version = str(ros_version).strip().lower()
+    first_char = ros_version[0] if ros_version else 'h'
+
+    with open(metadata_file, 'r') as f:
+        data = yaml.safe_load(f)
+
+    if not data or not isinstance(data, dict):
+        return
+
+    bag_info = data.get('rosbag2_bagfile_information', {})
+    if isinstance(bag_info, dict):
+        if first_char >= 'j':
+            bag_info['version'] = 9
+            if 'custom_data' not in bag_info:
+                bag_info['custom_data'] = None
+            if 'ros_distro' not in bag_info:
+                bag_info['ros_distro'] = ros_version
+        else:
+            bag_info['version'] = 5
+
+        topics = bag_info.get('topics_with_message_count', [])
+        if isinstance(topics, list):
+            for topic in topics:
+                if isinstance(topic, dict):
+                    topic_meta = topic.get('topic_metadata', {})
+                    if isinstance(topic_meta, dict):
+                        if 'offered_qos_profiles' not in topic_meta or topic_meta['offered_qos_profiles'] in ('', [], None):
+                            topic_meta['offered_qos_profiles'] = [] if first_char >= 'j' else ""
+                        if first_char >= 'j':
+                            if 'type_description_hash' not in topic_meta or topic_meta['type_description_hash'] is None:
+                                topic_meta['type_description_hash'] = ""
+
+    with open(metadata_file, 'w') as f:
+        yaml.dump(data, f, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False)
+
 
 @pytest.mark.launch_test
 def generate_test_description():
@@ -57,6 +124,9 @@ def generate_test_description():
     'test', 'config',
     test_name+'.yaml'
   )
+
+  bag_path = "/root/dddmr_bags/cicdtest/" + test_name
+  correct_yaml_format_by_ros2_version(bag_path)
 
   lego_loam_bag_node = Node(
     package="lego_loam_bor",

@@ -23,7 +23,6 @@ from launch_testing.asserts import assertInStdout
 
 import pytest
 
-
 class NoAliasDumper(yaml.SafeDumper):
     def ignore_aliases(self, data):
         return True
@@ -106,12 +105,23 @@ def generate_test_description():
           package="rviz2",
           executable="rviz2",
           output="screen",
-          arguments=['-d', os.path.join(get_package_share_directory('lego_loam_bor'), 'rviz', 'lego_loam.rviz')], # <-- FIXED CLOSING BRACKET HERE
+          arguments=['-d', os.path.join(get_package_share_directory('mcl_3dl'), 'rviz', 'mcl_3dl_demo.rviz')], # <-- FIXED CLOSING BRACKET HERE
           condition=IfCondition(enable_rviz_config)
   )  
 
-  ### Change test name and TF only
-  test_name = 'mapping_gpulidar_t0'
+  # Declare the launch argument for simulation time
+  use_sim_time_arg = DeclareLaunchArgument(
+      'use_sim_time',
+      default_value='true',
+      description='Use simulation (Gazebo) clock if true'
+  )
+  
+  # Reference the launch argument value
+  use_sim_time = LaunchConfiguration('use_sim_time')
+
+  ### Change test name, TF, and remap lidar topic only
+  lidar_topic = "cloud"
+  test_name = 'mcl_3dl_gpulidar'
   b2s = Node(
     package="tf2_ros",
     executable="static_transform_publisher",
@@ -125,46 +135,70 @@ def generate_test_description():
     arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "saye","base_link"]
   )
 
-  the_yaml = os.path.join(
-    get_package_share_directory('lego_loam_bor'),
+  mcl_3dl_yaml = os.path.join(
+    get_package_share_directory('mcl_3dl'),
     'test', 'config',
     test_name+'.yaml'
   )
 
+  dddmr_pg_map_server = Node(
+    package="dddmr_pg_map_server",
+    executable="dddmr_pg_map_server_node",
+    output="screen",
+    parameters = [mcl_3dl_yaml, {'use_sim_time': use_sim_time}]
+  )  
+
+  mcl_3dl_feature_node = Node(
+    package="lego_loam_bor",
+    executable="mcl_feature",
+    output="screen",
+    remappings=[('/lslidar_point_cloud', lidar_topic)],
+    parameters = [mcl_3dl_yaml, {'use_sim_time': use_sim_time}]
+  )  
+
+  mcl_3dl_node = Node(
+    package="mcl_3dl",
+    executable="mcl_3dl",
+    output="screen",
+    parameters = [mcl_3dl_yaml, {'use_sim_time': use_sim_time}]
+  )  
+
+  #for test node
+  test_node = Node(
+    package="mcl_3dl",
+    executable="mcl_3dl_test_node",
+    name="mcl_3dl_test_node",
+    output="screen",
+    parameters = [mcl_3dl_yaml, {'use_sim_time': use_sim_time}]
+  )  
+
   bag_path = "/root/dddmr_bags/cicdtest/" + test_name
   correct_yaml_format_by_ros2_version(bag_path)
 
-  lego_loam_bag_node = Node(
-    package="lego_loam_bor",
-    executable="lego_loam_bag",
-    output="screen",
-    parameters = [the_yaml]
-  )  
-
-  shutdown_on_crash = RegisterEventHandler(
-      event_handler=OnProcessExit(
-          target_action=lego_loam_bag_node,
-          on_exit=lambda event, context: EmitEvent(event=Shutdown(reason='lego_loam_bag node crashed')) if event.returncode != 0 else None
-      )
+  bag_player = ExecuteProcess(
+      cmd=[
+          "ros2",
+          "bag",
+          "play",
+          "-r",
+          "2.0",
+          bag_path,
+      ],
+      output="screen",
   )
-  
-  #for test node
-  test_node = Node(
-    package="lego_loam_bor",
-    executable="mapping_test_node",
-    name=test_name,
-    output="screen"
-  )  
 
   return LaunchDescription([
+      use_sim_time_arg,
       b2s,
       bb2b,
-      lego_loam_bag_node,
-      shutdown_on_crash,
+      dddmr_pg_map_server,
+      mcl_3dl_feature_node,
+      mcl_3dl_node,
+      bag_player,
       rviz,
-      TimerAction(period=5.0, actions=[test_node]),
+      TimerAction(period=3.0, actions=[test_node]),
       launch_testing.actions.ReadyToTest()
-  ]), {'test_node': test_node, 'lego_loam_bag_node': lego_loam_bag_node}
+  ]), {'test_node': test_node}
 
 # These tests will run concurrently with the dut process.  After all these tests are done,
 # the launch system will shut down the processes that it started up
@@ -184,7 +218,3 @@ class TestStdOutput(unittest.TestCase):
             "Success", 
             process=test_node
         )
-
-    def test_lego_loam_bag_node_exit_code(self, proc_info, lego_loam_bag_node):
-        # Trigger a failure if lego_loam_bag node crashes (exits with non-zero code)
-        launch_testing.asserts.assertExitCodes(proc_info, process=lego_loam_bag_node)

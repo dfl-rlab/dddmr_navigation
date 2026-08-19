@@ -86,4 +86,14 @@ if [ "$d_bag6" != "${d_bag6#[Yy]}" ] ;then
   unzip mapping_gpulidar_t0.zip
 fi
 
-
+echo -n "Do you want to download mcl_3dl_gpulidar (Y/N):"
+read d_bag7
+if [ "$d_bag7" != "${d_bag7#[Yy]}" ] ;then 
+  echo "Download map"
+  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='1yZ9xu-0X5cwo_YgGczdTLG46jFTLyH4j \
+      | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
+  curl -L -b cookies.txt -o mcl_3dl_gpulidar.zip \
+      'https://drive.usercontent.google.com/download?id='1yZ9xu-0X5cwo_YgGczdTLG46jFTLyH4j'&confirm='$(<confirm.txt)
+  rm -f confirm.txt cookies.txt
+  unzip mcl_3dl_gpulidar.zip
+fi

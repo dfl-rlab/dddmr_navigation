@@ -28,7 +28,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: SubMap
+    SyncSource: Map
 Visualization Manager:
   Class: ""
   Displays:
@@ -227,6 +227,27 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Alpha: 1
+      Arrow Length: 0.30000001192092896
+      Axes Length: 0.30000001192092896
+      Axes Radius: 0.009999999776482582
+      Class: rviz_default_plugins/PoseArray
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.07000000029802322
+      Head Radius: 0.029999999329447746
+      Name: PoseArray
+      Shaft Length: 0.23000000417232513
+      Shaft Radius: 0.009999999776482582
+      Shape: Arrow (Flat)
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /particles
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -273,25 +294,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/XYOrbit
-      Distance: 27.553983688354492
+      Distance: 43.356727600097656
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 4.188980579376221
-        Y: -8.681015968322754
+        X: -1.434346318244934
+        Y: 0.21643948554992676
         Z: 0.3934788703918457
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8647974729537964
+      Pitch: 1.4897968769073486
       Target Frame: base_link
       Value: XYOrbit (rviz_default_plugins)
-      Yaw: 3.705353021621704
+      Yaw: 1.5753494501113892
     Saved: ~
 Window Geometry:
   Displays:
@@ -310,4 +331,4 @@ Window Geometry:
     collapsed: true
   Width: 1850
   X: 70
-  Y: 27
+  Y: 32

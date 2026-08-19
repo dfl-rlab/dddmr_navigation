@@ -1,3 +1,4 @@
+#include <chrono>
 #include "rclcpp/rclcpp.hpp"
 #include <rcpputils/asserts.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
@@ -20,6 +21,46 @@ public:
   MCL3DLTestNode() : Node("mcl_3dl_test_node") {
     
     clock_ = this->get_clock();
+
+    declare_parameter("init_x", rclcpp::ParameterValue(0.0));
+    this->get_parameter("init_x", initial_pose_.pose.pose.position.x);
+    RCLCPP_INFO(this->get_logger(), "init_x: %.2f", initial_pose_.pose.pose.position.x);
+
+    declare_parameter("init_y", rclcpp::ParameterValue(0.0));
+    this->get_parameter("init_y", initial_pose_.pose.pose.position.y);
+    RCLCPP_INFO(this->get_logger(), "init_y: %.2f", initial_pose_.pose.pose.position.y);
+
+    declare_parameter("init_z", rclcpp::ParameterValue(0.0));
+    this->get_parameter("init_z", initial_pose_.pose.pose.position.z);
+    RCLCPP_INFO(this->get_logger(), "init_z: %.2f", initial_pose_.pose.pose.position.z);
+
+    declare_parameter("init_ox", rclcpp::ParameterValue(0.0));
+    this->get_parameter("init_ox", initial_pose_.pose.pose.orientation.x);
+    RCLCPP_INFO(this->get_logger(), "init_ox: %.2f", initial_pose_.pose.pose.orientation.x);
+
+    declare_parameter("init_oy", rclcpp::ParameterValue(0.0));
+    this->get_parameter("init_oy", initial_pose_.pose.pose.orientation.y);
+    RCLCPP_INFO(this->get_logger(), "init_oy: %.2f", initial_pose_.pose.pose.orientation.y);
+
+    declare_parameter("init_oz", rclcpp::ParameterValue(0.0));
+    this->get_parameter("init_oz", initial_pose_.pose.pose.orientation.z);
+    RCLCPP_INFO(this->get_logger(), "init_oz: %.2f", initial_pose_.pose.pose.orientation.z);
+
+    declare_parameter("init_ow", rclcpp::ParameterValue(1.0));
+    this->get_parameter("init_ow", initial_pose_.pose.pose.orientation.w);
+    RCLCPP_INFO(this->get_logger(), "init_ow: %.2f", initial_pose_.pose.pose.orientation.w);
+
+    declare_parameter("target_x", rclcpp::ParameterValue(0.0));
+    this->get_parameter("target_x", target_pose_.pose.pose.position.x);
+    RCLCPP_INFO(this->get_logger(), "target_x: %.2f", target_pose_.pose.pose.position.x);
+
+    declare_parameter("target_y", rclcpp::ParameterValue(0.0));
+    this->get_parameter("target_y", target_pose_.pose.pose.position.y);
+    RCLCPP_INFO(this->get_logger(), "target_y: %.2f", target_pose_.pose.pose.position.y);
+
+    declare_parameter("target_z", rclcpp::ParameterValue(0.0));
+    this->get_parameter("target_z", target_pose_.pose.pose.position.z);
+    RCLCPP_INFO(this->get_logger(), "target_z: %.2f", target_pose_.pose.pose.position.z);
 
     //@Initialize transform listener and broadcaster
     tf_listener_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -51,6 +92,9 @@ public:
   bool is_passed_ = false;
 
 private:
+  
+  geometry_msgs::msg::PoseWithCovarianceStamped initial_pose_;
+  geometry_msgs::msg::PoseWithCovarianceStamped target_pose_;
 
   enum class State {
     WAIT_B2M_TF,
@@ -73,13 +117,13 @@ private:
   std::shared_ptr<tf2_ros::TransformListener> tfl_;
   std::shared_ptr<tf2_ros::Buffer> tf2Buffer_;
   
-  rclcpp::Time latest_odom_time_;
+  std::chrono::system_clock::time_point latest_odom_time_;
   int dummy_cnt_ = 0;
   geometry_msgs::msg::TransformStamped transform_stamped_;
 
   void cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg){
 
-    latest_odom_time_ = clock_->now();
+    latest_odom_time_ = std::chrono::system_clock::now();
   }
 
   void testCb() {
@@ -104,19 +148,11 @@ private:
       break;
     }
     case State::SEND_INITIAL_POSE: {
-      geometry_msgs::msg::PoseWithCovarianceStamped p;
-      p.header.frame_id = "map";
-      p.pose.pose.position.x = 1.1513099670410156;
-      p.pose.pose.position.y = -2.90902042388916;
-      p.pose.pose.position.z = -0.3209571838378906;
-      p.pose.pose.orientation.x = 0.0;
-      p.pose.pose.orientation.y = 0.0;
-      p.pose.pose.orientation.z = 0.9986889872489132;
-      p.pose.pose.orientation.w = 0.05118893188708095;
-      RCLCPP_INFO(this->get_logger(), "Sending initial pose at %.2f ,%.2f ,%2.f", p.pose.pose.position.x, p.pose.pose.position.y, p.pose.pose.position.z);
-      initial_pose_pub_->publish(p);
+      initial_pose_.header.frame_id = "map";
+      RCLCPP_INFO(this->get_logger(), "Sending initial pose at %.2f ,%.2f ,%2.f", initial_pose_.pose.pose.position.x, initial_pose_.pose.pose.position.y, initial_pose_.pose.pose.position.z);
+      initial_pose_pub_->publish(initial_pose_);
       current_state_ = State::WAIT_LOCALIZATION_DONE;
-      latest_odom_time_ = clock_->now();
+      latest_odom_time_ = std::chrono::system_clock::now();
       break;
     }
     case State::WAIT_LOCALIZATION_DONE: {
@@ -138,7 +174,8 @@ private:
       }
 
 
-      if((clock_->now() - latest_odom_time_).seconds()>3.0){
+      std::chrono::duration<double> elapsed_time = std::chrono::system_clock::now() - latest_odom_time_;
+      if(elapsed_time.count() > 3.0){
         RCLCPP_INFO(this->get_logger(), "Bag finished");
         current_state_ = State::CHECK_RESULT;
       }
@@ -147,14 +184,9 @@ private:
       break;
     }
     case State::CHECK_RESULT: {
-      /*
-      At time 0.0
-      - Translation: [50.449, -92.092, -1.738]
-      - Rotation: in Quaternion (xyzw) [-0.003, 0.027, -0.377, 0.926]
-      */
-      double dx = transform_stamped_.transform.translation.x - 50.449;
-      double dy = transform_stamped_.transform.translation.y + 92.092;
-      double dz = transform_stamped_.transform.translation.z + 1.738;
+      double dx = transform_stamped_.transform.translation.x - target_pose_.pose.pose.position.x;
+      double dy = transform_stamped_.transform.translation.y - target_pose_.pose.pose.position.y;
+      double dz = transform_stamped_.transform.translation.z - target_pose_.pose.pose.position.z;
       double distance_diff = sqrt(dx*dx + dy*dy + dz*dz);
       RCLCPP_INFO(this->get_logger(), "Distance deviation: %.3f m", distance_diff);
       if(distance_diff<0.3){
