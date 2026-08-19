@@ -73,3 +73,17 @@ if [ "$d_bag5" != "${d_bag5#[Yy]}" ] ;then
   rm -f confirm.txt cookies.txt
   unzip mapping_airy_t45_trt.zip
 fi
+
+echo -n "Do you want to download mapping_gpulidar_t0 (Y/N):"
+read d_bag6
+if [ "$d_bag6" != "${d_bag6#[Yy]}" ] ;then 
+  echo "Download map"
+  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='1vP578A_npdXtBkolVaBKhgICrEmoYdQP \
+      | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
+  curl -L -b cookies.txt -o mapping_gpulidar_t0.zip \
+      'https://drive.usercontent.google.com/download?id='1vP578A_npdXtBkolVaBKhgICrEmoYdQP'&confirm='$(<confirm.txt)
+  rm -f confirm.txt cookies.txt
+  unzip mapping_gpulidar_t0.zip
+fi
+
+

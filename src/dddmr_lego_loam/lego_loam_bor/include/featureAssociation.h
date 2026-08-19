@@ -35,7 +35,9 @@ class FeatureAssociation : public rclcpp::Node
   bool systemInitedLM;
   nav_msgs::msg::Odometry mappingOdometry;
   nav_msgs::msg::Odometry exteralOdometry;
-  
+  bool first_odom_prepared_ = false;
+  std::string odom_type_;
+
  private:
 
   rclcpp::CallbackGroup::SharedPtr tf_listener_group_;
@@ -66,9 +68,7 @@ class FeatureAssociation : public rclcpp::Node
   float _edge_threshold;
   float _surf_threshold;
   float _nearest_feature_dist_sqr;
-  std::string odom_type_;
   std::string baselink_frame_;
-  bool first_odom_prepared_;
   tf2::Transform tf2_trans_b2s_, tf2_first_odom2b_, tf2_first_odom2s_, tf2_first_odom2s_inverse_, tf2_trans_c2s_;
   bool to_map_optimization_;
   bool odom_sanity_check_;

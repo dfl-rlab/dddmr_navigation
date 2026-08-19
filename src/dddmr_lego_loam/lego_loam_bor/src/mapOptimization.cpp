@@ -45,6 +45,11 @@ MapOptimization::MapOptimization(std::string name,
       _input_channel(input_channel)
 {
   
+  corner_voxel_size_ = 0.2;
+  surface_voxel_size_  = 0.4;
+  outlier_voxel_size_ = 0.4;
+  surface_icp_voxel_size_ = 1.0;
+
   ISAM2Params parameters;
   parameters.relinearizeThreshold = 0.01;
   parameters.relinearizeSkip = 1;
@@ -407,8 +412,8 @@ void MapOptimization::allocateMemory() {
   nearHistorySurfKeyFrameCloudDS.reset(new pcl::PointCloud<PointType>());
 
   latestCornerKeyFrameCloud.reset(new pcl::PointCloud<PointType>());
-  latestSurfKeyFrameCloud.reset(new pcl::PointCloud<PointType>());
-  latestSurfKeyFrameCloudDS.reset(new pcl::PointCloud<PointType>());
+  latestSurfCornerKeyFrameCloud.reset(new pcl::PointCloud<PointType>());
+  latestSurfCornerKeyFrameCloudDS.reset(new pcl::PointCloud<PointType>());
 
   globalMapKeyPoses.reset(new pcl::PointCloud<PointType>());
   globalMapKeyPosesDS.reset(new pcl::PointCloud<PointType>());
@@ -850,7 +855,7 @@ void MapOptimization::publishKeyPosesAndFrames() {
 }
 
 bool MapOptimization::detectLoopClosure() {
-  latestSurfKeyFrameCloud->clear();
+  latestSurfCornerKeyFrameCloud->clear();
   nearHistorySurfKeyFrameCloud->clear();
   nearHistorySurfKeyFrameCloudDS->clear();
 
@@ -926,12 +931,17 @@ bool MapOptimization::detectLoopClosure() {
 
   // save latest key frames
   latestFrameIDLoopCloure = cloudKeyPoses3D->points.size() - 1;
-  *latestSurfKeyFrameCloud +=
+  *latestSurfCornerKeyFrameCloud +=
       *transformPointCloud(cornerCloudKeyFrames[latestFrameIDLoopCloure],
                            &cloudKeyPoses6D->points[latestFrameIDLoopCloure]);
-  *latestSurfKeyFrameCloud +=
-      *transformPointCloud(surfCloudKeyFrames[latestFrameIDLoopCloure],
+
+  //@ down sample surface, since they are plane feature
+  pcl::PointCloud<PointType>::Ptr surface_aggregation = transformPointCloud(surfCloudKeyFrames[latestFrameIDLoopCloure],
                            &cloudKeyPoses6D->points[latestFrameIDLoopCloure]);
+
+  auto ds_surface_aggregation = small_gicp::voxelgrid_sampling_omp(*surface_aggregation, surface_icp_voxel_size_, 4);
+
+  *latestSurfCornerKeyFrameCloud += *ds_surface_aggregation;
   
   //@ without transform function in lego loam, the original frame is camera in cornerCloudKeyFrames/surfCloudKeyFrames
   pcl::PointCloud<PointType>::Ptr latestSurfKeyFrameCloudBaseLinkFrame(new pcl::PointCloud<PointType>());
@@ -995,7 +1005,7 @@ bool MapOptimization::detectLoopClosure() {
   
   //downSizeFilterHistoryKeyFrames.setInputCloud(nearHistorySurfKeyFrameCloud);
   //downSizeFilterHistoryKeyFrames.filter(*nearHistorySurfKeyFrameCloudDS);
-  nearHistorySurfKeyFrameCloudDS = small_gicp::voxelgrid_sampling_omp(*nearHistorySurfKeyFrameCloud, 0.4, 4);
+  nearHistorySurfKeyFrameCloudDS = small_gicp::voxelgrid_sampling_omp(*nearHistorySurfKeyFrameCloud, surface_voxel_size_, 4);
   // publish history near key frames
   
   sensor_msgs::msg::PointCloud2 cloudMsgTemp;
@@ -1033,7 +1043,7 @@ void MapOptimization::performLoopClosure() {
   icp.setEuclideanFitnessEpsilon(1e-6);
   icp.setRANSACIterations(0);
   // Align clouds
-  icp.setInputSource(latestSurfKeyFrameCloud);
+  icp.setInputSource(latestSurfCornerKeyFrameCloud);
   icp.setInputTarget(nearHistorySurfKeyFrameCloudDS);
   pcl::PointCloud<PointType>::Ptr unused_result(
       new pcl::PointCloud<PointType>());
@@ -1076,7 +1086,7 @@ void MapOptimization::performLoopClosure() {
   tf2_current2closestKeyFrame_.getOrigin().z()*tf2_current2closestKeyFrame_.getOrigin().z());
 
   icp_opti.SetMaxCorrespondDistance(correpond_distance);
-  icp_opti.Match(latestSurfKeyFrameCloud, T_predict, cloud_source_opti_transformed_ptr, T_final);
+  icp_opti.Match(latestSurfCornerKeyFrameCloud, T_predict, cloud_source_opti_transformed_ptr, T_final);
   //RCLCPP_INFO(this->get_logger(), "_history_keyframe_fitness_score: %.2f, ICP score: %.2f, convergence: %d", _history_keyframe_fitness_score, icp_opti.GetFitnessScore(), icp_opti.HasConverged());
   //!icp_opti.HasConverged() || 
   if (icp_opti.GetFitnessScore() > _history_keyframe_fitness_score)
@@ -1095,7 +1105,7 @@ void MapOptimization::performLoopClosure() {
   if (true) {
     pcl::PointCloud<PointType>::Ptr closed_cloud(
         new pcl::PointCloud<PointType>());
-    pcl::transformPointCloud(*latestSurfKeyFrameCloud, *closed_cloud, 
+    pcl::transformPointCloud(*latestSurfCornerKeyFrameCloud, *closed_cloud, 
                              T_final);
     sensor_msgs::msg::PointCloud2 cloudMsgTemp;
     pcl::toROSMsg(*closed_cloud, cloudMsgTemp);
@@ -1220,7 +1230,7 @@ void MapOptimization::extractSurroundingKeyFrames() {
   pcl::removeNaNFromPointCloud(*laserCloudCornerFromMap, *laserCloudCornerFromMap, indices_tmp1);
   //downSizeFilterCorner.setInputCloud(laserCloudCornerFromMap);
   //downSizeFilterCorner.filter(*laserCloudCornerFromMapDS);
-  laserCloudCornerFromMapDS = small_gicp::voxelgrid_sampling_omp(*laserCloudCornerFromMap, 0.2, 4);
+  laserCloudCornerFromMapDS = small_gicp::voxelgrid_sampling_omp(*laserCloudCornerFromMap, corner_voxel_size_, 4);
 
   // Downsample the surrounding surf key frames (or map)
   std::vector<int> indices_tmp2;
@@ -1228,7 +1238,7 @@ void MapOptimization::extractSurroundingKeyFrames() {
   pcl::removeNaNFromPointCloud(*laserCloudSurfFromMap, *laserCloudSurfFromMap, indices_tmp2);
   //downSizeFilterSurf.setInputCloud(laserCloudSurfFromMap);
   //downSizeFilterSurf.filter(*laserCloudSurfFromMapDS);
-  laserCloudSurfFromMapDS = small_gicp::voxelgrid_sampling_omp(*laserCloudSurfFromMap, 0.4, 4);
+  laserCloudSurfFromMapDS = small_gicp::voxelgrid_sampling_omp(*laserCloudSurfFromMap, surface_voxel_size_, 4);
 
 }
 
@@ -1237,17 +1247,17 @@ void MapOptimization::downsampleCurrentScan() {
   laserCloudCornerLastDS->clear();
   //downSizeFilterCorner.setInputCloud(laserCloudCornerLast);
   //downSizeFilterCorner.filter(*laserCloudCornerLastDS);
-  laserCloudCornerLastDS = small_gicp::voxelgrid_sampling_omp(*laserCloudCornerLast, 0.2, 2);
+  laserCloudCornerLastDS = small_gicp::voxelgrid_sampling_omp(*laserCloudCornerLast, corner_voxel_size_, 2);
 
   laserCloudSurfLastDS->clear();
   //downSizeFilterSurf.setInputCloud(laserCloudSurfLast);
   //downSizeFilterSurf.filter(*laserCloudSurfLastDS);
-  laserCloudSurfLastDS = small_gicp::voxelgrid_sampling_omp(*laserCloudSurfLast, 0.4, 2);
+  laserCloudSurfLastDS = small_gicp::voxelgrid_sampling_omp(*laserCloudSurfLast, surface_voxel_size_, 2);
   
   laserCloudOutlierLastDS->clear();
   //downSizeFilterOutlier.setInputCloud(laserCloudOutlierLast);
   //downSizeFilterOutlier.filter(*laserCloudOutlierLastDS);
-  laserCloudOutlierLastDS = small_gicp::voxelgrid_sampling_omp(*laserCloudOutlierLast, 0.4, 2);
+  laserCloudOutlierLastDS = small_gicp::voxelgrid_sampling_omp(*laserCloudOutlierLast, outlier_voxel_size_, 2);
 
   //laserCloudSurfTotalLast->clear();
   //laserCloudSurfTotalLastDS->clear();
