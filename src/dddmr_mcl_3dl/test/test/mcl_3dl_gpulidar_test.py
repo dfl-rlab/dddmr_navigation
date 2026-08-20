@@ -126,7 +126,7 @@ def generate_test_description():
     package="tf2_ros",
     executable="static_transform_publisher",
     output="screen" ,
-    arguments=["0.3", "0.0", "0.5", "0.0", "0.0", "0.0", "base_link", "saye/base_link/gpu_lidar"]
+    arguments=["0.0", "0.0", "0.2", "0.0", "0.0", "0.0", "base_link", "saye/base_link/gpu_lidar"]
   )
   bb2b = Node(
     package="tf2_ros",
@@ -194,7 +194,7 @@ def generate_test_description():
       dddmr_pg_map_server,
       mcl_3dl_feature_node,
       mcl_3dl_node,
-      bag_player,
+      TimerAction(period=5.0, actions=[bag_player]),
       rviz,
       TimerAction(period=3.0, actions=[test_node]),
       launch_testing.actions.ReadyToTest()

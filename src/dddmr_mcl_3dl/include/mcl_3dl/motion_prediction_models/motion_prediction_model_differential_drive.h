@@ -41,16 +41,20 @@ public:
     : odom_err_integ_lin_tc_(odom_err_integ_lin_tc)
     , odom_err_integ_ang_tc_(odom_err_integ_ang_tc)
   {
+    max_integ_tc_ = std::max(odom_err_integ_lin_tc_, odom_err_integ_ang_tc_);
   }
 
-  inline void setOdoms(const State6DOF& odom_prev, const State6DOF& odom_current, const float time_diff) final
+  inline void setOdoms(const State6DOF& odom_prev, const State6DOF& odom_current) final
   {
     relative_translation_ = odom_prev.rot_.inv() * (odom_current.pos_ - odom_prev.pos_);
     relative_quat_ = odom_prev.rot_.inv() * odom_current.rot_;
     Vec3 axis;
     relative_quat_.getAxisAng(axis, relative_angle_);
     relative_translation_norm_ = relative_translation_.norm();
-    time_diff_ = time_diff;
+    time_diff_ = odom_current.time_stamp_ - odom_prev.time_stamp_;
+    if(time_diff_<0.0 || time_diff_>max_integ_tc_){
+      time_diff_ = max_integ_tc_;
+    }
   };
 
   inline void predict(State6DOF& s) const final
@@ -74,6 +78,7 @@ private:
   float relative_translation_norm_;
   float relative_angle_;
   float time_diff_;
+  float max_integ_tc_;
 };
 }  // namespace mcl_3dl
 
