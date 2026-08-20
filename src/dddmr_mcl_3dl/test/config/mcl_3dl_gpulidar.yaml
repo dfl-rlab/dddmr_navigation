@@ -110,7 +110,7 @@ mcl_3dl:
 
     knn_num_of_ground_normals: 20
 
-    update_min_d: 0.1
+    update_min_d: 0.5
     update_min_a: 0.1
 
     odom_err_lin_lin: 0.6

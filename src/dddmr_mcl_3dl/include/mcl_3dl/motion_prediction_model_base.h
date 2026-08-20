@@ -41,7 +41,7 @@ class MotionPredictionModelBase
 public:
   using Ptr = std::shared_ptr<MotionPredictionModelBase>;
 
-  virtual void setOdoms(const State6DOF& odom_prev, const State6DOF& odom_current, const float time_diff) = 0;
+  virtual void setOdoms(const State6DOF& odom_prev, const State6DOF& odom_current) = 0;
   virtual void predict(State6DOF& s) const = 0;
 };
 }  // namespace mcl_3dl

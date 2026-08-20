@@ -188,7 +188,7 @@ def generate_test_description():
       dddmr_pg_map_server,
       mcl_3dl_feature_node,
       mcl_3dl_node,
-      bag_player,
+      TimerAction(period=5.0, actions=[bag_player]),
       rviz,
       TimerAction(period=3.0, actions=[test_node]),
       launch_testing.actions.ReadyToTest()

@@ -321,7 +321,7 @@ Parameters::Parameters(const rclcpp::node_interfaces::NodeLoggingInterface::Shar
   
   initial_pose_ = State6DOF(
       Vec3(x, y, z),
-      Quat(Vec3(roll, pitch, yaw)));
+      Quat(Vec3(roll, pitch, yaw)), 0.0);
   initial_pose_std_ = State6DOF(
       Vec3(v_x, v_y, v_z),
       Vec3(v_roll, v_pitch, v_yaw));
