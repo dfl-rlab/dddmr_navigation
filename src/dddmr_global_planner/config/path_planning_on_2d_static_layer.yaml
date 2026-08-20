@@ -1,24 +1,10 @@
 occupancy2ground:
   ros__parameters:
-    map_dir: "/root/dddmr_navigation/src/dddmr_global_planner/data/warehouse.pgm"
+    map_dir: "/root/dddmr_navigation/src/dddmr_global_planner/data/map_2d"
+    ground_voxel_size: 0.2
+    inflation_radius: 0.5
+    obstacle_weight: 100.0
 
-pcl_publisher:
-  ros__parameters:
-    global_frame: "map"
-    map_rotate_around_x: 0.0
-    map_rotate_around_y: 0.0
-    map_rotate_around_z: 0.0
-    map_translate_x: 0.0
-    map_translate_y: 0.0
-    map_translate_z: 0.0
-    ground_rotate_around_x: 0.0
-    ground_rotate_around_y: 0.0
-    ground_rotate_around_z: 0.0
-    ground_translate_x: 0.0
-    ground_translate_y: 0.0
-    ground_translate_z: 0.0
-    map_down_sample: 0.1
-    ground_down_sample: 0.05
 
 perception_3d_global:
   ros__parameters:
@@ -45,7 +31,7 @@ perception_3d_global:
       support:
         mapping_mode: false
           #if mapping mode is true, edge detection is automatically disabled
-        enable_edge_detection: true
+        enable_edge_detection: false
         generate_static_graph: false
           #the connection radius will be used
           #enable this value when using super dense ground say ground voxel size<=10 cm
@@ -54,7 +40,7 @@ perception_3d_global:
       
 global_planner:
   ros__parameters:
-    turning_weight: 0.1 #Punish the zig-zag path
-    a_star_expanding_radius: 0.2
+    turning_weight: 0.0 #Punish the zig-zag path
+    a_star_expanding_radius: 0.5
     use_pre_graph: false
       #if we want global planner to use pre-static graph, remember to set generate_static_graph to true under perception_3d::StaticLayer

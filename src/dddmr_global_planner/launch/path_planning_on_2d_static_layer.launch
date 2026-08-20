@@ -6,12 +6,13 @@
   </node>
 
   <!--name argument is not required, because it will overwrite all node name in the exec-->
+
   <node pkg="global_planner" exec="global_planner_node" output="screen" respawn="false">
     <param from="$(find-pkg-share global_planner)/config/path_planning_on_2d_static_layer.yaml" />
   </node>
 
   <!--- TF -->
-  <node pkg="tf2_ros" exec="static_transform_publisher" name="map2baselink" args="2.33 1.85 0.0 0.0 0.0 0.0 /map /base_link" />
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="map2baselink" args="150 253.0 0.0 0.0 0.0 0.0 /map /base_link" />
 
   <let name="rviz_config" value="$(find-pkg-share global_planner)/rviz/path_planning_on_2d_static_layer.rviz"/>
   <node name="rviz2" pkg="rviz2" exec="rviz2" args="-d $(var rviz_config)"/>
