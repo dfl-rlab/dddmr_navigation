@@ -1,0 +1,56 @@
+<launch>
+  <let name="use_sim" value="true"/>
+
+  <!-- Ackermann-specific copy of the Go2 localization configuration. -->
+  <node pkg="lego_loam_bor" exec="mcl_feature" output="screen" respawn="false">
+    <param from="$(find-pkg-share p2p_move_base)/config/ackermann_localization.yaml" />
+    <remap from="/lslidar_point_cloud" to="/cloud"/>
+    <remap from="/odom" to="/odom"/>
+    <param name="use_sim_time" value="$(var use_sim)"/>
+  </node>
+
+  <!-- Pose-graph map provider. It creates the configured map1 node, which
+       serves MCL submaps and latches /map1/mapcloud + /map1/mapground. -->
+  <node pkg="dddmr_pg_map_server" exec="dddmr_pg_map_server_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share p2p_move_base)/config/ackermann_localization.yaml" />
+    <param name="use_sim_time" value="$(var use_sim)"/>
+  </node>
+
+  <node pkg="mcl_3dl" exec="mcl_3dl" output="screen" respawn="false">
+    <param from="$(find-pkg-share p2p_move_base)/config/ackermann_localization.yaml" />
+    <param name="use_sim_time" value="$(var use_sim)"/>
+  </node>
+
+  <!-- Odom-only localization: Gazebo /odom is ground truth.  Keep the map
+       origin coincident with odom and prevent MCL from publishing this edge. -->
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="map_to_odom"
+        args="0 0 0 0 0 0 map odom" />
+
+  <node pkg="global_planner" exec="global_planner_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share p2p_move_base)/config/ackermann_localization.yaml" />
+    <param name="use_sim_time" value="$(var use_sim)"/>
+  </node>
+
+  <node pkg="p2p_move_base" exec="p2p_move_base_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share p2p_move_base)/config/ackermann_localization.yaml" />
+    <param name="use_sim_time" value="$(var use_sim)"/>
+  </node>
+
+  <!-- Bridge the new STEERING trajectory output to Gazebo's Twist input. -->
+  <node pkg="local_planner" exec="ackermann_drive_to_cmd_vel_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share p2p_move_base)/config/ackermann_localization.yaml" />
+    <param name="use_sim_time" value="$(var use_sim)"/>
+  </node>
+
+  <node pkg="p2p_move_base" exec="clicked2goal.py" output="screen" respawn="false">
+    <param name="use_sim_time" value="$(var use_sim)"/>
+  </node>
+
+  <node pkg="rviz2" exec="rviz2" output="screen" respawn="false" args="-d $(find-pkg-share p2p_move_base)/rviz/p2p_move_base_localization.rviz">
+    <param name="use_sim_time" value="$(var use_sim)"/>
+  </node>
+
+  <!-- Map Gazebo's namespaced base frame to the frame expected by MCL/LeGO-LOAM. -->
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="gazebo_base_link_alias" args="0 0 0 0 0 0 saye/base_link base_link" />
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="sensor2baselink" args="0 0 -0.219 0 0 0 base_link base_footprint" />
+</launch>

@@ -594,8 +594,13 @@ bool AckermannSimpleTrajectoryGeneratorTheory::generateTrajectory(
   // timestep
   loop_vel = sample_target_vel;
   traj.xv_ = sample_target_vel[0];
-  traj.thetav_ = sample_target_vel[2]; //@ Ackermann: this is now steering angle
-                                       // δ (rad), not angular velocity
+  // Ackermann commands use speed and front-wheel steering angle.  Do not
+  // overload the differential-drive yaw-rate field (thetav_): P2PMoveBase
+  // publishes STEERING trajectories through these dedicated fields.
+  traj.yv_ = 0.0;
+  traj.thetav_ = 0.0;
+  traj.steering_angle_ = sample_target_vel[2];
+  traj.steering_angle_velocity_ = 0.0;
 
   /*We first create trajectory based on robot_frame, then we use affine to
    * transform it to global frame*/

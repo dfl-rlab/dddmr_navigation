@@ -9,6 +9,14 @@
       <description>TBW</description>
     </class>
 
+    <class type="trajectory_generators::AKRotateInPlaceTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
+      <description>Ackermann-compatible rotate behavior: forward turning arc with configurable linear velocity.</description>
+    </class>
+
+    <class type="trajectory_generators::AKRotateReedsSheppTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
+      <description>Re-solves left-first and right-first Ackermann Reeds-Shepp curves every control cycle; full curves are collision checked while only the first command is published.</description>
+    </class>
+
     <class type="trajectory_generators::OmniSimpleTrajectoryGeneratorTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
       <description>TBW</description>
     </class>
@@ -23,4 +31,3 @@
 
   </library>
 </class_libraries>
-

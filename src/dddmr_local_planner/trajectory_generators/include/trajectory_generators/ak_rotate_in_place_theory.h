@@ -29,27 +29,49 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include <trajectory_generators/trajectory_generator_theory.h>
+#include <trajectory_generators/ackermann_simple_trajectory_generator_limits.h>
+#include <trajectory_generators/ackermann_simple_trajectory_generator_params.h>
+
+/*getMinMax3D*/
+#include <pcl/common/common.h>
 
 namespace trajectory_generators
 {
 
-TrajectoryGeneratorTheory::TrajectoryGeneratorTheory(){
+class AKRotateInPlaceTheory: public TrajectoryGeneratorTheory{
 
-}
+  public:
+    
+    AKRotateInPlaceTheory();
 
-void TrajectoryGeneratorTheory::initialize(const std::string name, const rclcpp::Node::WeakPtr& weak_node){
-  name_ = name;
-  node_ = weak_node.lock();
-  // Each concrete generator declares the command interface it produces
-  // (MOTOR/Twist or STEERING/AckermannDrive).  This must happen before a
-  // generated Trajectory copies actuator_type_.
-  configurateActuatorType();
-  onInitialize();
-}
+    virtual bool hasMoreTrajectories();
+    virtual bool nextTrajectory(base_trajectory::Trajectory& _traj);
 
-void TrajectoryGeneratorTheory::setSharedData(std::shared_ptr<trajectory_generators::TrajectoryGeneratorSharedData> shared_data){
-  shared_data_ = shared_data;
-}
+  private:
+    void initialise();
 
+    bool generateTrajectory(
+        Eigen::Vector3f command,
+        base_trajectory::Trajectory& traj);
+
+    Eigen::Vector3f computeNewPositions(const Eigen::Vector3f& pos,
+        const Eigen::Vector3f& command, double dt);
+
+    // Fixed low speed for this heading maneuver.  The steering target is
+    // always the largest physically admissible left or right steering angle.
+    double rotate_linear_speed_;
+    
+  protected:
+
+    virtual void onInitialize();
+    virtual void configurateActuatorType();
+    
+    std::shared_ptr<trajectory_generators::AckermannTrajectoryGeneratorLimits> limits_;
+    std::shared_ptr<trajectory_generators::AckermannTrajectoryGeneratorParams> params_;
+
+    unsigned int next_sample_index_;
+    // to store sample params of each sample between init and generation
+    std::vector<Eigen::Vector3f> sample_params_;
+};
 
 }//end of name space

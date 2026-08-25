@@ -100,6 +100,8 @@ ament_target_dependencies(trajectory_generator_ros
 # theories
 add_library(theories SHARED
   theories/dd_rotate_inplace_theory.cpp
+  theories/ak_rotate_in_place_theory.cpp
+  theories/ak_rotate_reeds_shepp_theory.cpp
   theories/dd_simple_trajectory_generator_theory.cpp
   theories/omni_simple_trajectory_generator_theory.cpp
   theories/ackermann_simple_trajectory_generator_theory.cpp

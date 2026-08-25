@@ -1,0 +1,449 @@
+p2p_move_base:
+  ros__parameters:
+    controller_frequency: 20.0
+    planner_patience: 10.0
+    oscillation_distance: 5.0
+    oscillation_angle: 1.0
+    oscillation_patience: 15.0
+    controller_patience: 10.0
+    no_plan_retry_num: 10
+    waiting_patience: 10.0
+    # Use the Ackermann bicycle-model generator while following a plan.
+    main_trajectory_generator: "ackermann_simple"
+
+# Output adapter for the current Gazebo plugin, which receives /cmd_vel rather
+# than AckermannDriveStamped directly.  Change only these values when a
+# simulator or vehicle uses different command topics or wheelbase.
+ackermann_drive_to_cmd_vel:
+  ros__parameters:
+    input_topic: "/ackermann_drive_cmd"
+    output_topic: "/cmd_vel"
+    wheelbase: 0.2255
+
+global_plan_manager:
+  ros__parameters:
+    global_planner_action_name: "get_dwa_plan"
+    global_plan_query_frequency: 0.1
+
+mcl_ip:
+  ros__parameters:
+    laser:
+        odom_type: "wheel_odometry"         #wheel_odometry/laser_odometry 
+        baselink_frame: "base_footprint"
+        num_vertical_scans: 128
+        num_horizontal_scans: 1024
+        vertical_angle_bottom: -30.0          # degrees
+        vertical_angle_top: 30.0            # degrees
+        scan_period: 0.1                   # seconds
+
+
+    imageProjection:
+        segment_valid_point_num: 5
+        segment_valid_line_num: 2
+        segment_theta: 60.0                      # decrese this value may improve accuracy
+        minimum_detection_range: 0.5
+        maximum_detection_range: 100.0            # point cloud within this range will be used to project image
+        distance_for_patch_between_rings: 1.0    # patch ground between rings within this range, i.e. ring0 and ring1 is smaller than 1 meter, patch them
+        stitcher_num: 0                          # for non-repetitive scan lidar use 2~4 (i.e. mid360)
+        trt_model_path: ""                       # provide trt engine for yolo
+        projected_image_stack_size: 1            # Stack this number of image for yolo11n to inference as time elapsed yolo (only work when TRT is loaded)
+        
+        ground_fov_bottom: -0.2617994 # -15deg
+        ground_fov_top: -0.087266 # -5deg
+        ground_positive_start: 0.0
+        ground_positive_stop: 3.1415926
+        ground_negative_start: 0.0
+        ground_negative_stop: -3.1415926
+mcl_fa:
+  ros__parameters:
+    featureAssociation:
+        edge_threshold: 0.1
+        surf_threshold: 0.1
+        nearest_feature_search_distance: 3.0
+    mapping:
+        to_map_optimization: false
+                
+dddmr_pg_map_server_manager:
+  ros__parameters:
+    maps: ["map1"]
+
+# The pose-graph map is now loaded and latched by dddmr_pg_map_server, rather
+# than being loaded by mcl_3dl directly.  Its published topics are
+# /map1/mapcloud and /map1/mapground.
+map1:
+  ros__parameters:
+    pose_graph_dir: "/root/dddmr_bags/2026_08_12_11_23_29"
+    complete_map_voxel_size: 0.4
+
+sub_maps:
+  ros__parameters:
+    pg_map_server_name: "map1"
+    sub_map_search_radius: 50.0
+    sub_map_warmup_trigger_distance: 20.0
+
+mcl_3dl:
+  ros__parameters:
+    init_x: 0.0
+    init_y: 0.0
+    init_z: 0.0
+    init_roll: 0.0
+    init_pitch: 0.0
+    init_yaw: 0.0
+    init_var_x: 2.0
+    init_var_y: 2.0
+    init_var_z: 0.02
+    # Gazebo runs on a level floor: constrain roll/pitch particle spread.
+    init_var_roll: 0.005
+    init_var_pitch: 0.005
+    init_var_yaw: 0.5
+    map_frame: "map"
+    robot_frame: "base_link"
+    odom_frame: "odom"
+    map_downsample_x: 0.1
+    map_downsample_y: 0.1
+    map_downsample_z: 0.1
+    map_update_interval_sec: 2 #int
+    num_particles: 300
+
+    # Small resampling perturbation: /odom is Gazebo ground truth, not encoder odometry.
+    resample_var_x: 0.2
+    resample_var_y: 0.2
+    resample_var_z: 0.02
+    resample_var_yaw: 0.2
+    resample_var_pitch: 0.001
+    resample_var_roll: 0.001
+    # Used only when the feature match ratio is too low.
+    expansion_var_x: 0.30
+    expansion_var_y: 0.30
+    expansion_var_z: 0.02
+    expansion_var_roll: 0.005
+    expansion_var_pitch: 0.005
+    expansion_var_yaw: 0.15
+    match_ratio_thresh: 0.0
+
+    euc_cluster_distance: 0.8
+    euc_cluster_min_size: 3
+    euc_cluster_max_size: 2400
+
+    knn_num_of_ground_normals: 20
+
+    update_min_d: 0.5
+    update_min_a: 0.5
+
+    # Motion-model noise for ground-truth Gazebo odometry.
+    odom_err_lin_lin: 0.03
+    odom_err_lin_ang: 0.01
+    odom_err_ang_lin: 0.01
+    odom_err_ang_ang: 0.03
+
+    odom_err_integ_lin_tc: 5.0
+    odom_err_integ_ang_tc: 10.0
+
+    lpf_step: 2.0
+    acc_lpf_step: 128.0
+
+    jump_dist: 1.0
+    jump_ang: 1.57
+
+    bias_var_dist: 2.0
+    bias_var_ang: 1.57
+    tf_tolerance: 0.1
+    # Odom-only mode: map -> odom is supplied as an identity static TF by the
+    # launch file, so MCL must not publish a competing transform.
+    publish_tf: false
+
+    likelihood:
+      num_points_global: 8
+      match_dist_min: 0.3
+      match_dist_flat: 0.05
+      threshold_for_trusted_ground: 6
+      radius_of_ground_search: 1.0
+
+local_planner:
+  ros__parameters:
+    odom_topic: odom
+    # Consumed by Local_Planner::cbSteeringState() to seed the Ackermann
+    # generator's speed and steering dynamic window.
+    steering_state_topic: "/ackermann_feedback"
+    forward_prune: 3.0
+    backward_prune: 1.0
+    heading_tracking_distance: 0.5
+    heading_align_angle: 0.8
+    prune_plane_timeout: 3.0
+    xy_goal_tolerance: 0.5
+    yaw_goal_tolerance: 0.5
+    controller_frequency: 10.0
+    
+    cuboid:
+      # 3x collision footprint in x/y relative to base_link; retain the
+      # Gazebo vehicle's real vertical envelope to avoid ground false hits.
+      flb: [0.4455, 0.3000, -0.0365]
+      frb: [0.4455, -0.3000, -0.0365]
+      flt: [0.4455, 0.3000, 0.1200]
+      frt: [0.4455, -0.3000, 0.1200]
+      blb: [-0.4500, 0.3000, -0.0365]
+      brb: [-0.4500, -0.3000, -0.0365]
+      blt: [-0.4500, 0.3000, 0.1200]
+      brt: [-0.4500, -0.3000, 0.1200]
+
+recovery_behaviors:
+  ros__parameters:
+    plugins: ["rotate_inplace"]
+    rotate_inplace:
+      plugin: "recovery_behaviors::RotateInPlaceBehavior"
+      frequency: 10.0
+      tolerance: 0.3
+      trajectory_generator_name: "differential_drive_rotate_inplace"
+
+trajectory_generators:
+  ros__parameters:
+    plugins: ["ackermann_simple", "differential_drive_rotate_inplace", "differential_drive_rotate_shortest_angle"]
+    ackermann_simple:
+      plugin: "trajectory_generators::AckermannSimpleTrajectoryGeneratorTheory"
+      max_vel_x: 0.80
+      min_vel_x: 0.10
+      acc_lim_x: 1.0
+      deceleration_ratio: 2.0
+      # Matches the Gazebo AckermannSteering plugin in saye/model.sdf.
+      wheelbase: 0.2255
+      # Keep the initial steering envelope conservative: +/- 11.5 degrees.
+      max_steer_rad: 0.37
+      max_lat_accel: 0.0
+      max_steering_rate: 0.0
+      controller_frequency: 10.0
+      sim_time: 1.0
+      linear_x_sample: 15.0
+      angular_z_sample: 35.0
+      sim_granularity: 0.05
+      debug_trajectory: false
+      cuboid:
+        flb: [0.4455, 0.3000, -0.0365]
+        frb: [0.4455, -0.3000, -0.0365]
+        flt: [0.4455, 0.3000, 0.1200]
+        frt: [0.4455, -0.3000, 0.1200]
+        blb: [-0.4500, 0.3000, -0.0365]
+        brb: [-0.4500, -0.3000, -0.0365]
+        blt: [-0.4500, 0.3000, 0.1200]
+        brt: [-0.4500, -0.3000, 0.1200]
+    differential_drive_rotate_shortest_angle:
+      plugin: "trajectory_generators::AKRotateReedsSheppTheory"
+      # Start with one complete side only. Its fixed RS word is a FIFO queue.
+      # Each command remains active for its planned duration, then FIFO advances.
+      rs_speed: 0.2                 # Command magnitude [m/s]; path decides +/- direction.
+      wheelbase: 0.2255               # Rear-to-front axle distance [m].
+      max_steer_rad: 0.37             # Larger = tighter turning arc.
+      path_resolution: 0.2           # Reference-step and collision spacing [m].
+      closed_heading_maneuver: true   # Return to alignment-start x/y; change yaw only.
+      closed_maneuver_reset_timeout: 0.5 # New x/y anchor after this unused time [s].
+      goal_heading_distance: 0.5      # Match local_planner.xy_goal_tolerance: use final goal quaternion inside it; otherwise use local path tangent [m].
+      forward_first_penalty: 0.00     # [m] Larger = prefer reverse first; 0 disables.
+      initial_side: "left"            # First route for every new heading maneuver: "left" or "right".
+
+      # -----------------------------------------------------------------
+      # Fallback: the previous Ackermann turning-arc generator.
+      # To switch back, comment the active RS-only settings and uncomment
+      # this block.  The cuboid below is shared by both generators.
+      # plugin: "trajectory_generators::AKRotateInPlaceTheory"
+      # rotate_linear_speed: 0.10
+      # wheelbase: 0.2255
+      # max_steer_rad: 0.37
+      # max_lat_accel: 0.0
+      # controller_frequency: 10.0
+      # sim_time: 10.0
+      # sim_granularity: 0.05
+      # angular_sim_granularity: 0.05
+      # -----------------------------------------------------------------
+      cuboid:
+        flb: [0.4455, 0.3000, -0.0365]
+        frb: [0.4455, -0.3000, -0.0365]
+        flt: [0.4455, 0.3000, 0.1200]
+        frt: [0.4455, -0.3000, 0.1200]
+        blb: [-0.4500, 0.3000, -0.0365]
+        brb: [-0.4500, -0.3000, -0.0365]
+        blt: [-0.4500, 0.3000, 0.1200]
+        brt: [-0.4500, -0.3000, 0.1200]
+
+    differential_drive_rotate_inplace:
+      plugin: "trajectory_generators::AKRotateInPlaceTheory"
+      # Same vehicle model for recovery behavior.
+      rotate_linear_speed: 0.10
+      wheelbase: 0.2255
+      max_steer_rad: 0.37
+      max_lat_accel: 0.0
+      max_steering_rate: 0.0
+      controller_frequency: 10.0
+      sim_time: 10.0
+      sim_granularity: 0.05
+      angular_sim_granularity: 0.05
+      cuboid:
+        flb: [0.4455, 0.3000, -0.0365]
+        frb: [0.4455, -0.3000, -0.0365]
+        flt: [0.4455, 0.3000, 0.1200]
+        frt: [0.4455, -0.3000, 0.1200]
+        blb: [-0.4500, 0.3000, -0.0365]
+        brb: [-0.4500, -0.3000, -0.0365]
+        blt: [-0.4500, 0.3000, 0.1200]
+        brt: [-0.4500, -0.3000, 0.1200]
+    
+    differential_drive_simple:
+      plugin: "trajectory_generators::DDSimpleTrajectoryGeneratorTheory"
+      max_vel_x: 1.2
+      min_vel_x: 0.25 #0.1 This value should not be negative, because we want to customize backward behavior
+      max_vel_theta: 0.6
+      min_vel_theta: 0.25
+      acc_lim_x: 3.0
+      acc_lim_theta: 3.0
+      deceleration_ratio: 2.0
+      max_motor_shaft_rpm: 3000.0
+      wheel_diameter: 0.16
+      gear_ratio: 1.0
+      robot_radius: 0.25
+      
+      controller_frequency: 10.0
+      sim_time: 1.0
+      linear_x_sample: 5.0
+      angular_z_sample: 8.0
+      sim_granularity: 0.05
+      angular_sim_granularity: 0.025
+
+      cuboid:
+        flb: [0.4455, 0.3000, -0.0365]
+        frb: [0.4455, -0.3000, -0.0365]
+        flt: [0.4455, 0.3000, 0.1200]
+        frt: [0.4455, -0.3000, 0.1200]
+        blb: [-0.4500, 0.3000, -0.0365]
+        brb: [-0.4500, -0.3000, -0.0365]
+        blt: [-0.4500, 0.3000, 0.1200]
+        brt: [-0.4500, -0.3000, 0.1200]
+
+mpc_critics:
+  ros__parameters:
+    plugins: ["collision", "stick_path", "pure_pursuit", "toward_global_plan", "collision_rotate", "collision_rotate_shortest", "prefer_rotate_shortest"]
+    collision:
+      plugin: "mpc_critics::CollisionModel"
+      trajectory_generator: ackermann_simple
+      weight: 1.0
+    stick_path:
+      plugin: "mpc_critics::StickPathModel"
+      trajectory_generator: ackermann_simple
+      weight: 0.1
+    pure_pursuit:
+      plugin: "mpc_critics::PurePursuitModel"
+      trajectory_generator: ackermann_simple
+      translation_weight: 1.0
+      orientation_weight: 0.01
+    toward_global_plan:
+      plugin: "mpc_critics::TowardGlobalPlanModel"
+      trajectory_generator: ackermann_simple
+      weight: 1.0
+    collision_rotate:
+      plugin: "mpc_critics::CollisionModel"
+      trajectory_generator: differential_drive_rotate_inplace
+      weight: 1.0
+    collision_rotate_shortest:
+      plugin: "mpc_critics::CollisionModel"
+      trajectory_generator: differential_drive_rotate_shortest_angle
+      weight: 1.0
+    prefer_rotate_shortest:
+      plugin: "mpc_critics::ShortestAngleModel"
+      trajectory_generator: differential_drive_rotate_shortest_angle
+      weight: 1.0
+
+perception_3d_local:
+  ros__parameters:
+    global_frame: "map"
+    robot_base_frame: "base_link"
+    max_obstacle_distance: 9999.0
+    inscribed_radius: 0.5
+    inflation_descending_rate: 2.0
+    inflation_radius: 1.5
+    sensors_collected_frequency: 10.0
+    plugins: ["map", "path_blocked_strategy"]
+    map:
+      plugin: "perception_3d::StaticLayer"
+      is_local_planner: true
+      mapping_mode: false
+      map_topic: "map1/mapcloud"
+      ground_topic: "map1/mapground"
+    path_blocked_strategy:
+      plugin: "perception_3d::PathBlockedStrategy"
+      check_radius: 0.3
+    lidar:
+      plugin: "perception_3d::MultiLayerSpinningLidar"
+      is_local_planner: true
+      topic: "segmented_cloud_pure"
+      pub_gbl_marking_for_visualization: false
+      vertical_FOV_top: 30.0
+      vertical_FOV_bottom: -30.0
+      scan_effective_positive_start: 30.0
+      scan_effective_positive_end: 180.0
+      scan_effective_negative_start: -30.0
+      scan_effective_negative_end: -180.0
+      resolution: 0.05
+      height_resolution: 0.05
+      marking_height: 2.0
+      perception_window_size: 3.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
+      segmentation_ignore_ratio: 0.5 #f a segmentation match static pc with this ratio, we ignore it. ex: a wall
+      expected_sensor_time: 0.2
+
+perception_3d_global:
+  ros__parameters:
+    global_frame: "map"
+    robot_base_frame: "base_link"
+    max_obstacle_distance: 9999.0
+    inscribed_radius: 0.5
+    inflation_descending_rate: 2.0
+    inflation_radius: 1.5
+    sensors_collected_frequency: 10.0
+    plugins: ["map"]
+    dgraph_publish_frequency: 1.0
+    map:
+      plugin: "perception_3d::StaticLayer"
+      is_local_planner: false
+      use_adaptive_connection: false #If true: the neighbors of node is sparse, it will automatically increase search radius.
+      adaptive_connection_number: 20
+      radius_of_ground_connection: 1.5 #If use_adaptive_connection=false, the radius search of the node is applied.
+      intensity_search_radius: 3.0 #this value is suggested to be 1.0 meters, because if it is too large, the narrow passage will be miscalculated
+      intensity_search_punish_weight: 0.1 #the weight for a node. Set this value higher means we dont like path planning cross a orphan node.
+      static_imposing_radius: 1.5 #use map to add weight on each ground node
+      map_topic: "map1/mapcloud"
+      ground_topic: "map1/mapground"
+      support:
+        mapping_mode: false
+          #if mapping mode is true, edge detection is automatically disabled
+        enable_edge_detection: true
+        generate_static_graph: false
+          #the connection radius will be used
+          #enable this value when using super dense ground say ground voxel size<=10 cm
+
+    lidar:
+      plugin: "perception_3d::MultiLayerSpinningLidar"
+      is_local_planner: false
+      topic: "segmented_cloud_pure"
+      pub_gbl_marking_for_visualization: true
+      vertical_FOV_top: 30.0
+      vertical_FOV_bottom: -30.0
+      scan_effective_positive_start: 30.0
+      scan_effective_positive_end: 180.0
+      scan_effective_negative_start: -30.0
+      scan_effective_negative_end: -180.0
+      euclidean_cluster_extraction_tolerance: 0.1
+      euclidean_cluster_extraction_min_cluster_size: 1
+      xy_resolution: 0.05
+      height_resolution: 0.05
+      marking_height: 2.0
+      perception_window_size: 5.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
+      segmentation_ignore_ratio: 1.1 #f a segmentation match static pc with this ratio, we ignore it. ex: a wall
+      expected_sensor_time: 0.1
+
+global_planner:
+  ros__parameters:
+    turning_weight: 0.1 #Punish the zig-zag path
+    enable_detail_log: false
+    a_star_expanding_radius: 1.0
+
+#if we use get_dwa_plan in global_plan_manager, we setup parameters for dwa_global_planner
+dynamic_window_aware_global_planner:
+  ros__parameters:
+    look_ahead_distance: 2.0
+    recompute_frequency: 10.0

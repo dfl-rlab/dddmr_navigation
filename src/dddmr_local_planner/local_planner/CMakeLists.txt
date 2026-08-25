@@ -11,6 +11,7 @@ find_package(std_srvs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(ackermann_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(message_filters REQUIRED)
@@ -40,6 +41,7 @@ set(dependencies
   visualization_msgs
   nav_msgs
   geometry_msgs
+  ackermann_msgs
   builtin_interfaces
   message_filters
   tf2_ros
@@ -100,6 +102,17 @@ ament_target_dependencies(local_planner_play_ground_node
 add_executable(ackermann_play_ground_node
   src/ackermann_play_ground_node.cpp
 )
+
+# Convert the navigation stack's AckermannDriveStamped command to the Twist
+# interface consumed by the current Gazebo AckermannSteering plugin.
+add_executable(ackermann_drive_to_cmd_vel_node
+  src/ackermann_drive_to_cmd_vel_node.cpp
+)
+ament_target_dependencies(ackermann_drive_to_cmd_vel_node
+  rclcpp
+  geometry_msgs
+  ackermann_msgs
+)
 target_link_libraries(ackermann_play_ground_node 
   local_planner
 )
@@ -119,6 +132,7 @@ install(TARGETS
   local_planner_node
   local_planner_play_ground_node
   ackermann_play_ground_node
+  ackermann_drive_to_cmd_vel_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 

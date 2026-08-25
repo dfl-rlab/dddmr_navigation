@@ -1,0 +1,29 @@
+<launch>
+  <let name="use_sim" value="true"/>
+
+  <!-- ============================================================
+       Move-base-only launch.
+       Run alongside ackermann_localization_infra.launch to get the
+       same behaviour as the original ackermann_localization.launch,
+       but with move-base in its own terminal for isolated log viewing.
+       ============================================================ -->
+
+  <node pkg="p2p_move_base" exec="p2p_move_base_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share p2p_move_base)/config/ackermann_localization.yaml" />
+    <param name="use_sim_time" value="$(var use_sim)"/>
+  </node>
+
+  <!-- Bridge the STEERING trajectory output to Gazebo's Twist input. -->
+  <node pkg="local_planner" exec="ackermann_drive_to_cmd_vel_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share p2p_move_base)/config/ackermann_localization.yaml" />
+    <param name="use_sim_time" value="$(var use_sim)"/>
+  </node>
+
+  <node pkg="p2p_move_base" exec="clicked2goal.py" output="screen" respawn="false">
+    <param name="use_sim_time" value="$(var use_sim)"/>
+  </node>
+
+  <node pkg="rviz2" exec="rviz2" output="screen" respawn="false" args="-d $(find-pkg-share p2p_move_base)/rviz/p2p_move_base_localization.rviz">
+    <param name="use_sim_time" value="$(var use_sim)"/>
+  </node>
+</launch>
