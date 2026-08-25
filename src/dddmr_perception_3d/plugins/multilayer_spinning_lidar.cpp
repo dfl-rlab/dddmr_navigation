@@ -193,7 +193,7 @@ void MultiLayerSpinningLidar::cbSensor(const sensor_msgs::msg::PointCloud2::Shar
   rclcpp::Duration diff = time2 - time1;
   double seconds_between_expectation = fabs(diff.seconds() - expected_sensor_time_);
   last_sensor_receiving_time_ = msg->header;
-  if(seconds_between_expectation>0.05){
+  if(seconds_between_expectation>0.05 && diff.seconds()>expected_sensor_time_){
     RCLCPP_WARN_THROTTLE(node_->get_logger().get_child(name_), 
         *clock_, 1000, "Topic: %s received with lantency higher than your expection: %.3f seconds difference and your are expecting: %.3f", 
           topic_.c_str(), diff.seconds(), expected_sensor_time_);
