@@ -98,6 +98,11 @@ State::State(const rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr& m_l
   main_trajectory_generator_ = main_trajectory_generator.as_string();
   RCLCPP_INFO(logger_->get_logger(), "main_trajectory_generator: %s", main_trajectory_generator_.c_str()); 
 
+  parameter_->declare_parameter("heading_trajectory_generator", rclcpp::ParameterValue("differential_drive_rotate_shortest_angle"));
+  rclcpp::Parameter heading_trajectory_generator = parameter_->get_parameter("heading_trajectory_generator");
+  heading_trajectory_generator_ = heading_trajectory_generator.as_string();
+  RCLCPP_INFO(logger_->get_logger(), "heading_trajectory_generator: %s", heading_trajectory_generator_.c_str());
+
 }
 
 bool State::isCurrentDecision(std::string m_decision){
@@ -157,8 +162,8 @@ bool State::setDecision(std::string m_decision){
   last_decision_ = current_decision_;
   current_decision_ = m_decision;
 
-  //if(last_decision_.compare(current_decision_)!=0)
-  //  RCLCPP_INFO(logger_->get_logger(), "Decision from -- %s -- to -- %s --", last_decision_.c_str(), current_decision_.c_str()); 
+  if(last_decision_.compare(current_decision_)!=0)
+    RCLCPP_INFO(logger_->get_logger(), "Decision from -- %s -- to -- %s --", last_decision_.c_str(), current_decision_.c_str()); 
   
   return true;
 

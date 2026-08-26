@@ -112,6 +112,9 @@ ament_target_dependencies(ackermann_drive_to_cmd_vel_node
   rclcpp
   geometry_msgs
   ackermann_msgs
+  visualization_msgs
+  tf2
+  tf2_geometry_msgs
 )
 target_link_libraries(ackermann_play_ground_node 
   local_planner

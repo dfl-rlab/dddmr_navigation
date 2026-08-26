@@ -10,6 +10,8 @@ p2p_move_base:
     waiting_patience: 10.0
     # Use the Ackermann bicycle-model generator while following a plan.
     main_trajectory_generator: "ackermann_simple"
+    # Override the default DD heading generator with the Ackermann RS plugin.
+    heading_trajectory_generator: "ak_rotate_reeds_shepp"
 
 # Output adapter for the current Gazebo plugin, which receives /cmd_vel rather
 # than AckermannDriveStamped directly.  Change only these values when a
@@ -19,6 +21,13 @@ ackermann_drive_to_cmd_vel:
     input_topic: "/ackermann_drive_cmd"
     output_topic: "/cmd_vel"
     wheelbase: 0.2255
+    # Steering visualization (MarkerArray on /steering_markers).
+    feedback_topic: "/ackermann_feedback"
+    base_frame: "base_footprint"
+    track_width: 0.50
+    wheel_radius: 0.08
+    tire_length: 0.18
+    tire_width: 0.06
 
 global_plan_manager:
   ros__parameters:
@@ -171,7 +180,7 @@ local_planner:
     heading_align_angle: 0.8
     prune_plane_timeout: 3.0
     xy_goal_tolerance: 0.5
-    yaw_goal_tolerance: 0.5
+    yaw_goal_tolerance: 0.1
     controller_frequency: 10.0
     
     cuboid:
@@ -193,11 +202,11 @@ recovery_behaviors:
       plugin: "recovery_behaviors::RotateInPlaceBehavior"
       frequency: 10.0
       tolerance: 0.3
-      trajectory_generator_name: "differential_drive_rotate_inplace"
+      trajectory_generator_name: "ak_rotate_inplace"
 
 trajectory_generators:
   ros__parameters:
-    plugins: ["ackermann_simple", "differential_drive_rotate_inplace", "differential_drive_rotate_shortest_angle"]
+    plugins: ["ackermann_simple", "ak_rotate_inplace", "ak_rotate_reeds_shepp"]
     ackermann_simple:
       plugin: "trajectory_generators::AckermannSimpleTrajectoryGeneratorTheory"
       max_vel_x: 0.80
@@ -225,7 +234,7 @@ trajectory_generators:
         brb: [-0.4500, -0.3000, -0.0365]
         blt: [-0.4500, 0.3000, 0.1200]
         brt: [-0.4500, -0.3000, 0.1200]
-    differential_drive_rotate_shortest_angle:
+    ak_rotate_reeds_shepp:
       plugin: "trajectory_generators::AKRotateReedsSheppTheory"
       # Start with one complete side only. Its fixed RS word is a FIFO queue.
       # Each command remains active for its planned duration, then FIFO advances.
@@ -234,9 +243,9 @@ trajectory_generators:
       max_steer_rad: 0.37             # Larger = tighter turning arc.
       path_resolution: 0.2           # Reference-step and collision spacing [m].
       closed_heading_maneuver: true   # Return to alignment-start x/y; change yaw only.
-      closed_maneuver_reset_timeout: 0.5 # New x/y anchor after this unused time [s].
+      closed_maneuver_reset_timeout: 1.0 # New x/y anchor after this unused time [s].
       goal_heading_distance: 0.5      # Match local_planner.xy_goal_tolerance: use final goal quaternion inside it; otherwise use local path tangent [m].
-      forward_first_penalty: 0.00     # [m] Larger = prefer reverse first; 0 disables.
+      forward_first_penalty: 0.5     # [m] Larger = prefer reverse first; 0 disables.
       initial_side: "left"            # First route for every new heading maneuver: "left" or "right".
 
       # -----------------------------------------------------------------
@@ -263,7 +272,7 @@ trajectory_generators:
         blt: [-0.4500, 0.3000, 0.1200]
         brt: [-0.4500, -0.3000, 0.1200]
 
-    differential_drive_rotate_inplace:
+    ak_rotate_inplace:
       plugin: "trajectory_generators::AKRotateInPlaceTheory"
       # Same vehicle model for recovery behavior.
       rotate_linear_speed: 0.10
@@ -338,15 +347,15 @@ mpc_critics:
       weight: 1.0
     collision_rotate:
       plugin: "mpc_critics::CollisionModel"
-      trajectory_generator: differential_drive_rotate_inplace
+      trajectory_generator: ak_rotate_inplace
       weight: 1.0
     collision_rotate_shortest:
       plugin: "mpc_critics::CollisionModel"
-      trajectory_generator: differential_drive_rotate_shortest_angle
+      trajectory_generator: ak_rotate_reeds_shepp
       weight: 1.0
     prefer_rotate_shortest:
       plugin: "mpc_critics::ShortestAngleModel"
-      trajectory_generator: differential_drive_rotate_shortest_angle
+      trajectory_generator: ak_rotate_reeds_shepp
       weight: 1.0
 
 perception_3d_local:
