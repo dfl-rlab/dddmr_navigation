@@ -157,6 +157,7 @@ class MultiLayerSpinningLidar: public Sensor{
     double perception_window_size_; 
     double segmentation_ignore_ratio_;
     bool pub_gbl_marking_for_visualization_;
+    int euclidean_cluster_extraction_min_cluster_size_;
     int euclidean_cluster_minimum_accepted_size_;
     double euclidean_cluster_extraction_tolerance_;
     int stitcher_num_;
@@ -170,6 +171,7 @@ class MultiLayerSpinningLidar: public Sensor{
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_current_projected_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_current_window_marking_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_cleared_window_marking_;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_marked_voxel_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_casting_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_gbl_marking_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_dGraph_;

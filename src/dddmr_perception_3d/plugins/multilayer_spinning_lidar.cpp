@@ -170,7 +170,8 @@ void MultiLayerSpinningLidar::onInitialize()
   get_first_tf_ = false;
   
   if(!is_local_planner_){
-
+    
+    pub_marked_voxel_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/marked_voxel", 2);
     pub_current_window_marking_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/current_window_marking", 2);
     pub_current_projected_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/current_projected", 2);
     pub_current_segmentation_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/current_segmentation", 2);
@@ -546,7 +547,7 @@ void MultiLayerSpinningLidar::selfClear(){
   //@ We queue all observation here for later clearing and remarking value
   //@ This is very important!!!!!!!!
   std::vector<perception_3d::marking_voxel> current_observation_ptr;
-  
+  std::vector<perception_3d::marking_voxel> cleared_voxel_;
   //@ find robot location and base on perception window, we extract all nearby marked clusters
   int round_robot_base_x_min = ((trans_gbl2b_.transform.translation.x-perception_window_size_)/resolution_);
   int round_robot_base_x_max = ((trans_gbl2b_.transform.translation.x+perception_window_size_)/resolution_);
@@ -556,8 +557,7 @@ void MultiLayerSpinningLidar::selfClear(){
   //@ TODO: make this threshold more adaptive and robust
   int round_robot_base_z_min = ((trans_gbl2b_.transform.translation.z-marking_height_)/height_resolution_);
   int round_robot_base_z_max = ((trans_gbl2b_.transform.translation.z+marking_height_)/height_resolution_);
-
-
+  
   //@Find min/max iterator
   //auto it_x_min = marking_.lower_bound(round_robot_base_x_min);
   //auto it_x_max = marking_.lower_bound(round_robot_base_x_max);
@@ -703,6 +703,11 @@ void MultiLayerSpinningLidar::selfClear(){
           else{
             addCastingMarker(pt, cleared_cnt, markerArray);
             pct_marking_->removePCPtr((*it_z).second);
+            perception_3d::marking_voxel a_voxel;
+            a_voxel.x = (*it_x).first;
+            a_voxel.y = (*it_y).first;
+            a_voxel.z = (*it_z).first;
+            cleared_voxel_.push_back(a_voxel);
             cleared_cnt++;
           } 
                  
@@ -724,6 +729,51 @@ void MultiLayerSpinningLidar::selfClear(){
     pc_current_window_->header.frame_id = gbl_utils_->getGblFrame();
     pcl::toROSMsg(*pc_current_window_, ros_pc2_msg);
     pub_current_window_marking_->publish(ros_pc2_msg);     
+  }
+
+  for(auto i=cleared_voxel_.begin();i!=cleared_voxel_.end();i++){
+    auto it1 = pct_marking_->marking_.find((*i).x);
+    if (it1 != pct_marking_->marking_.end()) {
+        
+        // 2. Find the second layer
+        auto it2 = it1->second.find((*i).y);
+        if (it2 != it1->second.end()) {
+            
+            // 3. Erase the specific key from the deepest map
+            it2->second.erase((*i).z);
+            
+            // Optional Cleanup: Remove parent maps if they are now empty
+            if (it2->second.empty()) {
+                it1->second.erase(it2);
+            }
+        }
+        
+        // Optional Cleanup: Remove top layer if it is now empty
+        if (it1->second.empty()) {
+            pct_marking_->marking_.erase(it1);
+        }
+    }
+  }
+
+  
+  pct_marking_->marking_pc_->clear();
+  for (const auto& [key1, middle_map] : pct_marking_->marking_) {
+    for (const auto& [key2, inner_map] : middle_map) {
+      for (const auto& [key3, last_map] : inner_map) {
+        pcl::PointXYZI ipt;
+        ipt.x = key1 * resolution_;
+        ipt.y = key2 * resolution_;
+        ipt.z = key3 * height_resolution_;
+        ipt.intensity = 0;
+        pct_marking_->marking_pc_->push_back(ipt);
+      }      
+    }
+  }  
+  if(pub_marked_voxel_->get_subscription_count()>0){
+    sensor_msgs::msg::PointCloud2 ros_pc2_msg;
+    pct_marking_->marking_pc_->header.frame_id = gbl_utils_->getGblFrame();
+    pcl::toROSMsg(*pct_marking_->marking_pc_, ros_pc2_msg);
+    pub_marked_voxel_->publish(ros_pc2_msg);     
   }
 
 }

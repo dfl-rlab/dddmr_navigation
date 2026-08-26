@@ -261,7 +261,15 @@ void DDSimpleTrajectoryGeneratorTheory::initialise(){
       max_vel_x = std::min(max_vel_x, shared_data_->current_allowed_max_linear_speed_);
     }
     max_vel[0] = std::min(max_vel_x, shared_data_->robot_state_.twist.twist.linear.x + acc_lim[0] * sim_period);
+    //@when using high frequency, the first step will be diluted to a small speed, therefore, use the min_vel
+    if(max_vel[0]<min_vel_x){
+      max_vel[0] = min_vel_x;
+    }
     max_vel[2] = std::min(max_vel_th, shared_data_->robot_state_.twist.twist.angular.z + acc_lim[2] * sim_period);
+    //@when using high frequency, the first step will be diluted to a small speed, therefore, use the min_vel
+    if(max_vel[2]<min_vel_th){
+      max_vel[2] = min_vel_th;
+    }
 
     min_vel[0] = std::max(min_vel_x, shared_data_->robot_state_.twist.twist.linear.x/limits_->deceleration_ratio);
     min_vel[2] = std::max(min_vel_th, shared_data_->robot_state_.twist.twist.angular.z - acc_lim[2] * sim_period);
