@@ -29,6 +29,10 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include <perception_3d/multilayer_spinning_lidar.h>
+#include <unordered_set>
+#include <algorithm>
+#include <omp.h>
+#include <cmath>
 
 PLUGINLIB_EXPORT_CLASS(perception_3d::MultiLayerSpinningLidar, perception_3d::Sensor)
 
@@ -165,7 +169,7 @@ void MultiLayerSpinningLidar::onInitialize()
   pub_current_observation_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/current_observation", 2);
   pub_lethal_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pre_topic_name + "/lethal", 2);
 
-  pct_marking_ = std::make_shared<Marking>(name_, &dGraph_, 
+  pct_marking_ = std::make_shared<KDTreeMarking>(name_, &dGraph_, 
         gbl_utils_->getInscribedRadius(), gbl_utils_->getInflationRadius(), shared_data_, resolution_, height_resolution_);
   get_first_tf_ = false;
   
@@ -481,9 +485,11 @@ void MultiLayerSpinningLidar::selfMark(){
       pcl_msg_gbl_->push_back(pt_centroid);
       cloud_cluster->push_back(centroid);
 
-      if(isinLidarObservation(voxelized_centroid))
-          pct_marking_->addPCPtr(centroid.x, centroid.y, centroid.z, cloud_cluster, coefficients);
-
+      if(isinLidarObservation(voxelized_centroid)){
+        PointXYZU64 p64;
+        p64.x = centroid.x; p64.y=centroid.y; p64.z=centroid.z;
+        pct_marking_->addPCPtr(p64, cloud_cluster, coefficients);
+      }
 
     }
     else{
@@ -491,6 +497,8 @@ void MultiLayerSpinningLidar::selfMark(){
     }
     
   }
+  //@ all cluster examined, rebuild kdtree for clearing
+  pct_marking_->updateKDTree();
 
   if(pub_current_projected_->get_subscription_count()>0){
     sensor_msgs::msg::PointCloud2 ros_pc2_msg;
@@ -541,185 +549,197 @@ void MultiLayerSpinningLidar::selfClear(){
     observation_clear = true;
   }
   
+  //@ if we have few marking
+  if(pct_marking_->marking_pc_->points.size()<5){
+    RCLCPP_INFO_THROTTLE(node_->get_logger().get_child(name_), *clock_, 1, "Marking less than 5 points");
+    return;
+  }
   visualization_msgs::msg::MarkerArray markerArray;
   pc_current_window_.reset(new pcl::PointCloud<pcl::PointXYZI>);
   sensor_current_observation_.reset(new pcl::PointCloud<pcl::PointXYZI>);
-  //@ We queue all observation here for later clearing and remarking value
-  //@ This is very important!!!!!!!!
-  std::vector<perception_3d::marking_voxel> current_observation_ptr;
-  std::vector<perception_3d::marking_voxel> cleared_voxel_;
-  //@ find robot location and base on perception window, we extract all nearby marked clusters
-  int round_robot_base_x_min = ((trans_gbl2b_.transform.translation.x-perception_window_size_)/resolution_);
-  int round_robot_base_x_max = ((trans_gbl2b_.transform.translation.x+perception_window_size_)/resolution_);
-  int round_robot_base_y_min = ((trans_gbl2b_.transform.translation.y-perception_window_size_)/resolution_);
-  int round_robot_base_y_max = ((trans_gbl2b_.transform.translation.y+perception_window_size_)/resolution_);
 
-  //@ TODO: make this threshold more adaptive and robust
-  int round_robot_base_z_min = ((trans_gbl2b_.transform.translation.z-marking_height_)/height_resolution_);
-  int round_robot_base_z_max = ((trans_gbl2b_.transform.translation.z+marking_height_)/height_resolution_);
-  
-  //@Find min/max iterator
-  //auto it_x_min = marking_.lower_bound(round_robot_base_x_min);
-  //auto it_x_max = marking_.lower_bound(round_robot_base_x_max);
-  auto it_x_min = pct_marking_->getXIter(round_robot_base_x_min);
-  auto it_x_max = pct_marking_->getXIter(round_robot_base_x_max);
-  if(it_x_min==pct_marking_->getEnd() && it_x_min==it_x_max)
-    return;
 
   size_t cleared_cnt = 0;
-  for(auto it_x = it_x_min; it_x!=it_x_max; it_x++){
-
-    auto it_y_min = (*it_x).second.lower_bound(round_robot_base_y_min);
-    auto it_y_max = (*it_x).second.lower_bound(round_robot_base_y_max);
-    if(it_y_min==(*it_x).second.end() && it_y_min==it_y_max)
-      continue;
-
-    for(auto it_y = it_y_min; it_y!=it_y_max; it_y++){
-      if((*it_x).second[(*it_y).first].empty())
-        continue;
-      //@ A marked point exists, loop z for sight check
-      auto it_z_min = (*it_x).second[(*it_y).first].lower_bound(round_robot_base_z_min);
-      auto it_z_max = (*it_x).second[(*it_y).first].lower_bound(round_robot_base_z_max);
-      if(it_z_min==(*it_x).second[(*it_y).first].end() && it_z_min==it_z_max)
-        continue;
-
-      //@ fast segmentation of z axis
-      for(auto it_z = it_z_min; it_z!=it_z_max;it_z++){
-
-        if((*it_z).second.pc_== nullptr){
-          continue;
-        }
-        
-        pcl::PointXYZ pt;
-        /* Restoring the pt is not accurate due to the rounding, we get it from last point in pt, which is pushed when added
-        pt.x = (*it_x).first*resolution_;
-        pt.y = (*it_y).first*resolution_;
-        pt.z = (*it_z).first*height_resolution_;
-        */
-        pt.x = (*it_z).second.pc_->back().x;
-        pt.y = (*it_z).second.pc_->back().y;
-        pt.z = (*it_z).second.pc_->back().z;
-        pcl::PointCloud<pcl::PointXYZI> casting_check;
-
-        if(!isinLidarObservation(pt)){
   
-          perception_3d::marking_voxel a_voxel;
-          a_voxel.x = (*it_x).first;
-          a_voxel.y = (*it_y).first;
-          a_voxel.z = (*it_z).first;
-          current_observation_ptr.push_back(a_voxel);
-          *pc_current_window_ += (*(*it_z).second.pc_);
-          continue;
-        }
-        else{
-          //@ get point cloud along the ray for casting
-          bool skip_clear_this_segmentation = false;
-          if(!observation_clear){
-            //@ create a pointcloud that actually is a line composed of many descrete points, and then we can check radius along this line
-            getCastingPointCloud(pt, casting_check);
-            //@ we loop this "line" and do radius search to see if there is any obstacle, if there is an obstacle, it means this line is blocked, so ray trace fail
-            for(auto a_pt=casting_check.points.begin(); a_pt!=casting_check.points.end(); a_pt++){
-              /*
-              //@ index 0 is cluster center
-              //@ Check center around to rule out one stand for all (huge segmentation)
-              if(a_pt==casting_check.points.begin()){
-                //@ find nearest ostacle and then check whether this obstacle belongs to itself
-                std::vector<int> pointIdxNKNSearch(1);
-                std::vector<float> pointNKNSquaredDistance(1);
-                pcl::PointXYZ pt_i;
-                pt_i.x = (*a_pt).x;
-                pt_i.y = (*a_pt).y;
-                pt_i.z = (*a_pt).z;
-                if(kdtree_last_observation->nearestKSearch(pt_i, 1, pointIdxNKNSearch, pointNKNSquaredDistance)>0){
-                  pcl::PointXYZI candidate_pt;
-                  candidate_pt.x = pcl_msg_gbl_->points[pointIdxNKNSearch.front()].x;
-                  candidate_pt.y = pcl_msg_gbl_->points[pointIdxNKNSearch.front()].y;
-                  candidate_pt.z = pcl_msg_gbl_->points[pointIdxNKNSearch.front()].z;
-                  if((*it_z).second.pc_->points.size()>4){
-                    pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_cluster(new pcl::KdTreeFLANN<pcl::PointXYZI>());
-                    kdtree_cluster->setInputCloud((*it_z).second.pc_);
-                    std::vector<int> id;
-                    std::vector<float> sqdist;
-                    if(kdtree_cluster->radiusSearch(candidate_pt, 0.5, id, sqdist)>0){
-                      //@ ray hits obstacle, we skip clearing this segmentation
-                      skip_clear_this_segmentation = true;
-                      break;
-                    }
-                  }
+  //@ search marked points around robot
+  PointXYZU64 robot_position;
+  robot_position.x = trans_gbl2b_.transform.translation.x;
+  robot_position.y = trans_gbl2b_.transform.translation.y;
+  robot_position.z = trans_gbl2b_.transform.translation.z;
+  std::vector<pcl::index_t> pointIdxRadiusSearch;
+  std::vector<pcl::index_t> indices_to_remove;
+  std::vector<float> pointRadiusSquaredDistance;
+  pct_marking_->kdtree_marking_->radiusSearch(robot_position, perception_window_size_, pointIdxRadiusSearch, pointRadiusSquaredDistance);
+  
+  for(auto nearest_point_idx=pointIdxRadiusSearch.begin(); nearest_point_idx!=pointIdxRadiusSearch.end(); nearest_point_idx++){
+    
+    PointXYZU64 pt64 = pct_marking_->marking_pc_->points[*nearest_point_idx];
+    //@prevent cross floor casting
+    if(fabs(robot_position.z-pt64.z)>0.2){
+      continue;
+    }
+    pcl::PointXYZ pt;
+    std::uint64_t pt_hash;
+    pt.x = pct_marking_->marking_pc_->points[*nearest_point_idx].x;
+    pt.y = pct_marking_->marking_pc_->points[*nearest_point_idx].y;
+    pt.z = pct_marking_->marking_pc_->points[*nearest_point_idx].z;
+    pt_hash = pct_marking_->mergeUint32ToUint64(pct_marking_->marking_pc_->points[*nearest_point_idx].hbyte, pct_marking_->marking_pc_->points[*nearest_point_idx].lbyte);
+    
+    pcl::PointCloud<pcl::PointXYZI> casting_check;
+    if(!isinLidarObservation(pt)){
+      *pc_current_window_ += (*pct_marking_->marking_map_[pt_hash].pc_);
+      continue;
+    }
+    else{
+      //@ get point cloud along the ray for casting
+      bool skip_clear_this_segmentation = false;
+      if(!observation_clear){
+        //@ create a pointcloud that actually is a line composed of many descrete points, and then we can check radius along this line
+        getCastingPointCloud(pt, casting_check);
+        //@ we loop this "line" and do radius search to see if there is any obstacle, if there is an obstacle, it means this line is blocked, so ray trace fail
+        for(auto a_pt=casting_check.points.begin(); a_pt!=casting_check.points.end(); a_pt++){
+          /*
+          //@ index 0 is cluster center
+          //@ Check center around to rule out one stand for all (huge segmentation)
+          if(a_pt==casting_check.points.begin()){
+            //@ find nearest ostacle and then check whether this obstacle belongs to itself
+            std::vector<int> pointIdxNKNSearch(1);
+            std::vector<float> pointNKNSquaredDistance(1);
+            pcl::PointXYZ pt_i;
+            pt_i.x = (*a_pt).x;
+            pt_i.y = (*a_pt).y;
+            pt_i.z = (*a_pt).z;
+            if(kdtree_last_observation->nearestKSearch(pt_i, 1, pointIdxNKNSearch, pointNKNSquaredDistance)>0){
+              pcl::PointXYZI candidate_pt;
+              candidate_pt.x = pcl_msg_gbl_->points[pointIdxNKNSearch.front()].x;
+              candidate_pt.y = pcl_msg_gbl_->points[pointIdxNKNSearch.front()].y;
+              candidate_pt.z = pcl_msg_gbl_->points[pointIdxNKNSearch.front()].z;
+              if((*it_z).second.pc_->points.size()>4){
+                pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_cluster(new pcl::KdTreeFLANN<pcl::PointXYZI>());
+                kdtree_cluster->setInputCloud((*it_z).second.pc_);
+                std::vector<int> id;
+                std::vector<float> sqdist;
+                if(kdtree_cluster->radiusSearch(candidate_pt, 0.5, id, sqdist)>0){
+                  //@ ray hits obstacle, we skip clearing this segmentation
+                  skip_clear_this_segmentation = true;
+                  break;
                 }
               }
-              */
-              //@ when casting back for last 5 cm, ignore it, because dirty lidar may cause casting fail
-              if((*a_pt).intensity<0.05)
-                break;
-              if((*a_pt).intensity>perception_window_size_){
-                skip_clear_this_segmentation = true;
-                break;
-              }
-              //@ Create a point for kd-tree
-              pcl::PointXYZ pt_i;
-              pt_i.x = (*a_pt).x;
-              pt_i.y = (*a_pt).y;
-              pt_i.z = (*a_pt).z;
-              //double search_distance =  (*a_pt).intensity/20. + 0.01; //@ decrease spot size, ex: at 1.0 meter look for 5 cm;
-              //search_distance = std::min(search_distance, 0.1);
-              double search_distance = std::max(resolution_, height_resolution_);
-              std::vector<int> id;
-              std::vector<float> sqdist;
-              if(kdtree_last_observation->radiusSearch(pt_i, search_distance, id, sqdist)>0){
-                //@ ray hits obstacle, we skip clearing this segmentation
-                skip_clear_this_segmentation = true;
-                break;
-              }
-            }            
+            }
           }
-
-          //Hit obstacle when ray tracing, so we skip clearing->meaning that we add this segmentation to the observation
-          if(skip_clear_this_segmentation){
-            perception_3d::marking_voxel a_voxel;
-            a_voxel.x = (*it_x).first;
-            a_voxel.y = (*it_y).first;
-            a_voxel.z = (*it_z).first;
-            current_observation_ptr.push_back(a_voxel);
-            *pc_current_window_ += (*(*it_z).second.pc_);
-            //addCastingMarker(pt, current_observation_ptr.size(), markerArray);
-            continue;
+          */
+          //@ when casting back for last 5 cm, ignore it, because dirty lidar may cause casting fail
+          if((*a_pt).intensity<0.05)
+            break;
+          if((*a_pt).intensity>perception_window_size_){
+            skip_clear_this_segmentation = true;
+            break;
           }
-          
-          
+          //@ Create a point for kd-tree
+          pcl::PointXYZ pt_i;
+          pt_i.x = (*a_pt).x;
+          pt_i.y = (*a_pt).y;
+          pt_i.z = (*a_pt).z;
+          //double search_distance =  (*a_pt).intensity/20. + 0.01; //@ decrease spot size, ex: at 1.0 meter look for 5 cm;
+          //search_distance = std::min(search_distance, 0.1);
+          double search_distance = std::max(resolution_, height_resolution_);
           std::vector<int> id;
           std::vector<float> sqdist;
-          //@ I am not sure what happen below, looks like I redo check again but the threshold (1) is different
-          if(kdtree_last_observation->radiusSearch(pt, resolution_, id, sqdist)>1){
-            *pc_current_window_ += (*(*it_z).second.pc_);
-
-            perception_3d::marking_voxel a_voxel;
-            a_voxel.x = (*it_x).first;
-            a_voxel.y = (*it_y).first;
-            a_voxel.z = (*it_z).first;
-            current_observation_ptr.push_back(a_voxel);
-            //addCastingMarker(pt, current_observation_ptr.size(), markerArray);
-          }       
-          else{
-            addCastingMarker(pt, cleared_cnt, markerArray);
-            pct_marking_->removePCPtr((*it_z).second);
-            perception_3d::marking_voxel a_voxel;
-            a_voxel.x = (*it_x).first;
-            a_voxel.y = (*it_y).first;
-            a_voxel.z = (*it_z).first;
-            cleared_voxel_.push_back(a_voxel);
-            cleared_cnt++;
-          } 
-                 
-        }
+          if(kdtree_last_observation->radiusSearch(pt_i, search_distance, id, sqdist)>0){
+            //@ ray hits obstacle, we skip clearing this segmentation
+            skip_clear_this_segmentation = true;
+            break;
+          }
+        }            
       }
 
+      //Hit obstacle when ray tracing, so we skip clearing->meaning that we add this segmentation to the observation
+      if(skip_clear_this_segmentation){
+        *pc_current_window_ += (*pct_marking_->marking_map_[pt_hash].pc_);
+        continue;
+      }
+      
+      
+      std::vector<int> id;
+      std::vector<float> sqdist;
+      //@ I am not sure what happen below, looks like I redo check again but the threshold (1) is different
+      if(kdtree_last_observation->radiusSearch(pt, resolution_, id, sqdist)>1){
+        *pc_current_window_ += (*pct_marking_->marking_map_[pt_hash].pc_);
+      }       
+      else{
+        addCastingMarker(pt, cleared_cnt, markerArray);
+        pct_marking_->removePCPtr(pt64);
+        indices_to_remove.push_back(*nearest_point_idx);
+        cleared_cnt++;
+      } 
+              
+    }
+  }
+  //@ a batch removed pt64, now remove them from marking_pc_
+
+  const float nan_val = std::numeric_limits<float>::quiet_NaN();
+  const size_t num_indices = indices_to_remove.size();
+
+  // In-place modification is inherently thread-safe since 
+  // each thread writes to a distinct index location.
+  #pragma omp parallel for schedule(static)
+  for (size_t i = 0; i < num_indices; ++i) {
+    int idx = indices_to_remove[i];
+    if (idx >= 0 && static_cast<size_t>(idx) < pct_marking_->marking_pc_->size()) {
+      pct_marking_->marking_pc_->points[idx].x = nan_val;
+      pct_marking_->marking_pc_->points[idx].y = nan_val;
+      pct_marking_->marking_pc_->points[idx].z = nan_val;
+    }
+  }
+  pcl::PointCloud<PointXYZU64>::Ptr new_marking_pc(new pcl::PointCloud<PointXYZU64>);
+  new_marking_pc->points.resize(pct_marking_->marking_pc_->points.size() - num_indices);
+
+  const size_t total_pts = pct_marking_->marking_pc_->points.size();
+  std::vector<size_t> thread_offsets;
+
+  #pragma omp parallel
+  {
+    int thread_id = omp_get_thread_num();
+    int num_threads = omp_get_num_threads();
+
+    #pragma omp single
+    {
+      thread_offsets.resize(num_threads + 1, 0);
+    }
+
+    size_t chunk_size = (total_pts + num_threads - 1) / num_threads;
+    size_t start_idx = std::min(static_cast<size_t>(thread_id) * chunk_size, total_pts);
+    size_t end_idx = std::min(start_idx + chunk_size, total_pts);
+
+    size_t valid_cnt = 0;
+    for (size_t i = start_idx; i < end_idx; ++i) {
+      if (!std::isnan(pct_marking_->marking_pc_->points[i].x)) {
+        valid_cnt++;
+      }
+    }
+    thread_offsets[thread_id + 1] = valid_cnt;
+
+    #pragma omp barrier
+
+    #pragma omp single
+    {
+      for (int t = 0; t < num_threads; ++t) {
+        thread_offsets[t + 1] += thread_offsets[t];
+      }
+    }
+
+    size_t out_idx = thread_offsets[thread_id];
+    for (size_t i = start_idx; i < end_idx; ++i) {
+      const auto& pt = pct_marking_->marking_pc_->points[i];
+      if (!std::isnan(pt.x)) {
+        new_marking_pc->points[out_idx++] = pt;
+      }
     }
   }
 
-  //pct_marking_->updateCleared(current_observation_ptr);
+  pct_marking_->marking_pc_ = new_marking_pc;
+
   //@ put to current observation, different for global/local
-  
   if(pub_casting_->get_subscription_count()>0){
     pub_casting_->publish(markerArray);
   }
@@ -731,44 +751,6 @@ void MultiLayerSpinningLidar::selfClear(){
     pub_current_window_marking_->publish(ros_pc2_msg);     
   }
 
-  for(auto i=cleared_voxel_.begin();i!=cleared_voxel_.end();i++){
-    auto it1 = pct_marking_->marking_.find((*i).x);
-    if (it1 != pct_marking_->marking_.end()) {
-        
-        // 2. Find the second layer
-        auto it2 = it1->second.find((*i).y);
-        if (it2 != it1->second.end()) {
-            
-            // 3. Erase the specific key from the deepest map
-            it2->second.erase((*i).z);
-            
-            // Optional Cleanup: Remove parent maps if they are now empty
-            if (it2->second.empty()) {
-                it1->second.erase(it2);
-            }
-        }
-        
-        // Optional Cleanup: Remove top layer if it is now empty
-        if (it1->second.empty()) {
-            pct_marking_->marking_.erase(it1);
-        }
-    }
-  }
-
-  
-  pct_marking_->marking_pc_->clear();
-  for (const auto& [key1, middle_map] : pct_marking_->marking_) {
-    for (const auto& [key2, inner_map] : middle_map) {
-      for (const auto& [key3, last_map] : inner_map) {
-        pcl::PointXYZI ipt;
-        ipt.x = key1 * resolution_;
-        ipt.y = key2 * resolution_;
-        ipt.z = key3 * height_resolution_;
-        ipt.intensity = 0;
-        pct_marking_->marking_pc_->push_back(ipt);
-      }      
-    }
-  }  
   if(pub_marked_voxel_->get_subscription_count()>0){
     sensor_msgs::msg::PointCloud2 ros_pc2_msg;
     pct_marking_->marking_pc_->header.frame_id = gbl_utils_->getGblFrame();
@@ -915,27 +897,12 @@ void MultiLayerSpinningLidar::pubUpdateLoop()
   if(shared_data_->dgraph_update_request_[name_]){
     return;
   }
-
+  
   if(pub_gbl_marking_for_visualization_){
     std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
     pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_msg (new pcl::PointCloud<pcl::PointXYZI>);
-    //for(auto itx=marking_.begin();itx!=marking_.end();itx++){
-    for(auto itx=pct_marking_->getBegin();itx!=pct_marking_->getEnd();itx++){
-      for(auto ity=(*itx).second.begin();ity!=(*itx).second.end();ity++){
-        if((*itx).second[(*ity).first].empty())
-          return;
-        for(auto itz=(*itx).second[(*ity).first].begin();itz!=(*itx).second[(*ity).first].end();itz++){
-          if((*itz).second.pc_== nullptr){
-            continue;
-          }
-          pcl::PointXYZ pt;
-          pt.x = (*itx).first*resolution_;
-          pt.y = (*ity).first*resolution_;
-          pt.z = (*itz).first*height_resolution_;   
-          if((*itz).second.pc_->points.size()>1)
-            *pcl_msg += (*(*itz).second.pc_);  
-        }
-      }
+    for(const auto& [key, value] : pct_marking_->marking_map_){
+      *pcl_msg += (*value.pc_);  
     }
     sensor_msgs::msg::PointCloud2 ros_pc2_msg;
     pcl_msg->header.frame_id = gbl_utils_->getGblFrame();
@@ -997,7 +964,7 @@ void MultiLayerSpinningLidar::resetdGraph(){
   RCLCPP_INFO(node_->get_logger().get_child(name_), "%s starts to reset dynamic graph.", name_.c_str());
   dGraph_.clear();
   dGraph_.initial(shared_data_->static_ground_size_, gbl_utils_->getMaxObstacleDistance());
-  pct_marking_ = std::make_shared<Marking>(name_, &dGraph_, 
+  pct_marking_ = std::make_shared<KDTreeMarking>(name_, &dGraph_, 
         gbl_utils_->getInscribedRadius(), gbl_utils_->getInflationRadius(), shared_data_, resolution_, height_resolution_);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "%s done dynamic graph regeneration.", name_.c_str());
 }

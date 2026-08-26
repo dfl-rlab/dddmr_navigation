@@ -33,7 +33,7 @@
 
 #include <perception_3d/sensor.h>
 
-#include <perception_3d/cluster_marking.h>
+#include <perception_3d/cluster_kdtree_marking.h>
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
 /*Point cloud library*/
@@ -143,7 +143,8 @@ class MultiLayerSpinningLidar: public Sensor{
     Eigen::Affine3d trans_gbl2s_af3_;
 
     /*Voxel structure*/
-    std::shared_ptr<Marking> pct_marking_;
+    //std::shared_ptr<Marking> pct_marking_;
+    std::shared_ptr<KDTreeMarking> pct_marking_;
 
 
     /*plugin parameter*/

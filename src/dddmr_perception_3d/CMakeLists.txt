@@ -133,6 +133,17 @@ ament_target_dependencies(cluster_marking
   ${dependencies}
 )
 
+# perception_cluster_kdtree_marking
+add_library(cluster_kdtree_marking SHARED
+  plugins/cluster_kdtree_marking.cpp
+)
+target_link_libraries(cluster_kdtree_marking
+  perception_sensor
+)
+ament_target_dependencies(cluster_kdtree_marking
+  ${dependencies}
+)
+
 #depth_camera_lib
 add_library(depth_camera_buffer SHARED
   plugins/depth_camera/depth_camera_observation.cpp
@@ -158,6 +169,7 @@ add_library(layers SHARED
 )
 target_link_libraries(layers
   cluster_marking 
+  cluster_kdtree_marking
   depth_camera_buffer 
   stacked_perception_ros
   OpenMP::OpenMP_CXX
@@ -202,6 +214,7 @@ install(TARGETS
   stacked_perception_ros
   depth_camera_buffer
   cluster_marking
+  cluster_kdtree_marking
   layers
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -233,7 +246,7 @@ install(FILES perception_3d_plugins.xml
 )
 
 ament_export_include_directories(include)
-ament_export_libraries(shared_data_sensor perception_sensor stacked_perception stacked_perception_ros cluster_marking depth_camera_buffer layers)
+ament_export_libraries(shared_data_sensor perception_sensor stacked_perception stacked_perception_ros cluster_marking cluster_kdtree_marking depth_camera_buffer layers)
 ament_export_dependencies(${dependencies})
 pluginlib_export_plugin_description_file(perception_3d perception_3d_plugins.xml)
 ament_package()
