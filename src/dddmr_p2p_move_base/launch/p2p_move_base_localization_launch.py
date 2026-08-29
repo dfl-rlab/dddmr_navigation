@@ -70,7 +70,8 @@ def generate_launch_description():
             executable='global_planner_node',
             output='screen',
             respawn=False,
-            parameters=[config_file, {'use_sim_time': use_sim_time}]
+            parameters=[config_file, {'use_sim_time': use_sim_time}],
+            #prefix=['xterm -e gdb -ex run --args'],
         ),
 
         # 6. p2p_move_base node

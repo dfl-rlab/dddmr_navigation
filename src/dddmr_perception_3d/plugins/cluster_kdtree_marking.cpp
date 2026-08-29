@@ -35,27 +35,146 @@ namespace perception_3d
 {
 
 KDTreeMarking::~KDTreeMarking(){
-
+  shared_data_.reset();
 }
 
-void KDTreeMarking::computeMinDistanceFromObstacle2GroundNodes(  
+void KDTreeMarking::computeProjection(  
   const pcl::PointCloud<pcl::PointXYZI>::Ptr& pcptr, 
   const pcl::ModelCoefficients::Ptr& pcplaneptr,
-  std::unordered_map<int, float>& nodes_of_min_distance){
+  pcl::PointCloud<pcl::PointXYZI>::Ptr& projectedptr){
 
-  pcl::PointCloud<pcl::PointXYZI>::Ptr projected_cloud_cluster (new pcl::PointCloud<pcl::PointXYZI>);
   pcl::ProjectInliers<pcl::PointXYZI> proj;
   proj.setModelType (pcl::SACMODEL_PLANE);
   proj.setInputCloud (pcptr);
   proj.setModelCoefficients (pcplaneptr);
-  proj.filter (*projected_cloud_cluster);
+  proj.filter (*projectedptr);
 
   pcl::VoxelGrid<pcl::PointXYZI> sor;
-  sor.setInputCloud (projected_cloud_cluster);
-  sor.setLeafSize (0.1f, 0.1f, 0.1f);
-  sor.filter (*projected_cloud_cluster);
+  sor.setInputCloud (projectedptr);
+  sor.setLeafSize (0.05f, 0.05f, 0.05f);
+  sor.filter (*projectedptr);
 
-  for(auto prj_pt_it=projected_cloud_cluster->points.begin();prj_pt_it!=projected_cloud_cluster->points.end();prj_pt_it++){
+}
+
+std::int16_t KDTreeMarking::safeConvert(int32_t large_value) {
+  if (large_value > std::numeric_limits<std::int16_t>::max() || 
+    large_value < std::numeric_limits<std::int16_t>::min()) {
+    RCLCPP_ERROR(rclcpp::get_logger("cluster_kdtree_marking"),"DDDMR do not support map larger than +-1600m");
+  }
+  return static_cast<std::int16_t>(large_value);
+}
+
+void KDTreeMarking::addPCPtr(PointXYZU64 centroid,  
+  const pcl::PointCloud<pcl::PointXYZI>::Ptr& pcptr, 
+  const pcl::ModelCoefficients::Ptr& pcplaneptr){
+
+  centroid.xshort = safeConvert(centroid.x/xy_resolution_);
+  centroid.yshort = safeConvert(centroid.y/xy_resolution_);
+  centroid.zshort = safeConvert(centroid.z/height_resolution_);
+  std::uint64_t pt_hash = int16ToUint64(centroid.xshort, centroid.yshort, centroid.zshort);
+  pcl::PointCloud<pcl::PointXYZI>::Ptr projectedptr(new pcl::PointCloud<pcl::PointXYZI>);
+  computeProjection(pcptr, pcplaneptr, projectedptr);
+  
+  auto it = marking_map_.find(pt_hash);
+  if (it != marking_map_.end()) {
+    //@ hash exist, do not push back pc
+    per_marking pm(pcptr, pcplaneptr, projectedptr);
+    marking_map_[pt_hash] = pm;
+  } else {
+    marking_pc_->push_back(centroid);
+    per_marking pm(pcptr, pcplaneptr, projectedptr);
+    marking_map_[pt_hash] = pm;
+  }
+
+}
+
+void KDTreeMarking::removePCPtr(const PointXYZU64& centroid){
+
+  std::uint64_t target_id = int16ToUint64(centroid.xshort, centroid.yshort, centroid.zshort);
+  
+  //@ Erase marking_map_ based on the input centroid
+  auto map_it = marking_map_.find(target_id);
+  if (map_it != marking_map_.end()) {
+    map_it->second.pc_.reset();
+    map_it->second.mc_.reset();
+    marking_map_.erase(map_it);
+  }
+  
+}
+
+void KDTreeMarking::updateDGraph(const pcl::PointCloud<PointXYZU64>::Ptr& centroids_for_dgraph, 
+                                  const std::vector<pcl::index_t>& ground_region_idx){
+  //if ground region is empty
+  //RCLCPP_INFO(rclcpp::get_logger("cluster_marking"),"ground region size: %lu", ground_region_idx.size());
+  if(ground_region_idx.size()<1)
+    return;
+
+  //@clear all dgraph value in ground region
+  for(auto idx_ground: ground_region_idx){
+    dGraph_->clearValue(idx_ground, 9999.0);
+    lethal_map_.erase(idx_ground);
+  }
+
+  //@loop marking_map_ to get projected point cloud
+  pcl::PointCloud<pcl::PointXYZI>::Ptr aggregated_projections(new pcl::PointCloud<pcl::PointXYZI>);
+  pcl::PointCloud<pcl::PointXYZI>::Ptr aggregated_projections_ds(new pcl::PointCloud<pcl::PointXYZI>);
+  for(auto a_pt: centroids_for_dgraph->points){
+    std::uint64_t pt_hash = int16ToUint64(a_pt.xshort, a_pt.yshort, a_pt.zshort);
+    *aggregated_projections += (*getMarkingCloudFromHash(pt_hash));
+  }
+
+  aggregated_projections_ds = small_gicp::voxelgrid_sampling_omp(*aggregated_projections, 0.1, 4);
+  pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_aggregated_projections_ds(new pcl::KdTreeFLANN<pcl::PointXYZI>());
+  if(aggregated_projections_ds->points.size()>5){
+    kdtree_aggregated_projections_ds->setInputCloud(aggregated_projections_ds);
+  }
+  else{
+    RCLCPP_DEBUG(rclcpp::get_logger("cluster_marking"),"only few projection");
+    return;
+  }
+
+  //@ loop ground and find closest one
+  //RCLCPP_INFO(rclcpp::get_logger("cluster_marking"),"tic");
+  std::vector<std::pair<pcl::index_t, double>> index_distance_pairs;
+
+  #pragma omp parallel
+  {
+    std::vector<std::pair<pcl::index_t, double>> local_pairs;
+
+    #pragma omp for nowait
+    for (size_t i = 0; i < ground_region_idx.size(); ++i) {
+      auto idx_ground = ground_region_idx[i];
+      std::vector<int> id_tmp;
+      std::vector<float> sqdist_tmp;
+      kdtree_aggregated_projections_ds->nearestKSearch(shared_data_->pcl_ground_->points[idx_ground], 1, id_tmp, sqdist_tmp);
+      double distance = sqrt(sqdist_tmp[0]);
+      if(distance>inflation_radius_){
+        //@ out of inflation range
+      }
+      else{
+        dGraph_->setValue(idx_ground, distance);
+        local_pairs.emplace_back(idx_ground, distance);
+        //if(distance<=inscribed_radius_)
+        //  lethal_map_[idx_ground] = distance;
+      }
+    }
+
+    #pragma omp critical
+    {
+      index_distance_pairs.insert(index_distance_pairs.end(), local_pairs.begin(), local_pairs.end());
+    }
+  }
+
+  for (const auto& pair : index_distance_pairs) {
+    if (pair.second <= inscribed_radius_) {
+      lethal_map_[pair.first] = pair.second;
+    }
+  }
+  
+  //RCLCPP_INFO(rclcpp::get_logger("cluster_marking"),"toc");
+  /*
+  //@ Below is the bottle neck of the marking, it can not be parallelized? Because we have to accessing a same address of dGrpah when inflate
+  for(auto prj_pt_it=aggregated_projections_ds->points.begin();prj_pt_it!=aggregated_projections_ds->points.end();prj_pt_it++){
     pcl::PointXYZI pt;
     pt.x = (*prj_pt_it).x;
     pt.y = (*prj_pt_it).y;
@@ -63,72 +182,23 @@ void KDTreeMarking::computeMinDistanceFromObstacle2GroundNodes(
 
     std::vector<int> id_tmp;
     std::vector<float> sqdist_tmp;
-    //@ We mark lethal
     if(shared_data_->kdtree_ground_->radiusSearch(pt, inflation_radius_, id_tmp, sqdist_tmp)){
+      //RCLCPP_INFO(rclcpp::get_logger("cluster_marking"),"small ground size: %lu", id_tmp.size());
       for(int i=0;i<id_tmp.size();i++){
         float dx = pt.x - shared_data_->pcl_ground_->points[id_tmp[i]].x;
         float dy = pt.y - shared_data_->pcl_ground_->points[id_tmp[i]].y;
         float dz = pt.z - shared_data_->pcl_ground_->points[id_tmp[i]].z;
         //@ Remove z value (see issue 8), we might have to review this assumption.
-        float distance = sqrt(dx*dx + dy* dy);
+        float distance = sqrt(dx*dx + dy* dy + dz*dz);
         //RCLCPP_DEBUG(rclcpp::get_logger("cluster_marking"),"Distance xyz: %.2f, distance xy: %.2f", sqrt(sqdist_tmp[i]), distance);
-        //if(nodes_of_min_distance.insert(std::make_pair(id_tmp[i], sqrt(sqdist_tmp[i]))).second == false)
-        if(nodes_of_min_distance.insert(std::make_pair(id_tmp[i], distance)).second == false)
-        {
-          //@ key was presented
-          //nodes_of_min_distance[id_tmp[i]] = std::min(nodes_of_min_distance[id_tmp[i]], sqrt(sqdist_tmp[i]));
-          nodes_of_min_distance[id_tmp[i]] = std::min(nodes_of_min_distance[id_tmp[i]], distance);
-        }
-
-      }
-      
-    }
-  }
-
-}
-
-
-void KDTreeMarking::addPCPtr(PointXYZU64 centroid,  
-  const pcl::PointCloud<pcl::PointXYZI>::Ptr& pcptr, 
-  const pcl::ModelCoefficients::Ptr& pcplaneptr){
-
-  marking_id_++;
-  centroid.hbyte = static_cast<std::uint32_t>(marking_id_ >> 32);
-  centroid.lbyte = static_cast<std::uint32_t>(marking_id_ & 0xFFFFFFFF);
-  marking_pc_->push_back(centroid);
-
-  std::unordered_map<int, float> nodes_of_min_distance;
-  computeMinDistanceFromObstacle2GroundNodes(pcptr, pcplaneptr, nodes_of_min_distance);
-  per_marking pm(pcptr, pcplaneptr, nodes_of_min_distance);
-  marking_map_[marking_id_] = pm;
-  for(auto id=nodes_of_min_distance.begin();id!=nodes_of_min_distance.end();id++){
-    dGraph_->setValue((*id).first, (*id).second);
-    if((*id).second<=inscribed_radius_)
-      lethal_map_[(*id).first] = (*id).second;
-  }
-
-}
-
-void KDTreeMarking::removePCPtr(const PointXYZU64& centroid){
-
-  std::uint64_t target_id = mergeUint32ToUint64(centroid.hbyte, centroid.lbyte);
-
-  //@ Clear corresponding values in dGraph_, lethal_map_, and marking_map_
-  auto map_it = marking_map_.find(target_id);
-  if (map_it != marking_map_.end()) {
-    for (const auto& node : map_it->second.nodes_of_min_distance_) {
-      dGraph_->clearValue(node.first, 9999.0);
-      if (node.second <= inscribed_radius_) {
-        lethal_map_.erase(node.first);
+        dGraph_->setValue(id_tmp[i], distance); //@setValue() will protect larger value being set, so we dont need to compare new and old
+        if(distance<=inscribed_radius_)
+          lethal_map_[id_tmp[i]] = distance;
       }
     }
-    map_it->second.pc_.reset();
-    map_it->second.mc_.reset();
-    marking_map_.erase(map_it);
   }
-    
+  */
 }
-
 
 void KDTreeMarking::updateKDTree(){
   if (marking_pc_->empty()){
@@ -138,19 +208,14 @@ void KDTreeMarking::updateKDTree(){
   kdtree_marking_->setInputCloud(marking_pc_);
 }
 
-void KDTreeMarking::splitMarkingId(std::uint32_t& hbyte, std::uint32_t& lbyte){
-  hbyte = static_cast<std::uint32_t>(marking_id_ >> 32);
-  lbyte = static_cast<std::uint32_t>(marking_id_ & 0xFFFFFFFF);
+pcl::PointCloud<pcl::PointXYZI>::Ptr KDTreeMarking::getMarkingCloudFromHash(std::uint64_t pt_hash){
+  auto it = marking_map_.find(pt_hash);
+  if (it != marking_map_.end()) {
+    return marking_map_[pt_hash].pc_;
+  } else {
+    pcl::PointCloud<pcl::PointXYZI>::Ptr empty_cloud(new pcl::PointCloud<pcl::PointXYZI>());
+    return empty_cloud;
+  }
 }
-
-void KDTreeMarking::splitUint64(std::uint64_t val, std::uint32_t& hbyte, std::uint32_t& lbyte){
-  hbyte = static_cast<std::uint32_t>(val >> 32);
-  lbyte = static_cast<std::uint32_t>(val & 0xFFFFFFFF);
-}
-
-std::uint64_t KDTreeMarking::mergeUint32ToUint64(std::uint32_t hbyte, std::uint32_t lbyte){
-  return (static_cast<std::uint64_t>(hbyte) << 32) | static_cast<std::uint64_t>(lbyte);
-}
-
 
 }//end of name space

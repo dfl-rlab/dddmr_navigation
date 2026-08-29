@@ -192,6 +192,10 @@ void MultiLayerSpinningLidar::onInitialize()
 
 void MultiLayerSpinningLidar::cbSensor(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 { 
+
+  //@Protect Mark/Clear functions
+  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
+
   //@ Sanity check
   rclcpp::Time time1(last_sensor_receiving_time_.stamp);
   rclcpp::Time time2(msg->header.stamp);
@@ -287,9 +291,6 @@ void MultiLayerSpinningLidar::cbSensor(const sensor_msgs::msg::PointCloud2::Shar
   sor.setInputCloud (pcl_msg_);
   sor.setLeafSize (0.1f, 0.1f, 0.1f);
   sor.filter (*pcl_msg_);
-
-  //@Protect Mark/Clear functions
-  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
 
   //pcl_msg_.reset(new pcl::PointCloud<pcl::PointXYZ>);
   //pcl_msg_ = pcl_msg;
@@ -490,7 +491,6 @@ void MultiLayerSpinningLidar::selfMark(){
         p64.x = centroid.x; p64.y=centroid.y; p64.z=centroid.z;
         pct_marking_->addPCPtr(p64, cloud_cluster, coefficients);
       }
-
     }
     else{
       RCLCPP_DEBUG(node_->get_logger().get_child(name_), "Reject cluster with size: %lu at %f,%f,%f, because it is located in the static layer", cloud_cluster->points.size(), centroid.x, centroid.y, centroid.z);
@@ -499,6 +499,37 @@ void MultiLayerSpinningLidar::selfMark(){
   }
   //@ all cluster examined, rebuild kdtree for clearing
   pct_marking_->updateKDTree();
+  
+  //@ extract centroids in perception window and infalte them
+  PointXYZU64 robot_position_u64;
+  robot_position_u64.x = trans_gbl2b_.transform.translation.x;
+  robot_position_u64.y = trans_gbl2b_.transform.translation.y;
+  robot_position_u64.z = trans_gbl2b_.transform.translation.z;
+  std::vector<pcl::index_t> idx_centroids;
+  std::vector<float> sqdist_centroids;
+  pct_marking_->kdtree_marking_->radiusSearch(robot_position_u64, 1.2*perception_window_size_, idx_centroids, sqdist_centroids);
+  pcl::PointCloud<PointXYZU64>::Ptr centroids_for_dgraph (new pcl::PointCloud<PointXYZU64>);
+  for (auto point_idx : idx_centroids) {
+    centroids_for_dgraph->push_back(pct_marking_->marking_pc_->points[point_idx]);
+  }
+
+  //@ extract ground region for update
+  pcl::PointXYZI robot_position;
+  robot_position.x = trans_gbl2b_.transform.translation.x;
+  robot_position.y = trans_gbl2b_.transform.translation.y;
+  robot_position.z = trans_gbl2b_.transform.translation.z;
+  std::vector<pcl::index_t> idx_ground;
+  std::vector<float> sqdist_ground;
+  std::vector<pcl::index_t> idx_ground_filtered;
+  shared_data_->kdtree_ground_->radiusSearch(robot_position, 2*perception_window_size_, idx_ground, sqdist_ground);
+  for (auto point_idx : idx_ground) {
+    if(fabs(shared_data_->pcl_ground_->points[point_idx].z - robot_position.z)<0.2)
+      idx_ground_filtered.push_back(point_idx);
+  }
+
+  //@ update dgraph of ground region based on marked centroids
+  pct_marking_->updateDGraph(centroids_for_dgraph, idx_ground_filtered);
+
 
   if(pub_current_projected_->get_subscription_count()>0){
     sensor_msgs::msg::PointCloud2 ros_pc2_msg;
@@ -513,11 +544,11 @@ void MultiLayerSpinningLidar::selfMark(){
     pcl::toROSMsg(*cloud_clusters, ros_pc2_msg);
     pub_current_segmentation_->publish(ros_pc2_msg);
   }
-  
+
 }
 
 void MultiLayerSpinningLidar::selfClear(){
-
+  
   if(is_local_planner_){return;}
 
   std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
@@ -537,7 +568,7 @@ void MultiLayerSpinningLidar::selfClear(){
     resetdGraph();
     shared_data_->dgraph_update_request_[name_] = false;
   }
-
+  
   pcl::KdTreeFLANN<pcl::PointXYZ>::Ptr kdtree_last_observation(new pcl::KdTreeFLANN<pcl::PointXYZ>());
   bool observation_clear = false;
 
@@ -562,6 +593,9 @@ void MultiLayerSpinningLidar::selfClear(){
   size_t cleared_cnt = 0;
   
   //@ search marked points around robot
+  int hist_crossing_floor = 0;
+  int hist_not_in_fov = 0;
+  int hist_skip_clear_this_segmentation = 0;
   PointXYZU64 robot_position;
   robot_position.x = trans_gbl2b_.transform.translation.x;
   robot_position.y = trans_gbl2b_.transform.translation.y;
@@ -569,13 +603,14 @@ void MultiLayerSpinningLidar::selfClear(){
   std::vector<pcl::index_t> pointIdxRadiusSearch;
   std::vector<pcl::index_t> indices_to_remove;
   std::vector<float> pointRadiusSquaredDistance;
-  pct_marking_->kdtree_marking_->radiusSearch(robot_position, perception_window_size_, pointIdxRadiusSearch, pointRadiusSquaredDistance);
+  pct_marking_->kdtree_marking_->radiusSearch(robot_position, 1.2*perception_window_size_, pointIdxRadiusSearch, pointRadiusSquaredDistance);
   
   for(auto nearest_point_idx=pointIdxRadiusSearch.begin(); nearest_point_idx!=pointIdxRadiusSearch.end(); nearest_point_idx++){
     
     PointXYZU64 pt64 = pct_marking_->marking_pc_->points[*nearest_point_idx];
     //@prevent cross floor casting
     if(fabs(robot_position.z-pt64.z)>0.2){
+      hist_crossing_floor++;
       continue;
     }
     pcl::PointXYZ pt;
@@ -583,11 +618,14 @@ void MultiLayerSpinningLidar::selfClear(){
     pt.x = pct_marking_->marking_pc_->points[*nearest_point_idx].x;
     pt.y = pct_marking_->marking_pc_->points[*nearest_point_idx].y;
     pt.z = pct_marking_->marking_pc_->points[*nearest_point_idx].z;
-    pt_hash = pct_marking_->mergeUint32ToUint64(pct_marking_->marking_pc_->points[*nearest_point_idx].hbyte, pct_marking_->marking_pc_->points[*nearest_point_idx].lbyte);
+    pt_hash = pct_marking_->int16ToUint64(pct_marking_->marking_pc_->points[*nearest_point_idx].xshort, 
+                                          pct_marking_->marking_pc_->points[*nearest_point_idx].yshort,
+                                          pct_marking_->marking_pc_->points[*nearest_point_idx].zshort);
     
     pcl::PointCloud<pcl::PointXYZI> casting_check;
     if(!isinLidarObservation(pt)){
-      *pc_current_window_ += (*pct_marking_->marking_map_[pt_hash].pc_);
+      *pc_current_window_ += (*pct_marking_->getMarkingCloudFromHash(pt_hash));
+      hist_not_in_fov++;
       continue;
     }
     else{
@@ -598,36 +636,6 @@ void MultiLayerSpinningLidar::selfClear(){
         getCastingPointCloud(pt, casting_check);
         //@ we loop this "line" and do radius search to see if there is any obstacle, if there is an obstacle, it means this line is blocked, so ray trace fail
         for(auto a_pt=casting_check.points.begin(); a_pt!=casting_check.points.end(); a_pt++){
-          /*
-          //@ index 0 is cluster center
-          //@ Check center around to rule out one stand for all (huge segmentation)
-          if(a_pt==casting_check.points.begin()){
-            //@ find nearest ostacle and then check whether this obstacle belongs to itself
-            std::vector<int> pointIdxNKNSearch(1);
-            std::vector<float> pointNKNSquaredDistance(1);
-            pcl::PointXYZ pt_i;
-            pt_i.x = (*a_pt).x;
-            pt_i.y = (*a_pt).y;
-            pt_i.z = (*a_pt).z;
-            if(kdtree_last_observation->nearestKSearch(pt_i, 1, pointIdxNKNSearch, pointNKNSquaredDistance)>0){
-              pcl::PointXYZI candidate_pt;
-              candidate_pt.x = pcl_msg_gbl_->points[pointIdxNKNSearch.front()].x;
-              candidate_pt.y = pcl_msg_gbl_->points[pointIdxNKNSearch.front()].y;
-              candidate_pt.z = pcl_msg_gbl_->points[pointIdxNKNSearch.front()].z;
-              if((*it_z).second.pc_->points.size()>4){
-                pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_cluster(new pcl::KdTreeFLANN<pcl::PointXYZI>());
-                kdtree_cluster->setInputCloud((*it_z).second.pc_);
-                std::vector<int> id;
-                std::vector<float> sqdist;
-                if(kdtree_cluster->radiusSearch(candidate_pt, 0.5, id, sqdist)>0){
-                  //@ ray hits obstacle, we skip clearing this segmentation
-                  skip_clear_this_segmentation = true;
-                  break;
-                }
-              }
-            }
-          }
-          */
           //@ when casting back for last 5 cm, ignore it, because dirty lidar may cause casting fail
           if((*a_pt).intensity<0.05)
             break;
@@ -655,7 +663,8 @@ void MultiLayerSpinningLidar::selfClear(){
 
       //Hit obstacle when ray tracing, so we skip clearing->meaning that we add this segmentation to the observation
       if(skip_clear_this_segmentation){
-        *pc_current_window_ += (*pct_marking_->marking_map_[pt_hash].pc_);
+        *pc_current_window_ += (*pct_marking_->getMarkingCloudFromHash(pt_hash));
+        hist_skip_clear_this_segmentation++;
         continue;
       }
       
@@ -664,7 +673,7 @@ void MultiLayerSpinningLidar::selfClear(){
       std::vector<float> sqdist;
       //@ I am not sure what happen below, looks like I redo check again but the threshold (1) is different
       if(kdtree_last_observation->radiusSearch(pt, resolution_, id, sqdist)>1){
-        *pc_current_window_ += (*pct_marking_->marking_map_[pt_hash].pc_);
+        *pc_current_window_ += (*pct_marking_->getMarkingCloudFromHash(pt_hash));
       }       
       else{
         addCastingMarker(pt, cleared_cnt, markerArray);
@@ -675,6 +684,10 @@ void MultiLayerSpinningLidar::selfClear(){
               
     }
   }
+
+
+  //RCLCPP_INFO(node_->get_logger().get_child(name_), "Hist cross floor: %d, Hist not in fov: %d, Hist skip clear: %d", 
+  //                hist_crossing_floor, hist_not_in_fov, hist_skip_clear_this_segmentation);
   //@ a batch removed pt64, now remove them from marking_pc_
 
   const float nan_val = std::numeric_limits<float>::quiet_NaN();
@@ -738,6 +751,8 @@ void MultiLayerSpinningLidar::selfClear(){
   }
 
   pct_marking_->marking_pc_ = new_marking_pc;
+  //@update kdtree for marking to find closest centroid
+  pct_marking_->updateKDTree();
 
   //@ put to current observation, different for global/local
   if(pub_casting_->get_subscription_count()>0){

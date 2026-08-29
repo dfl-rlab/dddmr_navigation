@@ -191,6 +191,7 @@ class MultiLayerSpinningLidar: public Sensor{
     std::list<pcl::PointCloud<pcl::PointXYZ>> pcl_stitcher_;
 
     std_msgs::msg::Header last_sensor_receiving_time_;
+
 };
 
 }//end of name space

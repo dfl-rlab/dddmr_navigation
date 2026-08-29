@@ -33,6 +33,7 @@ find_package(tf2_sensor_msgs REQUIRED)
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(OpenMP REQUIRED)
+find_package(small_gicp REQUIRED)
 
 set(dependencies
   rclcpp
@@ -139,6 +140,8 @@ add_library(cluster_kdtree_marking SHARED
 )
 target_link_libraries(cluster_kdtree_marking
   perception_sensor
+  small_gicp::small_gicp
+  OpenMP::OpenMP_CXX
 )
 ament_target_dependencies(cluster_kdtree_marking
   ${dependencies}
@@ -244,6 +247,44 @@ install(DIRECTORY
 install(FILES perception_3d_plugins.xml
   DESTINATION share/${PROJECT_NAME}
 )
+
+#--- Everything below is CI/CD test ---
+
+#Check CI/CD build flag
+if(NOT TEST_ENABLED)
+    set(TEST_ENABLED OFF CACHE BOOL "Enable or disable Test")
+endif()
+
+if(TEST_ENABLED)
+
+  add_definitions(-DTEST_ENABLED) 
+  # Compile test and install them 
+  install(DIRECTORY
+    test
+    DESTINATION share/${PROJECT_NAME}/
+  )
+
+  #testing node
+  add_executable(perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node
+    test/test_node/perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node.cpp
+  )
+  target_link_libraries(perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node 
+    ${PCL_LIBRARIES}
+  )
+  ament_target_dependencies(perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node
+    ${dependencies}
+  )
+
+
+  #install testing node
+  install(TARGETS
+    perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node    
+    RUNTIME DESTINATION lib/${PROJECT_NAME}
+  )
+
+endif()
+
+# --- Everything CI/CD test finish here ---
 
 ament_export_include_directories(include)
 ament_export_libraries(shared_data_sensor perception_sensor stacked_perception stacked_perception_ros cluster_marking cluster_kdtree_marking depth_camera_buffer layers)

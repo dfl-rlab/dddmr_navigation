@@ -57,7 +57,7 @@
 
 /*kd tree for casting*/
 #include <pcl/kdtree/impl/kdtree_flann.hpp>
-#include <pcl/search/impl/kdtree.hpp> // Include if using pcl::search::KdTree
+
 
 /*Open MP*/
 #include <omp.h>
@@ -75,12 +75,17 @@
 /*For shortest angle*/
 #include <angles/angles.h>
 
+// omp voxel
+#include <small_gicp/util/downsampling_omp.hpp>
+#include <small_gicp/pcl/pcl_point_traits.hpp>
+
 /* Customized point cloud type with fourth element as std::uint64_t */
 struct PointXYZU64
 {
   PCL_ADD_POINT4D;
-  std::uint32_t hbyte;
-  std::uint32_t lbyte;
+  std::int16_t xshort;
+  std::int16_t yshort;
+  std::int16_t zshort;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;
 
@@ -88,8 +93,9 @@ POINT_CLOUD_REGISTER_POINT_STRUCT (PointXYZU64,
                                    (float, x, x)
                                    (float, y, y)
                                    (float, z, z)
-                                   (std::uint32_t, hbyte, hbyte)
-                                   (std::uint32_t, lbyte, lbyte)
+                                   (std::uint32_t, xshort, xshort)
+                                   (std::uint32_t, yshort, yshort)
+                                   (std::uint32_t, zshort, zshort)
 )
 
 namespace perception_3d
@@ -101,14 +107,14 @@ class per_marking{
   public:
     pcl::PointCloud<pcl::PointXYZI>::Ptr pc_;
     pcl::ModelCoefficients::Ptr mc_;
-    std::unordered_map<int, float> nodes_of_min_distance_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr projection_;
 
     per_marking() = default;
 
     per_marking(const pcl::PointCloud<pcl::PointXYZI>::Ptr& pc,
                 const pcl::ModelCoefficients::Ptr& mc,
-                const std::unordered_map<int, float>& nodes_of_min_distance):
-      pc_(pc), mc_(mc), nodes_of_min_distance_(nodes_of_min_distance) {}
+                const pcl::PointCloud<pcl::PointXYZI>::Ptr& projection):
+      pc_(pc), mc_(mc), projection_(projection) {}
 };
 
 class KDTreeMarking{
@@ -120,7 +126,7 @@ class KDTreeMarking{
     pcl::KdTreeFLANN<PointXYZU64>::Ptr kdtree_marking_;
     
     KDTreeMarking(std::string m_name, DynamicGraph* dg, double inscribed_radius, double inflation_radius, const std::shared_ptr<perception_3d::SharedData>& shared_data, double xy_resolution, double height_resolution):
-      name_(m_name), dGraph_(dg), inscribed_radius_(inscribed_radius), inflation_radius_(inflation_radius), shared_data_(shared_data), xy_resolution_(xy_resolution), height_resolution_(height_resolution), marking_id_(0){
+      name_(m_name), dGraph_(dg), inscribed_radius_(inscribed_radius), inflation_radius_(inflation_radius), shared_data_(shared_data), xy_resolution_(xy_resolution), height_resolution_(height_resolution){
         marking_pc_.reset(new pcl::PointCloud<PointXYZU64>);
         kdtree_marking_.reset(new pcl::KdTreeFLANN<PointXYZU64>);
       };
@@ -131,30 +137,37 @@ class KDTreeMarking{
       const pcl::PointCloud<pcl::PointXYZI>::Ptr& pcptr, 
       const pcl::ModelCoefficients::Ptr& pcplaneptr);
 
-    void computeMinDistanceFromObstacle2GroundNodes(  
-      const pcl::PointCloud<pcl::PointXYZI>::Ptr& pcptr, 
-      const pcl::ModelCoefficients::Ptr& pcplaneptr,
-      std::unordered_map<int, float>& nodes_of_min_distance);
+  void computeProjection(  
+    const pcl::PointCloud<pcl::PointXYZI>::Ptr& pcptr, 
+    const pcl::ModelCoefficients::Ptr& pcplaneptr,
+    pcl::PointCloud<pcl::PointXYZI>::Ptr& projectedptr);
 
     void removePCPtr(const PointXYZU64& centroid);
+    
+    pcl::PointCloud<pcl::PointXYZI>::Ptr getMarkingCloudFromHash(std::uint64_t pt_hash);
 
     void updateKDTree();
+    void updateDGraph(const pcl::PointCloud<PointXYZU64>::Ptr& centroids_for_dgraph, 
+                                  const std::vector<pcl::index_t>& ground_region_idx);
 
-    void splitMarkingId(std::uint32_t& hbyte, std::uint32_t& lbyte);
-    void splitUint64(std::uint64_t val, std::uint32_t& hbyte, std::uint32_t& lbyte);
-    std::uint64_t mergeUint32ToUint64(std::uint32_t hbyte, std::uint32_t lbyte);
-
-    std::uint64_t pointToVoxelKey(float x, float y, float z) const {
-      std::int64_t ix = static_cast<std::int64_t>(std::floor(x / xy_resolution_));
-      std::int64_t iy = static_cast<std::int64_t>(std::floor(y / xy_resolution_));
-      std::int64_t iz = static_cast<std::int64_t>(std::floor(z / height_resolution_));
-      return voxelKeyFromIndices(ix, iy, iz);
+    static std::uint64_t convertInt16ToUint64(std::int16_t x, std::int16_t y, std::int16_t z) {
+      return (static_cast<std::uint64_t>(static_cast<std::uint16_t>(x)) << 32) |
+             (static_cast<std::uint64_t>(static_cast<std::uint16_t>(y)) << 16) |
+             (static_cast<std::uint64_t>(static_cast<std::uint16_t>(z)));
     }
 
-    static std::uint64_t voxelKeyFromIndices(std::int64_t ix, std::int64_t iy, std::int64_t iz) {
-      return (static_cast<std::uint64_t>(ix & 0x1FFFFF) << 42) |
-             (static_cast<std::uint64_t>(iy & 0x1FFFFF) << 21) |
-             (static_cast<std::uint64_t>(iz & 0x1FFFFF));
+    static std::uint64_t int16ToUint64(std::int16_t x, std::int16_t y, std::int16_t z) {
+      return convertInt16ToUint64(x, y, z);
+    }
+
+    static void convertUint64ToInt16(std::uint64_t val, std::int16_t& x, std::int16_t& y, std::int16_t& z) {
+      x = static_cast<std::int16_t>(static_cast<std::uint16_t>((val >> 32) & 0xFFFF));
+      y = static_cast<std::int16_t>(static_cast<std::uint16_t>((val >> 16) & 0xFFFF));
+      z = static_cast<std::int16_t>(static_cast<std::uint16_t>(val & 0xFFFF));
+    }
+
+    static void uint64ToInt16(std::uint64_t val, std::int16_t& x, std::int16_t& y, std::int16_t& z) {
+      convertUint64ToInt16(val, x, y, z);
     }
 
     double get_dGraphValue(const unsigned int index){
@@ -170,6 +183,8 @@ class KDTreeMarking{
     std::unordered_map<std::uint64_t, PointXYZU64> spatial_hash_grid_;
     
   private:
+    
+    std::int16_t safeConvert(int32_t large_value);
     
     std::string name_;
 
@@ -187,8 +202,6 @@ class KDTreeMarking{
     rclcpp::Time last_observation_time_;
 
     std::shared_ptr<perception_3d::SharedData> shared_data_;
-
-    std::uint64_t marking_id_{0};
 
 };
 
