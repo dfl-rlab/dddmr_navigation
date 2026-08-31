@@ -196,7 +196,7 @@ def generate_test_description():
   )  
 
   bag_path = "/root/dddmr_bags/cicdtest/" + test_name + "/" + test_name
-  #correct_yaml_format_by_ros2_version(bag_path)
+  correct_yaml_format_by_ros2_version(bag_path)
 
   bag_player = ExecuteProcess(
       cmd=[

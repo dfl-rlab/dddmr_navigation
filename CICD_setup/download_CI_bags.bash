@@ -102,10 +102,10 @@ echo -n "Do you want to download perception_3d_multilayer_spinning_lidar_hokuyo2
 read d_bag8
 if [ "$d_bag8" != "${d_bag8#[Yy]}" ] ;then 
   echo "Download bag"
-  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='1OOBStIDW5eispViKaS9nYX5KOBSMSQ9D \
+  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='1Y5qwgmV0Mrk2rL9WiT2UTooJNlbeKekf \
       | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
   curl -L -b cookies.txt -o perception_3d_multilayer_spinning_lidar_hokuyo2d.zip \
-      'https://drive.usercontent.google.com/download?id='1OOBStIDW5eispViKaS9nYX5KOBSMSQ9D'&confirm='$(<confirm.txt)
+      'https://drive.usercontent.google.com/download?id='1Y5qwgmV0Mrk2rL9WiT2UTooJNlbeKekf'&confirm='$(<confirm.txt)
   rm -f confirm.txt cookies.txt
   unzip perception_3d_multilayer_spinning_lidar_hokuyo2d.zip
 fi
