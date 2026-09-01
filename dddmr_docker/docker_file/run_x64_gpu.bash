@@ -32,8 +32,6 @@ elif [ "$is_l4t_r36" != "" ] ;then
         --privileged \
         --network=host \
         --runtime=nvidia\
-        --env="FASTRTPS_DEFAULT_PROFILES_FILE=/root/dddmr_navigation/dddmr_docker/docker_file/rtps_udp_profile.xml"\
-        --env="RMW_FASTRTPS_USE_QOS_FROM_XML=1"\
         --env="DISPLAY" \
         --env="QT_X11_NO_MITSHM=1" \
         --env="NVIDIA_VISIBLE_DEVICES=all"\

@@ -63,8 +63,8 @@ RUN /bin/bash -c "cd /tmp && ./compile_pcl.bash"
 # --- end of PCL
 
 # --- SMALL GICP ---
-RUN cd /tmp && git clone https://github.com/koide3/small_gicp.git && cd pcl && git checkout v1.0.1
-RUN cd /tmp/small_gicp && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release && make install -j$(nproc)
+RUN cd /tmp && git clone https://github.com/koide3/small_gicp.git && cd small_gicp && git checkout v1.0.1
+RUN cd /tmp/small_gicp && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make install -j$(nproc)
 # --- end of SMALL GICP --- 
 
 # --- Serial lib ---
@@ -210,8 +210,8 @@ RUN git clone https://github.com/IntelRealSense/realsense-ros.git && cd realsens
     && /bin/bash -c ". /opt/ros/humble/setup.bash && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release --merge-install --install-base /opt/ros/humble/install"\
     && rm -rf src
 
-#install ackermann msg to support ackermann drive
-RUN apt install -y ros-humble-ackermann-msgs ros-humble-rqt-tf-tree
+#everything ros2 packages
+RUN apt install -y ros-humble-ackermann-msgs ros-humble-rqt-tf-tree ros-humble-rosbag2-storage-mcap ros-humble-apriltag-msgs ros-humble-vision-msgs
 
 RUN echo "function ws_build(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release\n}" >> ~/.bashrc
 RUN echo "function ws_build_wi_test(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=OFF -DTEST_ENABLED=ON\n}" >> ~/.bashrc
