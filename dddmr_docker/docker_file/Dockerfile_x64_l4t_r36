@@ -216,6 +216,7 @@ RUN apt install -y ros-humble-ackermann-msgs ros-humble-rqt-tf-tree ros-humble-r
 RUN echo "function ws_build(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release\n}" >> ~/.bashrc
 RUN echo "function ws_build_wi_test(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=OFF -DTEST_ENABLED=ON\n}" >> ~/.bashrc
 RUN echo "function ws_build_wi_test_trt(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON\n}" >> ~/.bashrc
+RUN echo "function ws_build_wi_test_trt_single_thread(){\nMAKEFLAGS="-j1" colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON --parallel-workers 1\n}" >> ~/.bashrc
 
 WORKDIR /root
 
