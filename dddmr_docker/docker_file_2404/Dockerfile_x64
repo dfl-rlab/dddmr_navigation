@@ -76,7 +76,7 @@ RUN apt install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstre
 RUN apt install -y libfreeimage-dev
 
 #install GDB
-RUN apt install -y gdb
+RUN apt install -y gdb xterm
 
 #install can stuff for scout
 RUN apt install -y libasio-dev can-utils

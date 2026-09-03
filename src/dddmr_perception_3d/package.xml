@@ -26,6 +26,8 @@
   <depend>libpcl-all</depend>
   <depend>pcl_conversions</depend>
   <depend>angles</depend>
+  <depend>laser_geometry</depend>
+  <depend>tf2_sensor_msgs</depend>
 
   <test_depend>ament_lint_common</test_depend>
   <test_depend>ament_lint_auto</test_depend>

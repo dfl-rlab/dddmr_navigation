@@ -4,7 +4,6 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /Map1/Topic1
         - /Ground1/Autocompute Value Bounds1
         - /GlobalPath1/Topic1
       Splitter Ratio: 0.6117647290229797
@@ -49,7 +48,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: AxisColor
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: true
       Max Color: 255; 255; 255
       Max Intensity: 15
@@ -58,19 +57,18 @@ Visualization Manager:
       Name: Map
       Position Transformer: XYZ
       Selectable: true
-      Size (Pixels): 2
+      Size (Pixels): 10
       Size (m): 0.05000000074505806
       Style: Points
       Topic:
         Depth: 5
         Durability Policy: Transient Local
-        Filter size: 1
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /mapcloud
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: false
       Autocompute Value Bounds:
@@ -83,28 +81,27 @@ Visualization Manager:
       Color: 170; 255; 127
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 2
+      Max Intensity: 100
       Min Color: 0; 0; 0
       Min Intensity: 0
       Name: Ground
       Position Transformer: XYZ
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.05000000074505806
+      Size (m): 0.10000000149011612
       Style: Tiles
       Topic:
         Depth: 5
         Durability Policy: Transient Local
-        Filter size: 1
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /mapground
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: false
       Autocompute Value Bounds:
@@ -117,7 +114,7 @@ Visualization Manager:
       Color: 0; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 1
@@ -127,28 +124,27 @@ Visualization Manager:
       Position Transformer: XYZ
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.05000000074505806
+      Size (m): 0.10000000149011612
       Style: Tiles
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /map/dGraph
       Use Fixed Frame: true
       Use rainbow: false
-      Value: true
+      Value: false
     - Alpha: 1
       Buffer Length: 1
       Class: rviz_default_plugins/Path
-      Color: 0; 0; 0
+      Color: 0; 255; 0
       Enabled: true
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
       Line Style: Billboards
-      Line Width: 0.10000000149011612
+      Line Width: 0.30000001192092896
       Name: GlobalPath
       Offset:
         X: 0
@@ -166,6 +162,13 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /global_path
+      Value: true
+    - Class: rviz_default_plugins/Axes
+      Enabled: true
+      Length: 500
+      Name: Axes
+      Radius: 1
+      Reference Frame: map
       Value: true
   Enabled: true
   Global Options:
@@ -213,25 +216,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/XYOrbit
-      Distance: 19.9986572265625
+      Distance: 81.47630310058594
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 2.1097335815429688
-        Y: 9.232039451599121
-        Z: 7.375022687483579e-05
+        X: 123.18975067138672
+        Y: 230.7949981689453
+        Z: -0.00010879887122428045
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.5697963237762451
+      Pitch: 1.5497963428497314
       Target Frame: <Fixed Frame>
       Value: XYOrbit (rviz_default_plugins)
-      Yaw: 3.1435837745666504
+      Yaw: 4.693585395812988
     Saved: ~
 Window Geometry:
   Displays:
@@ -250,4 +253,4 @@ Window Geometry:
     collapsed: true
   Width: 1850
   X: 70
-  Y: 27
+  Y: 32

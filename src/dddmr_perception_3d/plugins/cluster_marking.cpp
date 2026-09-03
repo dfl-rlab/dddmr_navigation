@@ -106,20 +106,24 @@ void Marking::addPCPtr(const double cx, const double cy, const double cz,
   if(marking_[x][y][z].pc_!= nullptr){
     marking_[x][y][z].pc_.reset();
     marking_[x][y][z].mc_.reset();
+    //RCLCPP_INFO(rclcpp::get_logger("ClusterMarking"), "Marking exist at %d, %d, %d", x, y, z);
+  }
+  else{
+    //RCLCPP_INFO(rclcpp::get_logger("ClusterMarking"), "Marking new at %d, %d, %d", x, y, z);
   }
   marking_[x][y][z].pc_ = pcptr;
   marking_[x][y][z].mc_ = pcplaneptr;
   std::unordered_map<int, float> nodes_of_min_distance;
   computeMinDistanceFromObstacle2GroundNodes(pcptr, pcplaneptr, nodes_of_min_distance);
   marking_[x][y][z].nodes_of_min_distance_ = nodes_of_min_distance;
-  
+
   for(auto id=nodes_of_min_distance.begin();id!=nodes_of_min_distance.end();id++){
     //RCLCPP_INFO(rclcpp::get_logger("ClusterMarking"), "%.2f", (*id).second);
     dGraph_->setValue((*id).first, (*id).second);
     if((*id).second<=inscribed_radius_)
       lethal_map_[(*id).first] = (*id).second;
   }
-  
+
 }
 
 void Marking::removePCPtr(perception_3d::per_marking& per_marking){

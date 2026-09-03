@@ -347,6 +347,13 @@ bool OmniSimpleTrajectoryGeneratorTheory::isMotorConstraintSatisfied(Eigen::Vect
   //@ TODO: Omni kinematics required
 }
 
+size_t OmniSimpleTrajectoryGeneratorTheory::getSamplingSize(){
+  return sample_params_.size();
+}
+
+void OmniSimpleTrajectoryGeneratorTheory::getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj){
+  generateTrajectory(sample_params_[index], _traj);
+}
 
 bool OmniSimpleTrajectoryGeneratorTheory::hasMoreTrajectories(){
   return next_sample_index_ < sample_params_.size();
@@ -368,7 +375,7 @@ bool OmniSimpleTrajectoryGeneratorTheory::nextTrajectory(base_trajectory::Trajec
       generated_once = true;
     }
     else{
-      _traj.resetPoints();
+      _traj.resetPoses();
     }
     
   }
@@ -397,7 +404,7 @@ bool OmniSimpleTrajectoryGeneratorTheory::generateTrajectory(
   double eps = 1e-4;
   traj.cost_ = 0.0; // placed here in case we return early
   //trajectory might be reused so we'll make sure to reset it
-  traj.resetPoints();
+  traj.resetPoses();
 
   RCLCPP_DEBUG(node_->get_logger().get_child(name_), "Trajectory by state x: %.2f, y: %.2f, w: %.2f", sample_target_vel[0], sample_target_vel[1], sample_target_vel[2]);
 
@@ -495,7 +502,7 @@ bool OmniSimpleTrajectoryGeneratorTheory::generateTrajectory(
     base_trajectory::cuboid_min_max_t cuboid_min_max;
     pcl::getMinMax3D(pc_out, cuboid_min_max.first, cuboid_min_max.second);
 
-    if(!traj.addPoint(ros_pose, pc_out, cuboid_min_max)){
+    if(!traj.addPoseCuboid(ros_pose, pc_out, cuboid_min_max)){
       return false;
     }
 
@@ -511,5 +518,12 @@ Eigen::Vector3f OmniSimpleTrajectoryGeneratorTheory::computeNewPositions(const E
   new_pos[1] = pos[1] + (vel[0] * sin(pos[2]) + vel[1] * sin(M_PI_2 + pos[2])) * dt;
   new_pos[2] = pos[2] + vel[2] * dt;
   return new_pos;
+}
+
+void OmniSimpleTrajectoryGeneratorTheory::expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
+                                            std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
+                                              base_trajectory::Trajectory& best_traj){
+  //use default scoring
+  TrajectoryGeneratorTheory::expertScoring(accepted_trajectories, rejected_trajectories, best_traj); 
 }
 }//end of name space

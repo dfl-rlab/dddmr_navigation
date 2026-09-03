@@ -75,6 +75,29 @@ void StackedGenerator::initializeTheories_wi_Shared_data() {
 
 }
 
+/**
+ * Return sampling size for allocate memory to perform omp trajectories generation
+ */
+size_t StackedGenerator::getSamplingSize(std::string pname) {
+  //@ sanity chekc has been done using theoryExists
+  return theories_[pname]->getSamplingSize();
+}
+
+/**
+ * get a trajectory at provided index
+ */
+void StackedGenerator::getSamplingTrajectoryByIndex(std::string pname, size_t index, base_trajectory::Trajectory& _traj) {
+  //@ sanity chekc has been done using theoryExists
+  return theories_[pname]->getSamplingTrajectoryByIndex(index, _traj);
+}
+
+void StackedGenerator::expertScoring(std::string pname, 
+                        std::vector<base_trajectory::Trajectory>& accepted_trajectories,
+                          std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
+                            base_trajectory::Trajectory& best_traj){
+    
+    theories_[pname]->expertScoring(accepted_trajectories, rejected_trajectories, best_traj);
+}
 
 /**
  * Create and return the next sample trajectory

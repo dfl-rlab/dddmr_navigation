@@ -77,22 +77,13 @@ namespace base_trajectory {
        * @param y Will be set to the y position of the point
        * @param th Will be set to the theta position of the point
        */
-      geometry_msgs::msg::PoseStamped getPoint(unsigned int index) const;
+      geometry_msgs::msg::PoseStamped getPose(unsigned int index) const;
       pcl::PointXYZI getPCLPoint(unsigned int index) const;
-
-      /**
-       * @brief  Set a point within the trajectory
-       * @param index The index of the point to set
-       * @param x The x position
-       * @param y The y position
-       * @param th The theta position
-       */
-      void setPoint(unsigned int index, double x, double y, double th);
 
       /**
        * @brief  Add a point to the end of a trajectory
        */
-      bool addPoint(const geometry_msgs::msg::PoseStamped& pos, 
+      bool addPoseCuboid(const geometry_msgs::msg::PoseStamped& pos, 
                     const pcl::PointCloud<pcl::PointXYZ>& cuboid,
                     const cuboid_min_max_t& cuboid_min_max);
 
@@ -111,13 +102,13 @@ namespace base_trajectory {
       /**
        * @brief  Clear the trajectory's points
        */
-      void resetPoints();
+      void resetPoses();
 
       /**
        * @brief  Return the number of points in the trajectory
        * @return The number of points in the trajectory
        */
-      unsigned int getPointsSize() const;
+      unsigned int getPosesSize() const;
       
       /**
        * @brief  Return the string of the name who reject this trajectory

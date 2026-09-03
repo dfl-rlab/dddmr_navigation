@@ -49,6 +49,7 @@ namespace mcl_3dl
 class State6DOF : public mcl_3dl::pf::ParticleBase<float>
 {
 public:
+  double time_stamp_;
   mcl_3dl::Vec3 pos_;
   mcl_3dl::Quat rot_;
   bool diff_;
@@ -162,8 +163,9 @@ public:
     odom_err_integ_lin_ = mcl_3dl::Vec3(0.0, 0.0, 0.0);
     odom_err_integ_ang_ = mcl_3dl::Vec3(0.0, 0.0, 0.0);
   }
-  State6DOF(const mcl_3dl::Vec3 pos, const mcl_3dl::Quat rot)
+  State6DOF(const mcl_3dl::Vec3 pos, const mcl_3dl::Quat rot, const double time_stamp)
   {
+    time_stamp_ = time_stamp;
     pos_ = pos;
     rot_ = rot;
     noise_ll_ = noise_la_ = noise_aa_ = noise_al_ = 0.0;
@@ -318,7 +320,7 @@ public:
   {
     assert(p_sum_ > 0.0);
 
-    return State6DOF(e_.pos_ / p_sum_, mcl_3dl::Quat(front_sum_, up_sum_));
+    return State6DOF(e_.pos_ / p_sum_, mcl_3dl::Quat(front_sum_, up_sum_), 0.0);
   }
 
   float getTotalProbability()

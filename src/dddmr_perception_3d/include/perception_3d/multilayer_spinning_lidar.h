@@ -33,7 +33,7 @@
 
 #include <perception_3d/sensor.h>
 
-#include <perception_3d/cluster_marking.h>
+#include <perception_3d/cluster_kdtree_marking.h>
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
 /*Point cloud library*/
@@ -143,7 +143,8 @@ class MultiLayerSpinningLidar: public Sensor{
     Eigen::Affine3d trans_gbl2s_af3_;
 
     /*Voxel structure*/
-    std::shared_ptr<Marking> pct_marking_;
+    //std::shared_ptr<Marking> pct_marking_;
+    std::shared_ptr<KDTreeMarking> pct_marking_;
 
 
     /*plugin parameter*/
@@ -171,6 +172,7 @@ class MultiLayerSpinningLidar: public Sensor{
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_current_projected_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_current_window_marking_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_cleared_window_marking_;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_marked_voxel_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_casting_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_gbl_marking_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_dGraph_;
@@ -189,6 +191,7 @@ class MultiLayerSpinningLidar: public Sensor{
     std::list<pcl::PointCloud<pcl::PointXYZ>> pcl_stitcher_;
 
     std_msgs::msg::Header last_sensor_receiving_time_;
+
 };
 
 }//end of name space

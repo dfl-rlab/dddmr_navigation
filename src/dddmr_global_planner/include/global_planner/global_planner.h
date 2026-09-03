@@ -136,8 +136,8 @@ class GlobalPlanner : public rclcpp::Node {
       pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_ground_;
       pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_map_;
       /*Original kdtree*/
-      pcl::search::KdTree<pcl::PointXYZI>::Ptr kdtree_ground_; 
-      pcl::search::KdTree<pcl::PointXYZI>::Ptr kdtree_map_; 
+      pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_ground_; 
+      pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_map_; 
 
       /*
       Graph class:

@@ -27,10 +27,13 @@ find_package(pluginlib REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_geometry REQUIRED)
+find_package(laser_geometry REQUIRED)
+find_package(tf2_sensor_msgs REQUIRED)
 
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(OpenMP REQUIRED)
+find_package(small_gicp REQUIRED)
 
 set(dependencies
   rclcpp
@@ -131,6 +134,19 @@ ament_target_dependencies(cluster_marking
   ${dependencies}
 )
 
+# perception_cluster_kdtree_marking
+add_library(cluster_kdtree_marking SHARED
+  plugins/cluster_kdtree_marking.cpp
+)
+target_link_libraries(cluster_kdtree_marking
+  perception_sensor
+  small_gicp::small_gicp
+  OpenMP::OpenMP_CXX
+)
+ament_target_dependencies(cluster_kdtree_marking
+  ${dependencies}
+)
+
 #depth_camera_lib
 add_library(depth_camera_buffer SHARED
   plugins/depth_camera/depth_camera_observation.cpp
@@ -156,6 +172,7 @@ add_library(layers SHARED
 )
 target_link_libraries(layers
   cluster_marking 
+  cluster_kdtree_marking
   depth_camera_buffer 
   stacked_perception_ros
   OpenMP::OpenMP_CXX
@@ -172,6 +189,9 @@ set(utils_dependencies
   pcl_conversions
   cv_bridge
   image_geometry
+  laser_geometry
+  tf2_ros
+  tf2_sensor_msgs
 )
 add_executable(depthimg2pointcloud_node utils/depthimg2pointcloud_node.cpp)
 target_link_libraries(depthimg2pointcloud_node
@@ -182,6 +202,14 @@ ament_target_dependencies(depthimg2pointcloud_node
   ${utils_dependencies}
 )
 
+add_executable(laserscan2pointcloud_node utils/laserscan2pointcloud_node.cpp)
+target_link_libraries(laserscan2pointcloud_node
+  ${PCL_LIBRARIES}
+)
+ament_target_dependencies(laserscan2pointcloud_node
+  ${utils_dependencies}
+)
+
 install(TARGETS
   shared_data_sensor
   perception_sensor
@@ -189,6 +217,7 @@ install(TARGETS
   stacked_perception_ros
   depth_camera_buffer
   cluster_marking
+  cluster_kdtree_marking
   layers
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -199,6 +228,7 @@ install(TARGETS
 install(TARGETS
   perception_3d_ros_node
   depthimg2pointcloud_node
+  laserscan2pointcloud_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -218,8 +248,46 @@ install(FILES perception_3d_plugins.xml
   DESTINATION share/${PROJECT_NAME}
 )
 
+#--- Everything below is CI/CD test ---
+
+#Check CI/CD build flag
+if(NOT TEST_ENABLED)
+    set(TEST_ENABLED OFF CACHE BOOL "Enable or disable Test")
+endif()
+
+if(TEST_ENABLED)
+
+  add_definitions(-DTEST_ENABLED) 
+  # Compile test and install them 
+  install(DIRECTORY
+    test
+    DESTINATION share/${PROJECT_NAME}/
+  )
+
+  #testing node
+  add_executable(perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node
+    test/test_node/perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node.cpp
+  )
+  target_link_libraries(perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node 
+    ${PCL_LIBRARIES}
+  )
+  ament_target_dependencies(perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node
+    ${dependencies}
+  )
+
+
+  #install testing node
+  install(TARGETS
+    perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node    
+    RUNTIME DESTINATION lib/${PROJECT_NAME}
+  )
+
+endif()
+
+# --- Everything CI/CD test finish here ---
+
 ament_export_include_directories(include)
-ament_export_libraries(shared_data_sensor perception_sensor stacked_perception stacked_perception_ros cluster_marking depth_camera_buffer layers)
+ament_export_libraries(shared_data_sensor perception_sensor stacked_perception stacked_perception_ros cluster_marking cluster_kdtree_marking depth_camera_buffer layers)
 ament_export_dependencies(${dependencies})
 pluginlib_export_plugin_description_file(perception_3d perception_3d_plugins.xml)
 ament_package()

@@ -55,11 +55,18 @@ class TrajectoryGeneratorTheory{
     void initialize(const std::string name, const rclcpp::Node::WeakPtr& weak_node);
 
     void setSharedData(std::shared_ptr<trajectory_generators::TrajectoryGeneratorSharedData> shared_data);
-
+    
+    virtual size_t getSamplingSize() = 0;
+    virtual void getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj) = 0;
     virtual bool hasMoreTrajectories() = 0;
     virtual bool nextTrajectory(base_trajectory::Trajectory& _traj) = 0;
     //@ initialise is used for stacked generators to call every time to initialize the genertator
     virtual void initialise() = 0;
+
+    //@ allows second scoring from accepted trajectories, so MPPI types of controller can be implemented
+    virtual void expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
+                                std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
+                                  base_trajectory::Trajectory& best_traj) = 0;
 
   protected:
 

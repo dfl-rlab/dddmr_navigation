@@ -24,10 +24,13 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_eigen REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(pcl_conversions REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 find_package(PCL REQUIRED)
 find_package(perception_3d REQUIRED)
 find_package(dddmr_sys_core REQUIRED)
+find_package(small_gicp REQUIRED)
+find_package(OpenMP REQUIRED)
 
 set(dependencies
   rclcpp
@@ -55,6 +58,7 @@ set(dependencies
 include_directories(
   include
   ${PCL_INCLUDE_DIRS}
+  ${OpenMP_CXX_INCLUDE_DIRS}
 )
 
 # a_star_on_graph
@@ -108,6 +112,9 @@ add_executable(occupancy2ground
 )
 target_link_libraries(occupancy2ground 
   ${PCL_LIBRARIES}
+  yaml-cpp
+  small_gicp::small_gicp
+  OpenMP::OpenMP_CXX
 )
 ament_target_dependencies(occupancy2ground
   ${dependencies}

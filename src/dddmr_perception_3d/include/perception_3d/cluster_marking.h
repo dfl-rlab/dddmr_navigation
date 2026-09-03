@@ -91,6 +91,7 @@ class per_marking{
 };
 
 class Marking{
+
   /*
   This class is created to support marking in this plugin and made it sync with dynamic graph
   Originally, the marking_ is created but I need to sync it with dynamic graph,
@@ -100,8 +101,15 @@ class Marking{
 
   public:
 
+    //@ Voxel structure
+    marking_t marking_;
+
+    pcl::PointCloud<pcl::PointXYZI>::Ptr marking_pc_;
+
     Marking(std::string m_name, DynamicGraph* dg, double inscribed_radius, double inflation_radius, const std::shared_ptr<perception_3d::SharedData>& shared_data, double xy_resolution, double height_resolution):
-      name_(m_name), dGraph_(dg), inscribed_radius_(inscribed_radius), inflation_radius_(inflation_radius), shared_data_(shared_data), xy_resolution_(xy_resolution), height_resolution_(height_resolution){};
+      name_(m_name), dGraph_(dg), inscribed_radius_(inscribed_radius), inflation_radius_(inflation_radius), shared_data_(shared_data), xy_resolution_(xy_resolution), height_resolution_(height_resolution){
+        marking_pc_.reset(new pcl::PointCloud<pcl::PointXYZI>);
+      };
     
     ~Marking();
 
@@ -134,11 +142,8 @@ class Marking{
     std::map<int, double> lethal_map_;
     
   private:
-
+    
     std::string name_;
-
-    //@ Voxel structure
-    marking_t marking_;
 
     //@ For dynamic_graph, because kdd find int index, we use int
     std::map<pcl::PointCloud<pcl::PointXYZI>::Ptr, std::unordered_map<int, float>> marking2node_;  

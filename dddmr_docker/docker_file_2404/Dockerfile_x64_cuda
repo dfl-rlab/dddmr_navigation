@@ -37,7 +37,7 @@ RUN /bin/bash -c "cd /tmp && cp /var/nv-tensorrt-local-repo-ubuntu2404-10.16.0-c
 RUN apt-get install -y tensorrt
 #install tensorrt python
 RUN python3 -m pip install tensorrt==11.1.0.106 --break-system-packages
-RUN python3 -m pip install onnx==1.21.0 --break-system-packages
+RUN python3 -m pip install --ignore-installed numpy onnx==1.21.0 --break-system-packages
 
 #TODO install customized opencv 
 RUN pip3 install matplotlib --break-system-packages

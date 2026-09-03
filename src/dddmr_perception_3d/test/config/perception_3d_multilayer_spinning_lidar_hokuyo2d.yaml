@@ -1,0 +1,179 @@
+scan_front:
+  ros__parameters:
+    range_min: 0.01
+    range_max: 20.0
+
+scan_back:
+  ros__parameters:
+    range_min: 0.01
+    range_max: 20.0
+
+local_planner:
+  ros__parameters:
+    odom_topic: odom
+    forward_prune: 2.0
+    backward_prune: 0.5
+    heading_tracking_distance: 0.5
+    heading_align_angle: 0.5
+    prune_plane_timeout: 3.0
+    xy_goal_tolerance: 0.3
+    yaw_goal_tolerance: 0.3
+    controller_frequency: 20.0
+    
+    cuboid:
+      flb: [0.42, 0.36, 0.0] #front left buttom
+      frb: [0.42, -0.36, 0.0]
+      flt: [0.42, 0.36, 0.6] #front left top
+      frt: [0.42, -0.36, 0.6]
+      blb: [-0.35, 0.36, 0.0] #back left buttom
+      brb: [-0.35, -0.36, 0.0]
+
+perception_3d_local:
+  ros__parameters:
+    global_frame: "map"
+    robot_base_frame: "base_link"
+    max_obstacle_distance: 9999.0
+    inscribed_radius: 0.5
+    inflation_descending_rate: 2.0
+    inflation_radius: 1.5
+    sensors_collected_frequency: 20.0
+    plugins: ["map", "path_blocked_strategy", "front_lidar"]
+    map:
+      plugin: "perception_3d::StaticLayer"
+      is_local_planner: true
+      mapping_mode: false
+      map_topic: "mapcloud"
+      ground_topic: "mapground"
+    path_blocked_strategy:
+      plugin: "perception_3d::PathBlockedStrategy"
+      check_radius: 0.3
+
+    front_lidar:
+      plugin: "perception_3d::MultiLayerSpinningLidar"
+      is_local_planner: true
+      topic: "front_cloud"
+      pub_gbl_marking_for_visualization: false
+      vertical_FOV_top: 5.0
+      vertical_FOV_bottom: -5.0
+      scan_effective_positive_start: 0.0
+      scan_effective_positive_end: 125.0
+      scan_effective_negative_start: -0.0
+      scan_effective_negative_end: -125.0
+      resolution: 0.05
+      height_resolution: 0.05
+      marking_height: 2.0
+      marking_minimum_height: -0.1
+      perception_window_size: 4.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
+      segmentation_ignore_ratio: 0.5 #f a segmentation match static pc with this ratio, we ignore it. ex: a wall
+      expected_sensor_time: 0.1
+
+    back_lidar:
+      plugin: "perception_3d::MultiLayerSpinningLidar"
+      is_local_planner: true
+      topic: "back_cloud"
+      pub_gbl_marking_for_visualization: true
+      vertical_FOV_top: 5.0
+      vertical_FOV_bottom: -5.0
+      scan_effective_positive_start: 0.0
+      scan_effective_positive_end: 125.0
+      scan_effective_negative_start: -0.0
+      scan_effective_negative_end: -125.0
+      xy_resolution: 0.05
+      height_resolution: 0.05
+      marking_height: 2.0
+      marking_minimum_height: -0.1
+      perception_window_size: 1.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
+      segmentation_ignore_ratio: 0.5 #f a segmentation match static pc with this ratio, we ignore it. ex: a wall
+      expected_sensor_time: 0.1
+
+perception_3d_global:
+  ros__parameters:
+    global_frame: "map"
+    robot_base_frame: "base_link"
+    max_obstacle_distance: 9999.0
+    inscribed_radius: 0.5
+    inflation_descending_rate: 2.0
+    inflation_radius: 1.5
+    sensors_collected_frequency: 20.0
+    plugins: ["map", "front_lidar"]
+    dgraph_publish_frequency: 5.0
+    map:
+      plugin: "perception_3d::StaticLayer"
+      is_local_planner: false
+      use_adaptive_connection: false #If true: the neighbors of node is sparse, it will automatically increase search radius.
+      adaptive_connection_number: 20
+      radius_of_ground_connection: 1.5 #If use_adaptive_connection=false, the radius search of the node is applied.
+      intensity_search_radius: 1.0 #this value is suggested to be 1.0 meters, because if it is too large, the narrow passage will be miscalculated
+      intensity_search_punish_weight: 0.1 #the weight for a node. Set this value higher means we dont like path planning cross a orphan node.
+      static_imposing_radius: 1.5 #use map to add weight on each ground node
+      map_topic: "mapcloud"
+      ground_topic: "mapground"
+      support:
+        mapping_mode: false
+          #if mapping mode is true, edge detection is automatically disabled
+        enable_edge_detection: true
+        generate_static_graph: false
+          #the connection radius will be used
+          #enable this value when using super dense ground say ground voxel size<=10 cm
+
+    front_lidar:
+      plugin: "perception_3d::MultiLayerSpinningLidar"
+      is_local_planner: false
+      topic: "front_cloud"
+      pub_gbl_marking_for_visualization: true
+      vertical_FOV_top: 5.0
+      vertical_FOV_bottom: -5.0
+      scan_effective_positive_start: 0.0
+      scan_effective_positive_end: 125.0
+      scan_effective_negative_start: -0.0
+      scan_effective_negative_end: -125.0
+      euclidean_cluster_extraction_tolerance: 0.01
+      euclidean_cluster_minimum_accepted_size: 0 #set to zero for 2D lidar
+      xy_resolution: 0.05
+      height_resolution: 0.05
+      marking_height: 2.0
+      marking_minimum_height: -0.1
+      perception_window_size: 3.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
+      segmentation_ignore_ratio: 1.1 #f a segmentation match static pc with this ratio, we ignore it. ex: a wall
+      expected_sensor_time: 0.1
+
+    back_lidar:
+      plugin: "perception_3d::MultiLayerSpinningLidar"
+      is_local_planner: false
+      topic: "back_cloud"
+      pub_gbl_marking_for_visualization: true
+      vertical_FOV_top: 5.0
+      vertical_FOV_bottom: -5.0
+      scan_effective_positive_start: 0.0
+      scan_effective_positive_end: 125.0
+      scan_effective_negative_start: -0.0
+      scan_effective_negative_end: -125.0
+      euclidean_cluster_extraction_tolerance: 0.01
+      euclidean_cluster_minimum_accepted_size: 0 #set to zero for 2D lidar
+      xy_resolution: 0.05
+      height_resolution: 0.05
+      marking_height: 2.0
+      marking_minimum_height: -0.1
+      perception_window_size: 5.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
+      segmentation_ignore_ratio: 1.1 #f a segmentation match static pc with this ratio, we ignore it. ex: a wall
+      expected_sensor_time: 0.1
+
+occupancy2ground:
+  ros__parameters:
+    map_dir: "/root/dddmr_bags/cicdtest/perception_3d_multilayer_spinning_lidar_hokuyo2d/map_2d"
+    ground_voxel_size: 0.1
+    inflation_radius: 0.5
+    obstacle_weight: 50.0
+
+global_planner:
+  ros__parameters:
+    turning_weight: 0.1 #Punish the zig-zag path
+    enable_detail_log: false
+    a_star_expanding_radius: 0.4
+
+#if we use get_dwa_plan in global_plan_manager, we setup parameters for dwa_global_planner
+dynamic_window_aware_global_planner:
+  ros__parameters:
+    look_ahead_distance: 2.0
+    recompute_frequency: 2.0
+    

@@ -266,7 +266,15 @@ void DDSimpleTrajectoryGeneratorTheory::initialise(){
       max_vel_x = std::min(max_vel_x, shared_data_->current_allowed_max_linear_speed_);
     }
     max_vel[0] = std::min(max_vel_x, shared_data_->robot_state_.twist.twist.linear.x + acc_lim[0] * sim_period);
+    //@when using high frequency, the first step will be diluted to a small speed, therefore, use the min_vel
+    if(max_vel[0]<min_vel_x){
+      max_vel[0] = min_vel_x;
+    }
     max_vel[2] = std::min(max_vel_th, shared_data_->robot_state_.twist.twist.angular.z + acc_lim[2] * sim_period);
+    //@when using high frequency, the first step will be diluted to a small speed, therefore, use the min_vel
+    if(max_vel[2]<min_vel_th){
+      max_vel[2] = min_vel_th;
+    }
 
     min_vel[0] = std::max(min_vel_x, shared_data_->robot_state_.twist.twist.linear.x/limits_->deceleration_ratio);
     min_vel[2] = std::max(min_vel_th, shared_data_->robot_state_.twist.twist.angular.z - acc_lim[2] * sim_period);
@@ -316,6 +324,13 @@ bool DDSimpleTrajectoryGeneratorTheory::isMotorConstraintSatisfied(Eigen::Vector
   return true;
 }
 
+size_t DDSimpleTrajectoryGeneratorTheory::getSamplingSize(){
+  return sample_params_.size();
+}
+
+void DDSimpleTrajectoryGeneratorTheory::getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj){
+  generateTrajectory(sample_params_[index], _traj);
+}
 
 bool DDSimpleTrajectoryGeneratorTheory::hasMoreTrajectories(){
   return next_sample_index_ < sample_params_.size();
@@ -337,7 +352,7 @@ bool DDSimpleTrajectoryGeneratorTheory::nextTrajectory(base_trajectory::Trajecto
       generated_once = true;
     }
     else{
-      _traj.resetPoints();
+      _traj.resetPoses();
     }
     
   }
@@ -366,7 +381,7 @@ bool DDSimpleTrajectoryGeneratorTheory::generateTrajectory(
   double eps = 1e-4;
   traj.cost_ = 0.0; // placed here in case we return early
   //trajectory might be reused so we'll make sure to reset it
-  traj.resetPoints();
+  traj.resetPoses();
 
   // make sure that the robot would at least be moving with one of
   // the required minimum velocities for translation and rotation (if set)
@@ -454,7 +469,7 @@ bool DDSimpleTrajectoryGeneratorTheory::generateTrajectory(
     base_trajectory::cuboid_min_max_t cuboid_min_max;
     pcl::getMinMax3D(pc_out, cuboid_min_max.first, cuboid_min_max.second);
 
-    if(!traj.addPoint(ros_pose, pc_out, cuboid_min_max)){
+    if(!traj.addPoseCuboid(ros_pose, pc_out, cuboid_min_max)){
       return false;
     }
 
@@ -470,5 +485,12 @@ Eigen::Vector3f DDSimpleTrajectoryGeneratorTheory::computeNewPositions(const Eig
   new_pos[1] = pos[1] + (vel[0] * sin(pos[2])) * dt;
   new_pos[2] = pos[2] + vel[2] * dt;
   return new_pos;
+}
+
+void DDSimpleTrajectoryGeneratorTheory::expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
+                                            std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
+                                              base_trajectory::Trajectory& best_traj){
+  //use default scoring
+  TrajectoryGeneratorTheory::expertScoring(accepted_trajectories, rejected_trajectories, best_traj); 
 }
 }//end of name space

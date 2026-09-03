@@ -135,8 +135,8 @@ void StaticLayer::onInitialize()
 void StaticLayer::ptrInitial(){
   pcl_map_.reset(new pcl::PointCloud<pcl::PointXYZI>);
   pcl_ground_.reset(new pcl::PointCloud<pcl::PointXYZI>);
-  shared_data_->kdtree_map_.reset(new pcl::search::KdTree<pcl::PointXYZI>());
-  shared_data_->kdtree_ground_.reset(new pcl::search::KdTree<pcl::PointXYZI>());
+  shared_data_->kdtree_map_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
+  shared_data_->kdtree_ground_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
   sensor_current_observation_.reset(new pcl::PointCloud<pcl::PointXYZI>);
   shared_data_->sGraph_ptr_ = std::make_shared<perception_3d::StaticGraph>();
   new_map_ = new_ground_ = is_local_planner_ = false;
@@ -158,7 +158,7 @@ void StaticLayer::cbMap(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     RCLCPP_WARN(node_->get_logger().get_child(name_), "%s receive new \033[1;32mMap\033[0m with size: %lu", name_.c_str(), pcl_map_->points.size());
   }
   shared_data_->static_map_size_ = pcl_map_->points.size();
-  shared_data_->kdtree_map_.reset(new pcl::search::KdTree<pcl::PointXYZI>());
+  shared_data_->kdtree_map_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
   shared_data_->kdtree_map_->setInputCloud(pcl_map_);
   shared_data_->pcl_map_ = pcl_map_;
 }
@@ -178,7 +178,7 @@ void StaticLayer::cbGround(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     RCLCPP_WARN(node_->get_logger().get_child(name_), "%s receive new \033[1;32mGround\033[0m with size: %lu", name_.c_str(), pcl_ground_->points.size());
   }  
   shared_data_->static_ground_size_ = pcl_ground_->points.size();
-  shared_data_->kdtree_ground_.reset(new pcl::search::KdTree<pcl::PointXYZI>());
+  shared_data_->kdtree_ground_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
   shared_data_->kdtree_ground_->setInputCloud(pcl_ground_);
   shared_data_->pcl_ground_ = pcl_ground_;
  

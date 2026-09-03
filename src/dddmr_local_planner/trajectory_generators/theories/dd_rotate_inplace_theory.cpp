@@ -289,6 +289,13 @@ bool DDRotateInplaceTheory::isMotorConstraintSatisfied(Eigen::Vector3f& vel_samp
   return true;
 }
 
+size_t DDRotateInplaceTheory::getSamplingSize(){
+  return sample_params_.size();
+}
+
+void DDRotateInplaceTheory::getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj){
+  generateTrajectory(sample_params_[index], _traj);
+}
 
 bool DDRotateInplaceTheory::hasMoreTrajectories(){
   return next_sample_index_ < sample_params_.size();
@@ -310,7 +317,7 @@ bool DDRotateInplaceTheory::nextTrajectory(base_trajectory::Trajectory& _traj){
       generated_once = true;
     }
     else{
-      _traj.resetPoints();
+      _traj.resetPoses();
     }
     
   }
@@ -339,7 +346,7 @@ bool DDRotateInplaceTheory::generateTrajectory(
   double eps = 1e-4;
   traj.cost_ = 0.0; // placed here in case we return early
   //trajectory might be reused so we'll make sure to reset it
-  traj.resetPoints();
+  traj.resetPoses();
 
   int num_steps;
   double a_rad_sim_time = 6.28/fabs(sample_target_vel[2]);
@@ -416,7 +423,7 @@ bool DDRotateInplaceTheory::generateTrajectory(
     base_trajectory::cuboid_min_max_t cuboid_min_max;
     pcl::getMinMax3D(pc_out, cuboid_min_max.first, cuboid_min_max.second);
 
-    if(!traj.addPoint(ros_pose, pc_out, cuboid_min_max)){
+    if(!traj.addPoseCuboid(ros_pose, pc_out, cuboid_min_max)){
       return false;
     }
 
@@ -433,4 +440,12 @@ Eigen::Vector3f DDRotateInplaceTheory::computeNewPositions(const Eigen::Vector3f
   new_pos[2] = pos[2] + vel[2] * dt;
   return new_pos;
 }
+
+void DDRotateInplaceTheory::expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
+                                            std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
+                                              base_trajectory::Trajectory& best_traj){
+  //use default scoring
+  TrajectoryGeneratorTheory::expertScoring(accepted_trajectories, rejected_trajectories, best_traj); 
+}
+
 }//end of name space

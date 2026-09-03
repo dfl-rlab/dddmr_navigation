@@ -68,8 +68,8 @@ void RotateInPlaceBehavior::onInitialize(){
 void RotateInPlaceBehavior::trajectory2posearray_cuboids(const base_trajectory::Trajectory& a_traj, 
                                       geometry_msgs::msg::PoseArray& pose_arr, pcl::PointCloud<pcl::PointXYZ>& cuboids_pcl){
 
-  for(unsigned int i=0;i<a_traj.getPointsSize();i++){
-      auto p = a_traj.getPoint(i);
+  for(unsigned int i=0;i<a_traj.getPosesSize();i++){
+      auto p = a_traj.getPose(i);
       pose_arr.poses.push_back(p.pose);  
       //@ For cuboids debug
       //cuboids_pcl += a_traj.getCuboid(i);   

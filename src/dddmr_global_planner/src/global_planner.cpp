@@ -82,8 +82,8 @@ void GlobalPlanner::initial(const std::shared_ptr<perception_3d::Perception3D_RO
   
   pcl_map_.reset(new pcl::PointCloud<pcl::PointXYZI>);
   pcl_ground_.reset(new pcl::PointCloud<pcl::PointXYZI>);
-  kdtree_map_.reset(new pcl::search::KdTree<pcl::PointXYZI>);
-  kdtree_ground_.reset(new pcl::search::KdTree<pcl::PointXYZI>);
+  kdtree_map_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>);
+  kdtree_ground_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>);
   
   declare_parameter("turning_weight", rclcpp::ParameterValue(0.1));
   this->get_parameter("turning_weight", turning_weight_);

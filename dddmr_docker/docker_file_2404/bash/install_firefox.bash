@@ -1,15 +1,10 @@
 #!/bin/bash
+sudo apt update
+sudo apt install flatpak gnome-software-plugin-flatpak
+# Force delete the current broken flathub configuration
+flatpak remote-delete --force flathub
 
-sudo add-apt-repository ppa:mozillateam/ppa
-
-echo "
-Package: firefox*
-Pin: release o=LP-PPA-mozillateam
-Pin-Priority: 501
-
-Package: firefox*
-Pin: release o=Ubuntu
-Pin-Priority: -1
-" | sudo tee /etc/apt/preferences.d/mozilla-firefox
-
-sudo apt install --verbose-versions firefox
+# Re-add flathub cleanly using the official repository file
+flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+sudo flatpak update
+sudo flatpak install flathub org.mozilla.firefox

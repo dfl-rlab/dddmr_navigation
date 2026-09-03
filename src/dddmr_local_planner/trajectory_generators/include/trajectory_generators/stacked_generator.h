@@ -53,6 +53,13 @@ class StackedGenerator{
     std::shared_ptr<trajectory_generators::TrajectoryGeneratorSharedData> getSharedDataPtr(){return shared_data_;}
 
     void initializeTheories_wi_Shared_data();
+    size_t getSamplingSize(std::string pname);
+    void getSamplingTrajectoryByIndex(std::string pname, size_t index, base_trajectory::Trajectory& _traj);
+    void expertScoring(std::string pname, 
+                    std::vector<base_trajectory::Trajectory>& accepted_trajectories,
+                      std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
+                        base_trajectory::Trajectory& best_traj);
+    
     bool hasMoreTrajectories(std::string pname);
     bool nextTrajectory(std::string pname, base_trajectory::Trajectory& comp_traj);
     bool theoryExists(std::string pname);

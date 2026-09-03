@@ -462,35 +462,45 @@ void Local_Planner::prunePlan(double forward_distance, double backward_distance)
 
 void Local_Planner::getBestTrajectory(std::string traj_gen_name, base_trajectory::Trajectory& best_traj){
 
-  //@ in case we have collision
-  best_traj.cost_ = -1;
-
-  double minimum_cost = 9999999;
   geometry_msgs::msg::PoseArray accepted_pose_arr;
   pcl::PointCloud<pcl::PointXYZ> cuboids_pcl;
   
   rejected_trajectories_.clear();
+  accepted_trajectories_.clear();
 
+  #ifdef HAVE_SYS_TIME_H
+  struct timeval start, end;
+  double start_t, end_t, diff_t;
+  gettimeofday(&start, NULL);
+  #endif
+  
+  //@ TODO make this omp version
   for(auto traj_it=trajectories_->begin();traj_it!=trajectories_->end();traj_it++){
 
     mpc_critics_ros_->scoreTrajectory(traj_gen_name, (*traj_it));
     
-    if((*traj_it).cost_>=0 && (*traj_it).cost_<=minimum_cost){
-      best_traj = (*traj_it);
-      minimum_cost = (*traj_it).cost_;
-    }
-
     if((*traj_it).cost_>=0){
       trajectory2posearray_cuboids((*traj_it), accepted_pose_arr, cuboids_pcl);
+      accepted_trajectories_.push_back(*traj_it);
     }
 
     rejected_trajectories_[(*traj_it).rejected_by_].push_back(*traj_it);
     
   }
-  
+
+  #ifdef HAVE_SYS_TIME_H
+  gettimeofday(&end, NULL);
+  start_t = start.tv_sec + double(start.tv_usec) / 1e6;
+  end_t = end.tv_sec + double(end.tv_usec) / 1e6;
+  diff_t = end_t - start_t;
+  RCLCPP_WARN(this->get_logger(), "Scoring time: %.9f", diff_t);
+  #endif
+
   //for(auto report_it=rejected_trajectories_.begin(); report_it!=rejected_trajectories_.end(); report_it++){
   //  RCLCPP_INFO(this->get_logger().get_child(name_), "Report: %s with rate: %.2f", (*report_it).first.c_str(), (float)(*report_it).second.size()/(float)trajectories_->size());
   //}
+
+  trajectory_generators_ros_->expertScoring(traj_gen_name, accepted_trajectories_, rejected_trajectories_, best_traj);
 
   accepted_pose_arr.header.frame_id = perception_3d_ros_->getGlobalUtils()->getGblFrame();
   accepted_pose_arr.header.stamp = clock_->now();
@@ -539,8 +549,8 @@ dddmr_sys_core::PlannerState Local_Planner::computeVelocityCommand(std::string t
   pcl::toROSMsg(*(perception_3d_ros_->getSharedDataPtr()->aggregate_observation_), ros2_aggregate_onservation);
   pub_aggregate_observation_->publish(ros2_aggregate_onservation);
   if((clock_->now()-trans_gbl2b_.header.stamp).seconds() > 2.0){
-    RCLCPP_ERROR(this->get_logger().get_child(name_), "TF out of date in local planner, the local planner wont go further.");
-    return dddmr_sys_core::TF_FAIL;
+    //RCLCPP_ERROR(this->get_logger().get_child(name_), "TF out of date in local planner, the local planner wont go further.");
+    //return dddmr_sys_core::TF_FAIL;
   }
 
   //@ TODO: Compute cuboid of each pose and send to determineIsPathBlock
@@ -571,27 +581,26 @@ dddmr_sys_core::PlannerState Local_Planner::computeVelocityCommand(std::string t
 
   #ifdef HAVE_SYS_TIME_H
   struct timeval start, end;
-  double start_t, end_t, t_diff;
+  double start_t, end_t, diff_t;
   gettimeofday(&start, NULL);
   #endif
-
+  
   //@ We queue all trajectories in trajectories_, then score them one by one in getBestTrajectory()
-  while(trajectory_generators_ros_->hasMoreTrajectories(traj_gen_name)){
-    base_trajectory::Trajectory a_traj;
-    if(trajectory_generators_ros_->nextTrajectory(traj_gen_name, a_traj)){
-      //@ collected all trajectories here, for later scoring
-      trajectories_->push_back(a_traj);
+  //@ single thread validaed at 0.0004 seconds with 50 samples and 0.04 with 5000 samples
+  //@ omp validated at 0.003 seconds with 50 samples and 0.014 with 5000 samples
+  //@ omp can only be used when samples are large
+  trajectory_generators_ros_->generateAllTrajectories(traj_gen_name, trajectories_);
+  for (auto& a_traj : *trajectories_) {
+    if(a_traj.getPosesSize()>1)
       trajectory2posearray_cuboids(a_traj, pose_arr, cuboids_pcl);
-    }
-
   }
-
+  
   #ifdef HAVE_SYS_TIME_H
   gettimeofday(&end, NULL);
   start_t = start.tv_sec + double(start.tv_usec) / 1e6;
   end_t = end.tv_sec + double(end.tv_usec) / 1e6;
-  t_diff = end_t - start_t;
-  RCLCPP_WARN(this->get_logger(), "Map update time: %.9f", t_diff);
+  diff_t = end_t - start_t;
+  RCLCPP_WARN(this->get_logger(), "Trajectory generation time: %.9f", diff_t);
   #endif
 
   pose_arr.header.frame_id = perception_3d_ros_->getGlobalUtils()->getGblFrame();
@@ -655,8 +664,8 @@ void Local_Planner::trajectory2posearray_cuboids(const base_trajectory::Trajecto
                                       geometry_msgs::msg::PoseArray& pose_arr,
                                       pcl::PointCloud<pcl::PointXYZ>& cuboids_pcl){
 
-  for(unsigned int i=0;i<a_traj.getPointsSize();i++){
-      auto p = a_traj.getPoint(i);
+  for(unsigned int i=0;i<a_traj.getPosesSize();i++){
+      auto p = a_traj.getPose(i);
       pose_arr.poses.push_back(p.pose);
       //@ For cuboids debug
       //cuboids_pcl += a_traj.getCuboid(i);       

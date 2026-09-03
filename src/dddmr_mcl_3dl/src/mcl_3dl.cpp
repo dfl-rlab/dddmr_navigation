@@ -143,7 +143,8 @@ bool MCL3dlNode::configure(const std::shared_ptr<mcl_3dl::SubMaps>& sub_maps)
 }
 
 void MCL3dlNode::cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg){
-
+  
+  double time_seconds = msg->header.stamp.sec + (msg->header.stamp.nanosec * 1e-9);
   odom_ =
       State6DOF(
           Vec3(msg->pose.pose.position.x,
@@ -152,7 +153,8 @@ void MCL3dlNode::cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg){
           Quat(msg->pose.pose.orientation.x,
                 msg->pose.pose.orientation.y,
                 msg->pose.pose.orientation.z,
-                msg->pose.pose.orientation.w));
+                msg->pose.pose.orientation.w),
+          time_seconds);
 
   odom_header_ = msg->header;
   odom_trans_.header = msg->header;
@@ -195,15 +197,13 @@ void MCL3dlNode::cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg){
   double dpitch = pitch_odom - pitch_odom_prev;
   double dyaw = yaw_odom - yaw_odom_prev;
   rclcpp::Time msg_time(msg->header.stamp);
-  const double dt = msg_time.seconds() - odom_last_.seconds();
-  //RCLCPP_WARN(this->get_logger(), "Verify me!! I am dt : %.2f",dt);
 
   if(!first_tf_ || sqrt(dx*dx + dy*dy + dz*dz)>params_->update_min_d_ || sqrt(droll*droll + dpitch*dpitch + dyaw*dyaw)>params_->update_min_a_ ){
     if(pcl_segmentations_.empty()){
       return;
     }
 
-    motion_prediction_model_->setOdoms(odom_prev_, odom_, dt);
+    motion_prediction_model_->setOdoms(odom_prev_, odom_);
     auto prediction_func = [this](State6DOF& s)
     {
       motion_prediction_model_->predict(s);
@@ -283,8 +283,8 @@ void MCL3dlNode::cbLeGoFeatureCloud(const sensor_msgs::msg::PointCloud2::SharedP
     return;
 
   pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_sharp(new pcl::PointCloud<mcl_3dl::pcl_t>);
-  pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_less_sharp(new pcl::PointCloud<mcl_3dl::pcl_t>);
-  pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_flat(new pcl::PointCloud<mcl_3dl::pcl_t>); 
+  pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_less_sharp_in(new pcl::PointCloud<mcl_3dl::pcl_t>);
+  pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_flat_in(new pcl::PointCloud<mcl_3dl::pcl_t>); 
   pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_less_flat(new pcl::PointCloud<mcl_3dl::pcl_t>);
 
   //@
@@ -294,35 +294,36 @@ void MCL3dlNode::cbLeGoFeatureCloud(const sensor_msgs::msg::PointCloud2::SharedP
   
 
   //pcl::fromROSMsg(*pc_sharpMsg, *pc_sharp);
-  pcl::fromROSMsg(*pc_flatMsg, *pc_flat);
-  pcl::fromROSMsg(*pc_less_sharpMsg, *pc_less_sharp);
+  pcl::fromROSMsg(*pc_flatMsg, *pc_flat_in);
+  pcl::fromROSMsg(*pc_less_sharpMsg, *pc_less_sharp_in);
   //pcl::fromROSMsg(*pc_less_flatMsg, *pc_less_flat);
 
   //@Transform point cloud
   //pcl::transformPointCloud(*pc_sharp, *pc_sharp, trans_b2s_af3);
-  pcl::transformPointCloud(*pc_less_sharp, *pc_less_sharp, trans_b2s_af3);
-  pcl::transformPointCloud(*pc_flat, *pc_flat, trans_b2s_af3);
+  pcl::transformPointCloud(*pc_less_sharp_in, *pc_less_sharp_in, trans_b2s_af3);
+  pcl::transformPointCloud(*pc_flat_in, *pc_flat_in, trans_b2s_af3);
   pcl::transformPointCloud(*pc_less_flat, *pc_less_flat, trans_b2s_af3);
   
   //*pc_less_sharp+=*pc_less_flat;
 
-  pc_less_sharp->header.frame_id = params_->frame_ids_["base_link"];
+  pc_less_sharp_in->header.frame_id = params_->frame_ids_["base_link"];
+
+  RCLCPP_DEBUG(this->get_logger(), "Size pc_sharp: %lu, pc_less_sharp_in: %lu, pc_flat_in: %lu, pc_less_flat: %lu", 
+                          pc_sharp->points.size(), pc_less_sharp_in->points.size(), pc_flat_in->points.size(), pc_less_flat->points.size());
+
+
+  //Ground will skew the result when close to obstacle, because velodyne has blind spot of 50 cm
+  pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_flat(new pcl::PointCloud<mcl_3dl::pcl_t>); 
+  pc_flat = small_gicp::voxelgrid_sampling_omp(*pc_flat_in, 1.0, 4);
+  
+  //@ decide voxel size by total pc size
+  double voxel_size = pc_less_sharp_in->points.size()/3000.0;
+  pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_less_sharp(new pcl::PointCloud<mcl_3dl::pcl_t>);
+  pc_less_sharp = small_gicp::voxelgrid_sampling_omp(*pc_less_sharp_in, voxel_size, 4);
 
   RCLCPP_DEBUG(this->get_logger(), "Size pc_sharp: %lu, pc_less_sharp: %lu, pc_flat: %lu, pc_less_flat: %lu", 
                           pc_sharp->points.size(), pc_less_sharp->points.size(), pc_flat->points.size(), pc_less_flat->points.size());
 
-
-  //Ground will skew the result when close to obstacle, because velodyne has blind spot of 50 cm
-  pcl::VoxelGrid<mcl_3dl::pcl_t> sor;
-  sor.setInputCloud (pc_flat);
-  sor.setLeafSize (1.0f, 1.0f, 0.1f);
-  sor.filter (*pc_flat);
-  
-  //@Looks like downsample less sharp only 600->550 points, not very effective
-  //pcl::VoxelGrid<mcl_3dl::pcl_t> sor2;
-  //sor2.setInputCloud (pc_less_sharp);
-  //sor2.setLeafSize (0.1f, 0.1f, 0.1f);
-  //sor2.filter (*pc_less_sharp);
 
   pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_less_sharp_intensity(new pcl::PointCloud<mcl_3dl::pcl_t>);
 
@@ -460,13 +461,11 @@ void MCL3dlNode::cbLeGoFeatureCloud(const sensor_msgs::msg::PointCloud2::SharedP
   //Surface can correct roll and pitch
   //Perpendicular can correct yaw
   
-  if (true){
-    sensor_msgs::msg::PointCloud2 ec_out;
-    pcl::toROSMsg(*pc_less_sharp_intensity, ec_out);
-    ec_out.header = pc_less_sharpMsg->header;
-    ec_out.header.frame_id = params_->frame_ids_["base_link"];
-    pub_pc_ec_->publish(ec_out);
-  }
+  sensor_msgs::msg::PointCloud2 ec_out;
+  pcl::toROSMsg(*pc_less_sharp_intensity, ec_out);
+  ec_out.header = pc_less_sharpMsg->header;
+  ec_out.header.frame_id = params_->frame_ids_["base_link"];
+  pub_pc_ec_->publish(ec_out);
   
   pcl_segmentations_[std::string("flat")] = pc_flat;
   pcl_segmentations_[std::string("less_sharp")] = pc_less_sharp_intensity;
@@ -773,11 +772,13 @@ void MCL3dlNode::cbPosition(const geometry_msgs::msg::PoseWithCovarianceStamped:
   }
   
   RCLCPP_INFO(this->get_logger(), "Set initial pose at: %.2f, %.2f, %.2f", pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
+  double time_seconds = msg->header.stamp.sec + (msg->header.stamp.nanosec * 1e-9);
   const State6DOF mean(Vec3(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z),
                         Quat(pose.pose.orientation.x,
                             pose.pose.orientation.y,
                             pose.pose.orientation.z,
-                            pose.pose.orientation.w));
+                            pose.pose.orientation.w),
+                        time_seconds);
   const MultivariateNoiseGenerator<float> noise_gen(mean, msg->pose.covariance);
   pf_->initUsingNoiseGenerator(noise_gen);
 

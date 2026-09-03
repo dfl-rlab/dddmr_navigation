@@ -1,13 +1,27 @@
+mcl_3dl_test_node:
+  ros__parameters:
+    use_sim_time: true
+    init_x: 0.0
+    init_y: 0.0
+    init_z: 0.0
+    init_ox: 0.0
+    init_oy: 0.0
+    init_oz: 0.0
+    init_ow: 1.0
+    target_x: 12.6
+    target_y: -17.15
+    target_z: -0.29
+
 mcl_ip:
   ros__parameters:
-    # leishen16
+    use_sim_time: true
     laser:
-        odom_type: "laser_odometry"         #wheel_odometry/laser_odometry 
+        odom_type: "wheel_odometry"         #wheel_odometry/laser_odometry 
         base_ground_frame: "base_link"
-        num_vertical_scans: 16
-        num_horizontal_scans: 1000
-        vertical_angle_bottom: -15.0          # degrees
-        vertical_angle_top: 15.0            # degrees
+        num_vertical_scans: 128
+        num_horizontal_scans: 1024
+        vertical_angle_bottom: -30.0          # degrees
+        vertical_angle_top: 30.0            # degrees
         scan_period: 0.1                   # seconds
 
 
@@ -31,7 +45,7 @@ mcl_ip:
         
 mcl_fa:
   ros__parameters:
-
+    use_sim_time: true
     featureAssociation:
         edge_threshold: 0.1
         surf_threshold: 0.1
@@ -43,17 +57,19 @@ dddmr_pg_map_server_manager:
 
 map1:
   ros__parameters:
-    pose_graph_dir: "/root/dddmr_bags/cicdtest/mcl_3dl_c16/pg"
+    pose_graph_dir: "/root/dddmr_bags/cicdtest/mcl_3dl_gpulidar/pg"
     complete_map_voxel_size: 0.3
 
 sub_maps:
   ros__parameters:
+    use_sim_time: true
     pg_map_server_name: "map1" #options from line#3
     sub_map_search_radius: 50.0
     sub_map_warmup_trigger_distance: 20.0
     
 mcl_3dl:
   ros__parameters:
+    use_sim_time: true
     init_x: 0.0
     init_y: 0.0
     init_z: 0.0
@@ -72,7 +88,7 @@ mcl_3dl:
     map_downsample_x: 0.1
     map_downsample_y: 0.1
     map_downsample_z: 0.1
-    num_particles: 60
+    num_particles: 100
 
     resample_var_x: 0.1
     resample_var_y: 0.1
@@ -94,7 +110,7 @@ mcl_3dl:
 
     knn_num_of_ground_normals: 20
 
-    update_min_d: 0.1
+    update_min_d: 0.5
     update_min_a: 0.1
 
     odom_err_lin_lin: 0.6

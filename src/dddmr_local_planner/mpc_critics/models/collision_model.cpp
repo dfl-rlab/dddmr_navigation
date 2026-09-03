@@ -56,7 +56,7 @@ double CollisionModel::scoreTrajectory(base_trajectory::Trajectory &traj){
   
 
 
-  for(unsigned int i=0;i<traj.getPointsSize();i++){
+  for(unsigned int i=0;i<traj.getPosesSize();i++){
 
     base_trajectory::cuboid_min_max_t cmmt = traj.getCuboidMinMax(i);
     /*Assert for cuboids, we want user to have cuboids with the trajectory, otherwise it is dangerous*/

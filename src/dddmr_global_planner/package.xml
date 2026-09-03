@@ -23,6 +23,8 @@
   <depend>builtin_interfaces</depend>
   <depend>tf2_ros</depend>
   <depend>pluginlib</depend>
+  <depend>yaml-cpp_vendor</depend>
+  <depend>libyaml-cpp-dev</depend>
   <depend>libpcl-all</depend>
   <depend>pcl_conversions</depend>
   <build_depend>perception_3d</build_depend>

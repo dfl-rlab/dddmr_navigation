@@ -41,7 +41,7 @@ namespace base_trajectory {
   {
   }
 
-  geometry_msgs::msg::PoseStamped Trajectory::getPoint(unsigned int index) const {
+  geometry_msgs::msg::PoseStamped Trajectory::getPose(unsigned int index) const {
     return trajectory_path_.poses[index];
   }
 
@@ -57,11 +57,7 @@ namespace base_trajectory {
     return cuboids_min_max_[index];
   }
 
-  void Trajectory::setPoint(unsigned int index, double x, double y, double th){
-
-  }
-
-  bool Trajectory::addPoint(const geometry_msgs::msg::PoseStamped& pos, 
+  bool Trajectory::addPoseCuboid(const geometry_msgs::msg::PoseStamped& pos, 
                             const pcl::PointCloud<pcl::PointXYZ>& cuboid,
                             const cuboid_min_max_t& cuboid_min_max){
     trajectory_path_.poses.push_back(pos);
@@ -79,7 +75,7 @@ namespace base_trajectory {
 
   }
 
-  void Trajectory::resetPoints(){
+  void Trajectory::resetPoses(){
     trajectory_path_.poses.clear();
     cuboids_.clear();
     cuboids_min_max_.clear();
@@ -90,7 +86,7 @@ namespace base_trajectory {
 
   }
 
-  unsigned int Trajectory::getPointsSize() const {
+  unsigned int Trajectory::getPosesSize() const {
     return trajectory_path_.poses.size();
   }
 };

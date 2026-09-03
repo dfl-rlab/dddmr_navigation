@@ -40,10 +40,19 @@
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <yaml-cpp/yaml.h>
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <pcl/filters/voxel_grid.h>
+
+// omp voxel
+#include <small_gicp/util/downsampling_omp.hpp>
+#include <small_gicp/pcl/pcl_point_traits.hpp>
+#include <omp.h>
+
+// kdtree
+#include <pcl/kdtree/kdtree_flann.h>
 
 using namespace std::chrono_literals;
 
@@ -74,17 +83,22 @@ class Occupancy2Ground : public rclcpp::Node
     std::string map_dir_;
 
     PGMImage_t pgm_t_;
-
+    
+    pcl::PointCloud<pcl::PointXYZI>::Ptr pc_ground_ds_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr pc_ground_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr pc_wall_ds_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr pc_wall_, pc_wall_flat_;
 
     double inflation_radius_;
-    std::map<std::pair<int, int>, size_t> twoD2oneD_;
     std::vector<std::pair<int, int>> obstacles_;
     float ground_voxel_size_;
 
-    double map_rotate_around_x_, map_rotate_around_y_, map_rotate_around_z_;
-    double map_translate_x_, map_translate_y_, map_translate_z_;
+    double obstacle_weight_;
+    float resolution_;
+    std::vector<float> origin_;
+    double free_thresh_;
+    double occupied_thresh_;
+    int negate_;
 };
 
 
@@ -112,130 +126,124 @@ Occupancy2Ground::Occupancy2Ground():Node("occupancy2ground"){
   this->get_parameter("ground_voxel_size", ground_voxel_size_);
   RCLCPP_INFO(this->get_logger(), "ground_voxel_size: %.2f" , ground_voxel_size_);
 
-  this->declare_parameter("map_rotate_around_x", rclcpp::ParameterValue(0.0));
-  rclcpp::Parameter map_rotate_around_x = this->get_parameter("map_rotate_around_x");
-  map_rotate_around_x_ = map_rotate_around_x.as_double();
-  RCLCPP_INFO(this->get_logger(), "map_rotate_around_x: %.2f", map_rotate_around_x_);
+  this->declare_parameter("obstacle_weight", rclcpp::ParameterValue(100.0));
+  this->get_parameter("obstacle_weight", obstacle_weight_);
+  RCLCPP_INFO(this->get_logger(), "obstacle_weight: %.2f" , obstacle_weight_);
 
-  this->declare_parameter("map_rotate_around_y", rclcpp::ParameterValue(0.0));
-  rclcpp::Parameter map_rotate_around_y = this->get_parameter("map_rotate_around_y");
-  map_rotate_around_y_ = map_rotate_around_y.as_double();
-  RCLCPP_INFO(this->get_logger(), "map_rotate_around_y: %.2f", map_rotate_around_y_);
-
-  this->declare_parameter("map_rotate_around_z", rclcpp::ParameterValue(0.0));
-  rclcpp::Parameter map_rotate_around_z = this->get_parameter("map_rotate_around_z");
-  map_rotate_around_z_ = map_rotate_around_z.as_double();
-  RCLCPP_INFO(this->get_logger(), "map_rotate_around_z: %.2f", map_rotate_around_z_);
-
-  this->declare_parameter("map_translate_x", rclcpp::ParameterValue(0.0));
-  rclcpp::Parameter map_translate_x = this->get_parameter("map_translate_x");
-  map_translate_x_ = map_translate_x.as_double();
-  RCLCPP_INFO(this->get_logger(), "map_translate_x: %.2f", map_translate_x_);
-
-  this->declare_parameter("map_translate_y", rclcpp::ParameterValue(0.0));
-  rclcpp::Parameter map_translate_y = this->get_parameter("map_translate_y");
-  map_translate_y_ = map_translate_y.as_double();
-  RCLCPP_INFO(this->get_logger(), "map_translate_y: %.2f", map_translate_y_);
-
-  this->declare_parameter("map_translate_z", rclcpp::ParameterValue(0.0));
-  rclcpp::Parameter map_translate_z = this->get_parameter("map_translate_z");
-  map_translate_z_ = map_translate_z.as_double();
-  RCLCPP_INFO(this->get_logger(), "map_translate_z: %.2f", map_translate_z_);
 
   if(!std::filesystem::exists(map_dir_))
   {
-    RCLCPP_INFO(this->get_logger(), "File: %s not exist, exit.", map_dir_.c_str());
+    RCLCPP_INFO(this->get_logger(), "Directory: %s not exist, exit.", map_dir_.c_str());
     return;
   }
 
-  RCLCPP_INFO(this->get_logger(), "Reading file from: %s", map_dir_.c_str());
-  pgm_t_ = readPGM(map_dir_);
+  std::string yaml_path = map_dir_ + "/map.yaml";
+  if(!std::filesystem::exists(yaml_path))
+  {
+    RCLCPP_INFO(this->get_logger(), "File: %s not exist, exit.", yaml_path.c_str());
+    return;
+  }
+
+  RCLCPP_INFO(this->get_logger(), "Reading yaml from: %s", yaml_path.c_str());
+  YAML::Node config = YAML::LoadFile(yaml_path);
+  std::string image_name = config["image"].as<std::string>();
+  resolution_ = config["resolution"].as<float>();
+  origin_ = config["origin"].as<std::vector<float>>();
+  free_thresh_ = config["free_thresh"] ? config["free_thresh"].as<double>() : 0.196;
+  occupied_thresh_ = config["occupied_thresh"] ? config["occupied_thresh"].as<double>() : 0.65;
+  negate_ = config["negate"] ? config["negate"].as<int>() : 0;
+
+  std::string pgm_path = map_dir_ + "/" + image_name;
+
+  RCLCPP_INFO(this->get_logger(), "Reading file from: %s", pgm_path.c_str());
+  pgm_t_ = readPGM(pgm_path);
   img2Ground();
 }
 
 void Occupancy2Ground::img2Ground() {
 
-  pc_ground_->points.resize(pgm_t_.pixelData.size());
+  std::vector<pcl::PointXYZI> grid(pgm_t_.pixelData.size());
+  std::vector<uint8_t> valid(pgm_t_.pixelData.size(), 0);
   
+  int num_threads = omp_get_max_threads();
+  std::vector<pcl::PointCloud<pcl::PointXYZI>> local_pc_walls(num_threads);
+  std::vector<pcl::PointCloud<pcl::PointXYZI>> local_pc_wall_flats(num_threads);
+  std::vector<std::vector<std::pair<int, int>>> local_obstacles(num_threads);
+
+  #pragma omp parallel for
   for (size_t i = 0; i < pgm_t_.pixelData.size(); ++i) {
-    if(pgm_t_.pixelData[i]>200){
+    int tid = omp_get_thread_num();
+    double p = negate_ ? (pgm_t_.pixelData[i] / 255.0) : ((255.0 - pgm_t_.pixelData[i]) / 255.0);
+    if(p < free_thresh_){
       pcl::PointXYZI pt;
-      pt.x = (i%pgm_t_.width)*0.05;
-      pt.y = pgm_t_.height*0.05 - (int)(i/pgm_t_.width)*0.05;
+      pt.x = (i%pgm_t_.width)*resolution_ + origin_[0];
+      pt.y = pgm_t_.height*resolution_ - (int)(i/pgm_t_.width)*resolution_ + origin_[1];
       pt.z = 0.0;
-      pc_ground_->points[i] = pt;
-      twoD2oneD_[std::make_pair(i%pgm_t_.width, (int)(i/pgm_t_.width))] = i;
+      pt.intensity = 0.0;
+      grid[i] = pt;
+      valid[i] = 1;
     }
-    else{
+    else if(p > occupied_thresh_){
       //@ create vertical structure
       for(int j=0;j<5;j++){
         pcl::PointXYZI pt;
-        pt.x = (i%pgm_t_.width)*0.05;
-        pt.y = pgm_t_.height*0.05 - (int)(i/pgm_t_.width)*0.05;
+        pt.x = (i%pgm_t_.width)*resolution_ + origin_[0];
+        pt.y = pgm_t_.height*resolution_ - (int)(i/pgm_t_.width)*resolution_ + origin_[1];
         pt.z = j*0.2;
-        pc_wall_->push_back(pt);
+        local_pc_walls[tid].push_back(pt);
         if(j==0)
-          pc_wall_flat_->push_back(pt);
+          local_pc_wall_flats[tid].push_back(pt);
       }
       pcl::PointXYZI pt;
-      pt.x = (i%pgm_t_.width)*0.05;
-      pt.y = pgm_t_.height*0.05 - (int)(i/pgm_t_.width)*0.05;
+      pt.x = (i%pgm_t_.width)*resolution_ + origin_[0];
+      pt.y = pgm_t_.height*resolution_ - (int)(i/pgm_t_.width)*resolution_ + origin_[1];
       pt.z = 0.0;
-      pt.intensity = 1000;
-      pc_ground_->points[i] = pt;
-      twoD2oneD_[std::make_pair(i%pgm_t_.width, (int)(i/pgm_t_.width))] = i;
-      obstacles_.push_back(std::make_pair(i%pgm_t_.width, (int)(i/pgm_t_.width)));
+      pt.intensity = obstacle_weight_;
+      grid[i] = pt;
+      valid[i] = 1;
+      local_obstacles[tid].push_back(std::make_pair(i%pgm_t_.width, (int)(i/pgm_t_.width)));
     }
   }
   
-  for(auto it=obstacles_.begin(); it!=obstacles_.end();it++){
-
-    int sx = (*it).first;
-    int sy = (*it).second;
-    int step = inflation_radius_/0.05;
-    for(int dx = -step; dx<=step; dx++){
-      for(int dy = -step; dy<=step; dy++){
-        if(dx==0 && dy==0)
-          continue;
-        double d = 1/hypot(dx, dy);
-        if (twoD2oneD_.find(std::make_pair(sx+dx,sy+dy)) != twoD2oneD_.end()) {
-          size_t i = twoD2oneD_[std::make_pair(sx+dx,sy+dy)];
-          if(pc_ground_->points[i].intensity < d)
-            pc_ground_->points[i].intensity = d;
-        } else {
-          // Key does not exist
-        }
-
-      }
-    }
+  for(int t = 0; t < num_threads; ++t) {
+    *pc_wall_ += local_pc_walls[t];
+    *pc_wall_flat_ += local_pc_wall_flats[t];
+    obstacles_.insert(obstacles_.end(), local_obstacles[t].begin(), local_obstacles[t].end());
   }
 
-  pcl::VoxelGrid<pcl::PointXYZI> sor;
-  sor.setInputCloud (pc_ground_);
-  sor.setLeafSize (ground_voxel_size_, ground_voxel_size_, ground_voxel_size_);
-  sor.filter (*pc_ground_);
-
-  Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
-
-  // Define a translation of 0.0 meters on the axis.
-  transform_2.translation() << map_translate_x_, map_translate_y_, map_translate_z_;
-
-  // The same rotation matrix as before; theta radians around X axis
-  if(fabs(map_rotate_around_x_)>0.01)
-    transform_2.rotate (Eigen::AngleAxisf (map_rotate_around_x_, Eigen::Vector3f::UnitX()));
-  if(fabs(map_rotate_around_y_)>0.01)
-    transform_2.rotate (Eigen::AngleAxisf (map_rotate_around_y_, Eigen::Vector3f::UnitY()));
-  if(fabs(map_rotate_around_z_)>0.01)
-    transform_2.rotate (Eigen::AngleAxisf (map_rotate_around_z_, Eigen::Vector3f::UnitZ()));  
+  pc_ground_->points.clear();
+  for (size_t i = 0; i < grid.size(); ++i) {
+    if (valid[i]) {
+      pc_ground_->points.push_back(grid[i]);
+    }
+  }
+  pc_ground_->width = pc_ground_->points.size();
+  pc_ground_->height = 1;
   
-  pcl::transformPointCloud(*pc_ground_, *pc_ground_, transform_2);
-  pcl::transformPointCloud(*pc_wall_, *pc_wall_, transform_2);
+  pc_ground_ds_.reset(new pcl::PointCloud<pcl::PointXYZI>());
+  pc_ground_ds_ = small_gicp::voxelgrid_sampling_omp(*pc_ground_, ground_voxel_size_, 6);
+  RCLCPP_INFO(this->get_logger(), "Origin ground: %lu, DS: %lu", pc_ground_->points.size(), pc_ground_ds_->points.size());
+  
+  //@ now loop voxelized ground and doing z search
+  pcl::KdTreeFLANN<pcl::PointXYZI> map_kdtree;
+  map_kdtree.setInputCloud(pc_wall_flat_);
+  for(auto i=pc_ground_ds_->points.begin(); i!=pc_ground_ds_->points.end(); i++){
+    pcl::PointXYZI query_point = (*i);
+    std::vector<int> point_idx_radius;
+    std::vector<float> point_radius_squared_distance;
+    if (map_kdtree.radiusSearch(query_point, inflation_radius_, point_idx_radius, point_radius_squared_distance) > 0){
+      double dis2ob = (inflation_radius_+0.01)-sqrt(point_radius_squared_distance[0]);
+      (*i).intensity = obstacle_weight_*dis2ob;
+    }
+  }
 
   sensor_msgs::msg::PointCloud2 ros_msg_map_ground;
-  pcl::toROSMsg(*pc_ground_, ros_msg_map_ground);
+  pcl::toROSMsg(*pc_ground_ds_, ros_msg_map_ground);
   ros_msg_map_ground.header.frame_id = "map";
   pub_ground_->publish(ros_msg_map_ground);
-
+  
+  pc_wall_ds_.reset(new pcl::PointCloud<pcl::PointXYZI>());
+  pc_wall_ds_ = small_gicp::voxelgrid_sampling_omp(*pc_wall_, 0.2, 6);
   sensor_msgs::msg::PointCloud2 ros_msg_map_wall;
   pcl::toROSMsg(*pc_wall_, ros_msg_map_wall);
   ros_msg_map_wall.header.frame_id = "map";
