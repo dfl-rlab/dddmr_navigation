@@ -7,11 +7,8 @@ Panels:
         - /Map1/Topic1
         - /WeightGround1/Topic1
         - /SubMap1/Topic1
-        - /Axes1
         - /mcl_euc_cluster1/Topic1
         - /GlobalMarking1/Topic1
-        - /PoseArray2
-        - /MarkerArray2
       Splitter Ratio: 0.5823529362678528
     Tree Height: 1793
   - Class: rviz_common/Selection
@@ -289,7 +286,7 @@ Visualization Manager:
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
       Line Style: Billboards
-      Line Width: 0.05000000074505806
+      Line Width: 0.07999999821186066
       Name: GlobalPath
       Offset:
         X: 0
@@ -491,27 +488,6 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /steering_markers
       Value: true
-    - Alpha: 1
-      Arrow Length: 0.10000000149011612
-      Axes Length: 0.30000001192092896
-      Axes Radius: 0.009999999776482582
-      Class: rviz_default_plugins/PoseArray
-      Color: 85; 255; 255
-      Enabled: true
-      Head Length: 0.07000000029802322
-      Head Radius: 0.029999999329447746
-      Name: PoseArray
-      Shaft Length: 0.23000000417232513
-      Shaft Radius: 0.009999999776482582
-      Shape: Arrow (Flat)
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /ak_rotate_reeds_shepp/rs_candidates
-      Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
       Name: MarkerArray
@@ -579,11 +555,11 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 551.77587890625
+      Scale: 272.7844543457031
       Target Frame: <Fixed Frame>
       Value: TopDownOrtho (rviz_default_plugins)
-      X: 0.5125229954719543
-      Y: 4.525424003601074
+      X: 3.2339305877685547
+      Y: 2.9567580223083496
     Saved: ~
 Window Geometry:
   Displays:

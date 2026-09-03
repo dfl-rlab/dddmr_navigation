@@ -211,6 +211,9 @@ trajectory_generators:
       plugin: "trajectory_generators::AckermannSimpleTrajectoryGeneratorTheory"
       max_vel_x: 0.80
       min_vel_x: 0.10
+      # The main local planner only follows paths forward.  Ignore a residual
+      # reverse RS speed when building its velocity sampling window.
+      forward_only: true
       acc_lim_x: 1.0
       deceleration_ratio: 2.0
       # Matches the Gazebo AckermannSteering plugin in saye/model.sdf.

@@ -71,6 +71,8 @@ class AckermannSimpleTrajectoryGeneratorTheory: public TrajectoryGeneratorTheory
     // to store sample params of each sample between init and generation
     std::vector<Eigen::Vector3f> sample_params_;
     bool debug_trajectory_;
+    // When enabled, the main Ackermann planner never samples reverse speeds.
+    bool forward_only_;
 };
 
 }//end of name space

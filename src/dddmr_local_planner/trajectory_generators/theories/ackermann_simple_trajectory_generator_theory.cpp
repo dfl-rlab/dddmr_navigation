@@ -37,7 +37,8 @@ PLUGINLIB_EXPORT_CLASS(
 namespace trajectory_generators {
 
 AckermannSimpleTrajectoryGeneratorTheory::
-    AckermannSimpleTrajectoryGeneratorTheory() {
+    AckermannSimpleTrajectoryGeneratorTheory()
+    : forward_only_(false) {
   return;
 }
 
@@ -98,6 +99,12 @@ void AckermannSimpleTrajectoryGeneratorTheory::onInitialize() {
   if (limits_->min_vel_x < 0)
     RCLCPP_FATAL(node_->get_logger().get_child(name_),
                  "The min velocity of the robot should be positive!");
+
+  node_->declare_parameter(name_ + ".forward_only",
+                           rclcpp::ParameterValue(false));
+  node_->get_parameter(name_ + ".forward_only", forward_only_);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "forward_only: %s",
+              forward_only_ ? "true" : "false");
 
   /*Motor constraint*/
   node_->declare_parameter(name_ + ".use_motor_constraint",
@@ -368,8 +375,18 @@ void AckermannSimpleTrajectoryGeneratorTheory::initialise() {
       max_vel_x =
           std::min(max_vel_x, shared_data_->current_allowed_max_linear_speed_);
     }
-    //@ Ackermann: use ackermann_drive_state for current speed
-    double current_v = shared_data_->ackermann_drive_state_.drive.speed;
+    //@ Ackermann: use ackermann_drive_state for current speed.  A forward-only
+    //@ planner treats a reverse residual command as stopped for sampling, so it
+    //@ cannot create a reverse-only dynamic window after an RS maneuver.
+    const double feedback_v = shared_data_->ackermann_drive_state_.drive.speed;
+    const double current_v = forward_only_ ? std::max(0.0, feedback_v)
+                                           : feedback_v;
+    if (forward_only_ && feedback_v < 0.0) {
+      RCLCPP_WARN_THROTTLE(
+          node_->get_logger().get_child(name_), *node_->get_clock(), 1000,
+          "Ackermann forward-only: clamping reverse feedback_v=%.3f to 0.0 "
+          "before building the sampling window.", feedback_v);
+    }
     max_vel[0] = std::min(max_vel_x, current_v + acc_lim[0] * sim_period);
     //@ Ackermann: three-layer steering angle bounds
     //@ Layer 1: base range [-max_steer_rad, +max_steer_rad]
