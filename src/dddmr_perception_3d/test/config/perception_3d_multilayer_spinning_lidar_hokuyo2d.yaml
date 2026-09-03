@@ -1,3 +1,11 @@
+perception_3d_multilayer_spinning_lidar_lethal_test_node:
+  ros__parameters:
+    check_points:
+      p1: [-1.78, -1.48, 0.0]
+      p2: [-1.67, -2.16, 0.0]
+      p3: [-1.77, -3.19, 0.0]
+    search_radius: 0.2
+
 scan_front:
   ros__parameters:
     range_min: 0.01

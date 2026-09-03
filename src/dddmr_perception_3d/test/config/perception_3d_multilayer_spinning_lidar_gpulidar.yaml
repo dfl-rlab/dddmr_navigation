@@ -1,0 +1,212 @@
+perception_3d_multilayer_spinning_lidar_lethal_test_node:
+  ros__parameters:
+    check_points:
+      p1: [-1.78, -1.48, 0.0]
+      p2: [-1.67, -2.16, 0.0]
+      p3: [-1.77, -3.19, 0.0]
+    search_radius: 0.2
+    
+mcl_3dl_test_node:
+  ros__parameters:
+    use_sim_time: true
+    init_x: 0.0
+    init_y: 0.0
+    init_z: 0.0
+    init_ox: 0.0
+    init_oy: 0.0
+    init_oz: 0.0
+    init_ow: 1.0
+    target_x: 12.6
+    target_y: -17.15
+    target_z: -0.29
+
+mcl_ip:
+  ros__parameters:
+    use_sim_time: true
+    laser:
+        odom_type: "laser_odometry"         #wheel_odometry/laser_odometry 
+        base_ground_frame: "base_link"
+        num_vertical_scans: 128
+        num_horizontal_scans: 1024
+        vertical_angle_bottom: -30.0          # degrees
+        vertical_angle_top: 30.0            # degrees
+        scan_period: 0.1                   # seconds
+
+
+    imageProjection:
+        segment_valid_point_num: 5
+        segment_valid_line_num: 2
+        segment_theta: 60.0                      # decrese this value may improve accuracy
+        minimum_detection_range: 0.5
+        maximum_detection_range: 100.0            # point cloud within this range will be used to project image
+        distance_for_patch_between_rings: 1.0    # patch ground between rings within this range, i.e. ring0 and ring1 is smaller than 1 meter, patch them
+        stitcher_num: 0                          # for non-repetitive scan lidar use 2~4 (i.e. mid360)
+        trt_model_path: ""                       # provide trt engine for yolo
+        projected_image_stack_size: 1            # Stack this number of image for yolo11n to inference as time elapsed yolo (only work when TRT is loaded)
+        
+        ground_fov_bottom: -0.2617994 # -15deg
+        ground_fov_top: -0.087266 # -5deg
+        ground_positive_start: 0.0
+        ground_positive_stop: 3.1415926
+        ground_negative_start: 0.0
+        ground_negative_stop: -3.1415926
+        
+mcl_fa:
+  ros__parameters:
+    use_sim_time: true
+    featureAssociation:
+        edge_threshold: 0.1
+        surf_threshold: 0.1
+        nearest_feature_search_distance: 3.0
+        
+dddmr_pg_map_server_manager:
+  ros__parameters:
+    maps: ["map1"]
+
+map1:
+  ros__parameters:
+    pose_graph_dir: "/root/dddmr_bags/cicdtest/perception_3d_multilayer_spinning_lidar_gpulidar/pg"
+    complete_map_voxel_size: 0.3
+
+sub_maps:
+  ros__parameters:
+    use_sim_time: true
+    pg_map_server_name: "map1" #options from line#3
+    sub_map_search_radius: 50.0
+    sub_map_warmup_trigger_distance: 20.0
+    
+mcl_3dl:
+  ros__parameters:
+    use_sim_time: true
+    init_x: 0.0
+    init_y: 0.0
+    init_z: 0.0
+    init_roll: 0.0
+    init_pitch: 0.0
+    init_yaw: 0.0
+    init_var_x: 2.0
+    init_var_y: 2.0
+    init_var_z: 0.5
+    init_var_roll: 0.1
+    init_var_pitch: 0.1
+    init_var_yaw: 0.5
+    map_frame: "map"
+    robot_frame: "base_link"
+    odom_frame: "odom"
+    map_downsample_x: 0.1
+    map_downsample_y: 0.1
+    map_downsample_z: 0.1
+    num_particles: 100
+
+    resample_var_x: 0.1
+    resample_var_y: 0.1
+    resample_var_z: 0.1
+    resample_var_yaw: 0.1
+    resample_var_pitch: 0.1
+    resample_var_roll: 0.1
+    expansion_var_x: 0.3
+    expansion_var_y: 0.05
+    expansion_var_z: 0.05
+    expansion_var_roll: 0.01
+    expansion_var_pitch: 0.01
+    expansion_var_yaw: 0.05
+    match_ratio_thresh: 0.65
+
+    euc_cluster_distance: 0.8
+    euc_cluster_min_size: 3
+    euc_cluster_max_size: 2400
+
+    knn_num_of_ground_normals: 20
+
+    update_min_d: 0.5
+    update_min_a: 0.1
+
+    odom_err_lin_lin: 0.6
+    odom_err_lin_ang: 0.3
+    odom_err_ang_lin: 0.3
+    odom_err_ang_ang: 0.6
+
+    odom_err_integ_lin_tc: 5.0
+    odom_err_integ_ang_tc: 10.0
+
+    lpf_step: 2.0
+    acc_lpf_step: 128.0
+
+    jump_dist: 1.0
+    jump_ang: 1.57
+
+    bias_var_dist: 2.0
+    bias_var_ang: 1.57
+    tf_tolerance: 0.1
+    publish_tf: true
+
+    likelihood:
+      num_points_global: 8
+      match_dist_min: 0.5
+      match_dist_flat: 0.05
+      threshold_for_trusted_ground: 6
+      radius_of_ground_search: 1.0
+
+perception_3d_global:
+  ros__parameters:
+    global_frame: "map"
+    robot_base_frame: "base_link"
+    max_obstacle_distance: 9999.0
+    inscribed_radius: 0.5
+    inflation_descending_rate: 2.0
+    inflation_radius: 1.5
+    sensors_collected_frequency: 20.0
+    plugins: ["map", "gpu_lidar"]
+    dgraph_publish_frequency: 5.0
+    map:
+      plugin: "perception_3d::StaticLayer"
+      is_local_planner: false
+      use_adaptive_connection: false #If true: the neighbors of node is sparse, it will automatically increase search radius.
+      adaptive_connection_number: 20
+      radius_of_ground_connection: 1.5 #If use_adaptive_connection=false, the radius search of the node is applied.
+      intensity_search_radius: 1.0 #this value is suggested to be 1.0 meters, because if it is too large, the narrow passage will be miscalculated
+      intensity_search_punish_weight: 0.1 #the weight for a node. Set this value higher means we dont like path planning cross a orphan node.
+      static_imposing_radius: 1.5 #use map to add weight on each ground node
+      map_topic: "map1/mapcloud"
+      ground_topic: "map1/mapground"
+      support:
+        mapping_mode: false
+          #if mapping mode is true, edge detection is automatically disabled
+        enable_edge_detection: true
+        generate_static_graph: false
+          #the connection radius will be used
+          #enable this value when using super dense ground say ground voxel size<=10 cm
+
+    gpu_lidar:
+      plugin: "perception_3d::MultiLayerSpinningLidar"
+      is_local_planner: false
+      topic: "cloud"
+      pub_gbl_marking_for_visualization: true
+      vertical_FOV_top: 30.0
+      vertical_FOV_bottom: -30.0
+      scan_effective_positive_start: 0.0
+      scan_effective_positive_end: 180.0
+      scan_effective_negative_start: -0.0
+      scan_effective_negative_end: -180.0
+      euclidean_cluster_extraction_tolerance: 0.1
+      euclidean_cluster_minimum_accepted_size: 5
+      xy_resolution: 0.05
+      height_resolution: 0.05
+      marking_height: 2.0
+      marking_minimum_height: 0.05
+      perception_window_size: 3.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
+      segmentation_ignore_ratio: 1.1 #f a segmentation match static pc with this ratio, we ignore it. ex: a wall
+      expected_sensor_time: 0.1
+
+global_planner:
+  ros__parameters:
+    turning_weight: 0.1 #Punish the zig-zag path
+    enable_detail_log: false
+    a_star_expanding_radius: 0.4
+
+#if we use get_dwa_plan in global_plan_manager, we setup parameters for dwa_global_planner
+dynamic_window_aware_global_planner:
+  ros__parameters:
+    look_ahead_distance: 2.0
+    recompute_frequency: 2.0
+    
