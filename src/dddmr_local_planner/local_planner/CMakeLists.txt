@@ -96,6 +96,17 @@ ament_target_dependencies(local_planner_play_ground_node
   ${dependencies}
 )
 
+#ackermann_play_ground_node
+add_executable(ackermann_play_ground_node
+  src/ackermann_play_ground_node.cpp
+)
+target_link_libraries(ackermann_play_ground_node 
+  local_planner
+)
+ament_target_dependencies(ackermann_play_ground_node
+  ${dependencies}
+)
+
 install(TARGETS
   local_planner
   ARCHIVE DESTINATION lib
@@ -107,6 +118,7 @@ install(TARGETS
 install(TARGETS
   local_planner_node
   local_planner_play_ground_node
+  ackermann_play_ground_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 

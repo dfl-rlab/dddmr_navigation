@@ -39,6 +39,7 @@
 
 #include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
+#include <ackermann_msgs/msg/ackermann_drive_stamped.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 /*For tf2::matrix3x3 as quaternion to euler*/
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>

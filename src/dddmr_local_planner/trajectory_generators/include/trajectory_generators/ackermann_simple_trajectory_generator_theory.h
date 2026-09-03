@@ -29,8 +29,8 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include <trajectory_generators/trajectory_generator_theory.h>
-#include <trajectory_generators/dd_simple_trajectory_generator_limits.h>
-#include <trajectory_generators/dd_simple_trajectory_generator_params.h>
+#include <trajectory_generators/ackermann_simple_trajectory_generator_limits.h>
+#include <trajectory_generators/ackermann_simple_trajectory_generator_params.h>
 #include <trajectory_generators/velocity_iterator.h>
 
 /*getMinMax3D*/
@@ -39,18 +39,14 @@
 namespace trajectory_generators
 {
 
-class DDSimpleTrajectoryGeneratorTheory: public TrajectoryGeneratorTheory{
+class AckermannSimpleTrajectoryGeneratorTheory: public TrajectoryGeneratorTheory{
 
   public:
     
-    DDSimpleTrajectoryGeneratorTheory();
-    virtual size_t getSamplingSize();
-    virtual void getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj);
+    AckermannSimpleTrajectoryGeneratorTheory();
+
     virtual bool hasMoreTrajectories();
     virtual bool nextTrajectory(base_trajectory::Trajectory& _traj);
-    void expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
-                        std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
-                          base_trajectory::Trajectory& best_traj) override;
 
   private:
     void initialise();
@@ -68,12 +64,13 @@ class DDSimpleTrajectoryGeneratorTheory: public TrajectoryGeneratorTheory{
     virtual void onInitialize();
     virtual void configurateActuatorType();
     
-    std::shared_ptr<trajectory_generators::DDTrajectoryGeneratorLimits> limits_;
-    std::shared_ptr<trajectory_generators::DDTrajectoryGeneratorParams> params_;
+    std::shared_ptr<trajectory_generators::AckermannTrajectoryGeneratorLimits> limits_;
+    std::shared_ptr<trajectory_generators::AckermannTrajectoryGeneratorParams> params_;
 
     unsigned int next_sample_index_;
     // to store sample params of each sample between init and generation
     std::vector<Eigen::Vector3f> sample_params_;
+    bool debug_trajectory_;
 };
 
 }//end of name space

@@ -28,54 +28,50 @@
 * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#ifndef DDDMR_SYS_CORE_ENUM_STATES_H
-#define DDDMR_SYS_CORE_ENUM_STATES_H
 
-#include <geometry_msgs/msg/pose_stamped.hpp>
-#include <geometry_msgs/msg/transform_stamped.hpp>
-#include <geometry_msgs/msg/twist.hpp>
-#include <tf2_ros/buffer.h>
+#ifndef _ACKERMANN_SIMPLE_TRAJECTORY_GENERATOR_PARAMS_H__
+#define _ACKERMANN_SIMPLE_TRAJECTORY_GENERATOR_PARAMS_H__
 
-#include "rclcpp_action/rclcpp_action.hpp"
-#include "dddmr_sys_core/action/p_to_p_move_base.hpp"
+#include <Eigen/Core>
+//@ pcl for cuboid
+#include <pcl/point_cloud.h>
 
-namespace dddmr_sys_core {
+namespace trajectory_generators
+{
+class AckermannTrajectoryGeneratorParams
+{
+public:
 
-  typedef rclcpp_action::Server<dddmr_sys_core::action::PToPMoveBase> PToPMoveBaseActionServer;
+  double controller_frequency;
+  double sim_time;
+  double linear_x_sample;
+  double angular_z_sample;
+  double sim_granularity;
+  double angular_sim_granularity;
+  pcl::PointCloud<pcl::PointXYZ> cuboid;
 
-  enum PlannerState {
-    TF_FAIL,
-    PRUNE_PLAN_FAIL,
-    ALL_TRAJECTORIES_FAIL,
-    PERCEPTION_MALFUNCTION,
-    TRAJECTORY_FOUND,
-    PATH_BLOCKED_WAIT,
-    PATH_BLOCKED_REPLANNING,
-    CONFIGURATION_ERROR
-  };
+  AckermannTrajectoryGeneratorParams() {}
 
-  enum RecoveryState {
-    RECOVERY_BEHAVIOR_NOT_FOUND,
-    INTERRUPT_BY_CANCEL,
-    INTERRUPT_BY_NEW_GOAL,
-    RECOVERY_DONE,
-    RECOVERY_FAIL
-  };
+  AckermannTrajectoryGeneratorParams(
+      double ncontroller_frequency,
+      double nsim_time,
+      double nlinear_x_sample,
+      double nangular_z_sample,
+      double nsim_granularity,
+      double nangular_sim_granularity):
+        controller_frequency(ncontroller_frequency),
+        sim_time(nsim_time),
+        linear_x_sample(nlinear_x_sample),
+        angular_z_sample(nangular_z_sample),
+        sim_granularity(nsim_granularity),
+        angular_sim_granularity(nangular_sim_granularity)
 
-  enum ActuatorType{
-    MOTOR,
-    STEERING
-  };
+{}
 
-  class dddmr_enum_states
-  {
-  private:
-    /* data */
-  public:
-    dddmr_enum_states();
-    ~dddmr_enum_states();
-  };
-  
-};  // namespace dddmr_sys_core
+  ~AckermannTrajectoryGeneratorParams() {}
 
-#endif  // dddmr_sys_core_BASE_P2P_LOCAL_PLANNER_H
+
+};
+
+}
+#endif // _ACKERMANN_SIMPLE_TRAJECTORY_GENERATOR_PARAMS_H__

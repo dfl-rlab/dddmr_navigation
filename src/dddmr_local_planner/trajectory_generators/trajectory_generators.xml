@@ -13,6 +13,10 @@
       <description>TBW</description>
     </class>
 
+    <class type="trajectory_generators::AckermannSimpleTrajectoryGeneratorTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
+      <description>Ackermann bicycle-model trajectory generator with three-layer steering bounds</description>
+    </class>
+
     <class type="trajectory_generators::OneStateTrajectoryGeneratorTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
       <description>TBW</description>
     </class>

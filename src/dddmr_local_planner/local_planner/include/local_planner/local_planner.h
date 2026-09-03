@@ -84,6 +84,8 @@ class Local_Planner : public rclcpp::Node {
       void updateGlobalPose();
       geometry_msgs::msg::TransformStamped getGlobalPose();
       std::string getControlFrame();
+
+      void syncRobotState(nav_msgs::msg::Odometry& odom, ackermann_msgs::msg::AckermannDriveStamped& ackermann_drive_state);
       
     private: 
       
@@ -103,7 +105,7 @@ class Local_Planner : public rclcpp::Node {
       std::string robot_frame_;
       std::string odom_topic_;
       std::string odom_topic_qos_;
-      std::string ackermann_topic_;
+      std::string steering_state_topic_;
 
       /*For cuboid visualization*/
       visualization_msgs::msg::MarkerArray robot_cuboid_;
@@ -136,11 +138,11 @@ class Local_Planner : public rclcpp::Node {
 
       /*Sub*/
       rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_ros_sub_;
-      rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr ackermann_drive_ros_sub_;
+      rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr steering_state_ros_sub_;
       
       /*cb*/
       void cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg);
-      void cbAckermannDrive(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg);
+      void cbSteeringState(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg);
 
       void trajectory2posearray_cuboids(const base_trajectory::Trajectory& a_traj, 
                                       geometry_msgs::msg::PoseArray& pose_arr,
@@ -150,8 +152,6 @@ class Local_Planner : public rclcpp::Node {
       //void normal2quaternion();
       void prunePlan(double forward_distance, double backward_distance);
       double getDistanceBTWPoseStamp(const geometry_msgs::msg::PoseStamped& a, const geometry_msgs::msg::PoseStamped& b);
-
-      bool compute_best_trajectory_in_odomCb_;
 
       /* Variables for prune. I have no idea to put these variables now.
          This should be optimize in future. The variables affect the control behavior.

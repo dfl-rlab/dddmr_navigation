@@ -52,14 +52,11 @@ void Local_Planner::initial(
   declare_parameter("odom_topic_qos", rclcpp::ParameterValue("reliable"));
   this->get_parameter("odom_topic_qos", odom_topic_qos_);
   RCLCPP_INFO(this->get_logger(), "odom_topic_qos: %s", odom_topic_qos_.c_str());
-
-  declare_parameter("ackermann_drive_topic", rclcpp::ParameterValue("ackermann_drive"));
-  this->get_parameter("ackermann_drive_topic", ackermann_topic_);
-  RCLCPP_INFO(this->get_logger(), "ackermann_drive_topic: %s", ackermann_topic_.c_str());
-
-  declare_parameter("compute_best_trajectory_in_odomCb", rclcpp::ParameterValue(false));
-  this->get_parameter("compute_best_trajectory_in_odomCb", compute_best_trajectory_in_odomCb_);
-  RCLCPP_INFO(this->get_logger(), "compute_best_trajectory_in_odomCb: %d", compute_best_trajectory_in_odomCb_);
+  
+  //@ subscibe steering angle/velocity from ackermann vehicle
+  declare_parameter("steering_state_topic", rclcpp::ParameterValue("steering_state_topic"));
+  this->get_parameter("steering_state_topic", steering_state_topic_);
+  RCLCPP_INFO(this->get_logger(), "steering_state_topic: %s", steering_state_topic_.c_str());
 
   declare_parameter("forward_prune", rclcpp::ParameterValue(1.0));
   this->get_parameter("forward_prune", forward_prune_);
@@ -136,9 +133,9 @@ void Local_Planner::initial(
       std::bind(&Local_Planner::cbOdom, this, std::placeholders::_1), sub_options);
   }
   
-  ackermann_drive_ros_sub_ = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>(
-      ackermann_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).durability_volatile().best_effort(),
-      std::bind(&Local_Planner::cbAckermannDrive, this, std::placeholders::_1), sub_options);
+  steering_state_ros_sub_ = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>(
+      steering_state_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).durability_volatile().best_effort(),
+      std::bind(&Local_Planner::cbSteeringState, this, std::placeholders::_1), sub_options);
 
   //@Initial pcl ptr
   pcl_global_plan_.reset(new pcl::PointCloud<pcl::PointXYZ>);
@@ -194,18 +191,19 @@ void Local_Planner::parseCuboid(){
   }
 }
 
+void Local_Planner::syncRobotState(nav_msgs::msg::Odometry& odom, ackermann_msgs::msg::AckermannDriveStamped& ackermann_drive_state){
+  odom = robot_state_;
+  ackermann_drive_state = ackermann_drive_state_;
+}
+
 void Local_Planner::cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
   robot_state_ = *msg;
   updateGlobalPose();
-  if(compute_best_trajectory_in_odomCb_){
-    base_trajectory::Trajectory best_traj;
-    computeVelocityCommand("differential_drive_simple", best_traj);
-  }
   got_odom_ = true;
 }
 
-void Local_Planner::cbAckermannDrive(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg){
+void Local_Planner::cbSteeringState(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg){
   ackermann_drive_state_ = *msg;
   updateGlobalPose();
 }

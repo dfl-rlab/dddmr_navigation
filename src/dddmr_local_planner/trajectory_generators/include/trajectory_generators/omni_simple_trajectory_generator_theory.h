@@ -67,7 +67,8 @@ class OmniSimpleTrajectoryGeneratorTheory: public TrajectoryGeneratorTheory{
   protected:
 
     virtual void onInitialize();
-
+    virtual void configurateActuatorType();
+    
     std::shared_ptr<trajectory_generators::OmniTrajectoryGeneratorLimits> limits_;
     std::shared_ptr<trajectory_generators::OmniTrajectoryGeneratorParams> params_;
 

@@ -1,0 +1,122 @@
+# Ackermann PlayGround Config
+# Based on local_planner_play_ground.yaml, swapped DD → Ackermann
+local_planner_play_ground:
+  ros__parameters:
+    odom_topic: odom
+    forward_prune: 3.0
+    backward_prune: 1.0
+    heading_tracking_distance: 0.5
+    heading_align_angle: 0.5
+    prune_plane_timeout: 3.0
+    xy_goal_tolerance: 0.3
+    yaw_goal_tolerance: 0.3
+    controller_frequency: 10.0
+    
+    cuboid:
+      flb: [0.25, 0.10, 0.0]   # front left bottom  (1/10 scale)
+      frb: [0.25, -0.10, 0.0]
+      flt: [0.25, 0.10, 0.15]
+      frt: [0.25, -0.10, 0.15]
+      blb: [-0.25, 0.10, 0.0]
+      brb: [-0.25, -0.10, 0.0]
+      blt: [-0.25, 0.10, 0.15]
+      brt: [-0.25, -0.10, 0.15]
+
+    # --- Simulation inputs (click point to trigger) ---
+    sim_speed: 0.5                # m/s current vehicle speed
+    sim_steering_angle: 0.0       # rad current steering angle
+    vis_wheelbase: 0.3            # m  for steering line visualization
+
+    # --- Footprint display ---
+    footprint_display_ratio: 0.01 # 5% of poses show footprint (head/mid/tail guaranteed)
+
+    # --- Obstacle points (8 points, placed ~0.3m ahead) ---
+    obstacle_x: [1.10, 1.12, 1.14, 1.16, 1.13, 1.15, 1.11, 1.17]
+    obstacle_y: [0.54, 0.52, 0.56, 0.50, 0.48, 0.53, 0.49, 0.55]
+    obstacle_z: [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
+
+# No recovery behaviors for Ackermann (cannot rotate in place)
+recovery_behaviors:
+  ros__parameters:
+    plugins: []
+
+trajectory_generators:
+  ros__parameters:
+    plugins: ["ackermann_simple"]
+    ackermann_simple:
+      plugin: "trajectory_generators::AckermannSimpleTrajectoryGeneratorTheory"
+      # --- speed limits ---
+      max_vel_x: 1.0          # m/s  (low speed test)
+      min_vel_x: 0.1
+      acc_lim_x: 3.0           # m/s²
+      deceleration_ratio: 2.0
+      debug_trajectory: true  # Set to true to print key indicators for each trajectory in real time
+
+      # --- Ackermann specific ---
+      max_steer_rad: 0.342     # ≈19.6°
+      wheelbase: 0.3           # m (1/10 scale)
+      max_lat_accel: 0.0       # 0 = disabled (no g-g cap for low speed test)
+      max_steering_rate: 0.0   # 0 = disabled (no rate DW for simplicity)
+
+      # --- sampling ---
+      controller_frequency: 10.0
+      sim_time: 3.0
+      linear_x_sample: 5.0
+      angular_z_sample: 5.0    # odd number → includes δ=0 center sample
+      sim_granularity: 0.05
+
+      # --- Unused DD Legacy Parameters (Commented out / not used by Ackermann) ---
+      # min_vel_theta: 0.0       # Now defaults to 0.0 in source code, safe to omit
+      # max_vel_theta: 0.342     # NOT used by Ackermann (uses max_steer_rad instead)
+      # acc_lim_theta: 0.5       # NOT used by Ackermann (uses max_steering_rate instead)
+      # angular_sim_granularity: 0.05  # NOT used by Ackermann (sim_steps uses sim_granularity only)
+      # use_motor_constraint: false
+      # max_motor_shaft_rpm: 3000.0
+      # wheel_diameter: 0.16
+      # gear_ratio: 1.0
+      # robot_radius: 0.25
+
+      # --- cuboid (1/10 scale) ---
+      cuboid:
+        flb: [0.25, 0.10, 0.0]
+        frb: [0.25, -0.10, 0.0]
+        flt: [0.25, 0.10, 0.15]
+        frt: [0.25, -0.10, 0.15]
+        blb: [-0.25, 0.10, 0.0]
+        brb: [-0.25, -0.10, 0.0]
+        blt: [-0.25, 0.10, 0.15]
+        brt: [-0.25, -0.10, 0.15]
+
+mpc_critics:
+  ros__parameters:
+    plugins: ["collision", "stick_path", "pure_pursuit", "toward_global_plan"]
+    collision:
+      plugin: "mpc_critics::CollisionModel"
+      trajectory_generator: ackermann_simple
+      weight: 1.0
+    stick_path:
+      plugin: "mpc_critics::StickPathModel"
+      trajectory_generator: ackermann_simple
+      weight: 0.1
+    pure_pursuit:
+      plugin: "mpc_critics::PurePursuitModel"
+      trajectory_generator: ackermann_simple
+      translation_weight: 1.0
+      orientation_weight: 0.01
+    toward_global_plan:
+      plugin: "mpc_critics::TowardGlobalPlanModel"
+      trajectory_generator: ackermann_simple
+      weight: 1.0
+
+perception_3d_local:
+  ros__parameters:
+    global_frame: "map"
+    robot_base_frame: "base_link"
+    max_obstacle_distance: 9999.0
+    inscribed_radius: 0.15
+    inflation_descending_rate: 2.0
+    inflation_radius: 0.3
+    sensors_collected_frequency: 5.0
+    plugins: ["map"]
+    map:
+      plugin: "perception_3d::StaticLayer"

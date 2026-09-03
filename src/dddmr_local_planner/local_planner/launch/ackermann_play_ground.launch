@@ -1,0 +1,20 @@
+<launch>
+
+  <node pkg="mcl_3dl" exec="pcl_publisher" output="screen" respawn="false">
+    <param from="$(find-pkg-share mcl_3dl)/config/pcl_publisher.yaml" />
+    <param name="map_dir" value="$(find-pkg-share perception_3d)/map/map.pcd" />
+    <param name="ground_dir" value="$(find-pkg-share perception_3d)/map/ground.pcd" />
+  </node>
+    
+  <!--Ackermann PlayGround Node — uses ackermann config-->
+  <node pkg="local_planner" exec="ackermann_play_ground_node" output="screen" respawn="false">
+    <param from="$(find-pkg-share local_planner)/config/local_planner_play_ground_ackermann.yaml" />
+  </node>
+
+  <let name="rviz_config" value="$(find-pkg-share local_planner)/rviz/ackermann_play_ground.rviz"/>
+  <node name="rviz2" pkg="rviz2" exec="rviz2" args="-d $(var rviz_config)"/>
+
+  <!--- TF -->
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="map2baselink" args="0.0 0.0 0.0 0.0 0.0 0.0 /map /base_link" />
+
+</launch>

@@ -85,7 +85,7 @@ void P2PMoveBase::initial(const std::shared_ptr<local_planner::Local_Planner>& l
   else{
     cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 1);
   }
-  
+  stamped_ackermann_drive_pub_ = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("ackermann_drive_cmd", 1);
 
   tf_listener_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   action_server_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -170,22 +170,45 @@ void P2PMoveBase::publishZeroVelocity(){
   else{
     cmd_vel_pub_->publish(cmd_vel);
   }
+
+  ackermann_msgs::msg::AckermannDriveStamped ackermann_drive_cmd;
+  ackermann_drive_cmd.header.frame_id = LP_->getControlFrame();
+  ackermann_drive_cmd.header.stamp = clock_->now();
+  ackermann_drive_cmd.drive.speed = 0.0;
+  ackermann_drive_cmd.drive.steering_angle = ackermann_drive_state_.drive.steering_angle;
+  ackermann_drive_cmd.drive.steering_angle_velocity = 0.0;
+  stamped_ackermann_drive_pub_->publish(ackermann_drive_cmd);
 }
 
-void P2PMoveBase::publishVelocity(double vx, double vy, double angular_z){
-  geometry_msgs::msg::Twist cmd_vel;
-  cmd_vel.linear.x = vx;
-  cmd_vel.linear.y = vy;
-  cmd_vel.angular.z = angular_z;
-  if(STATE_->use_twist_stamped_){
-    geometry_msgs::msg::TwistStamped stamped_cmd_vel;
-    stamped_cmd_vel.header.frame_id = LP_->getControlFrame();
-    stamped_cmd_vel.header.stamp = clock_->now();
-    stamped_cmd_vel.twist = cmd_vel;
-    stamped_cmd_vel_pub_->publish(stamped_cmd_vel);
+void P2PMoveBase::publishVelocity(const base_trajectory::Trajectory& cmd_traj){
+
+  if(cmd_traj.actuator_type_ == dddmr_sys_core::ActuatorType::MOTOR){
+    geometry_msgs::msg::Twist cmd_vel;
+    cmd_vel.linear.x = cmd_traj.xv_;
+    cmd_vel.linear.y = cmd_traj.yv_;
+    cmd_vel.angular.z = cmd_traj.thetav_;
+    if(STATE_->use_twist_stamped_){
+      geometry_msgs::msg::TwistStamped stamped_cmd_vel;
+      stamped_cmd_vel.header.frame_id = LP_->getControlFrame();
+      stamped_cmd_vel.header.stamp = clock_->now();
+      stamped_cmd_vel.twist = cmd_vel;
+      stamped_cmd_vel_pub_->publish(stamped_cmd_vel);
+    }
+    else{
+      cmd_vel_pub_->publish(cmd_vel);
+    }
+  }
+  else if(cmd_traj.actuator_type_ == dddmr_sys_core::ActuatorType::STEERING){
+    ackermann_msgs::msg::AckermannDriveStamped ackermann_drive_cmd;
+    ackermann_drive_cmd.header.frame_id = LP_->getControlFrame();
+    ackermann_drive_cmd.header.stamp = clock_->now();
+    ackermann_drive_cmd.drive.speed = cmd_traj.xv_;
+    ackermann_drive_cmd.drive.steering_angle = cmd_traj.steering_angle_;
+    ackermann_drive_cmd.drive.steering_angle_velocity = cmd_traj.steering_angle_velocity_;
+    stamped_ackermann_drive_pub_->publish(ackermann_drive_cmd);
   }
   else{
-    cmd_vel_pub_->publish(cmd_vel);
+    RCLCPP_WARN(this->get_logger(), "Actuator type is not defined in Commanding Trajectory!, Robot will be going to move.");
   }
 }
 
@@ -265,6 +288,8 @@ void P2PMoveBase::executeCb(const std::shared_ptr<rclcpp_action::ServerGoalHandl
 bool P2PMoveBase::executeCycle(const std::shared_ptr<rclcpp_action::ServerGoalHandle<dddmr_sys_core::action::PToPMoveBase>> goal_handle){
 
     STATE_->global_pose_ = LP_->getGlobalPose();
+    LP_->syncRobotState(robot_state_, ackermann_drive_state_);
+
     if(STATE_->getDistance(STATE_->global_pose_, STATE_->oscillation_pose_) >= STATE_->oscillation_distance_ ||
           STATE_->getAngle(STATE_->global_pose_, STATE_->oscillation_pose_) >= STATE_->oscillation_angle_)
     {
@@ -337,7 +362,7 @@ bool P2PMoveBase::executeCycle(const std::shared_ptr<rclcpp_action::ServerGoalHa
         if(PS == dddmr_sys_core::PlannerState::TRAJECTORY_FOUND){
           STATE_->last_valid_control_ = clock_->now();
           STATE_->setDecision("d_align_heading");  
-          publishVelocity(best_traj.xv_, best_traj.yv_, best_traj.thetav_);
+          publishVelocity(best_traj);
           return false;
         }
         else if(PS == dddmr_sys_core::PlannerState::PERCEPTION_MALFUNCTION){
@@ -419,7 +444,7 @@ bool P2PMoveBase::executeCycle(const std::shared_ptr<rclcpp_action::ServerGoalHa
         if(PS == dddmr_sys_core::PlannerState::TRAJECTORY_FOUND){
           STATE_->last_valid_control_ = clock_->now();
           STATE_->setDecision("d_align_goal_heading");  
-          publishVelocity(best_traj.xv_, best_traj.yv_, best_traj.thetav_);
+          publishVelocity(best_traj);
           return false;
         }
         else if(PS == dddmr_sys_core::PlannerState::PERCEPTION_MALFUNCTION){
@@ -508,7 +533,7 @@ bool P2PMoveBase::executeCycle(const std::shared_ptr<rclcpp_action::ServerGoalHa
       if(PS == dddmr_sys_core::PlannerState::TRAJECTORY_FOUND){
         STATE_->last_valid_control_ = clock_->now();
         STATE_->setDecision("d_controlling");  
-        publishVelocity(best_traj.xv_, best_traj.yv_, best_traj.thetav_);
+        publishVelocity(best_traj);
         return false;
       }
       else if(PS == dddmr_sys_core::PlannerState::PERCEPTION_MALFUNCTION){

@@ -85,12 +85,13 @@ class P2PMoveBase : public rclcpp::Node {
 
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr stamped_cmd_vel_pub_;
+    rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr stamped_ackermann_drive_pub_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr mb_state_pub_;
 
     bool isQuaternionValid(const geometry_msgs::msg::Quaternion& q);
 
     void publishZeroVelocity();
-    void publishVelocity(double vx, double vy, double angular_z);
+    void publishVelocity(const base_trajectory::Trajectory& cmd_traj);
 
     std::shared_ptr<p2p_move_base::State> STATE_;
     std::shared_ptr<local_planner::Local_Planner> LP_;
@@ -113,6 +114,8 @@ class P2PMoveBase : public rclcpp::Node {
     bool is_recoverying_succeed_;
     void startRecoveryBehaviors(std::string behavior_name);
 
+    nav_msgs::msg::Odometry robot_state_;
+    ackermann_msgs::msg::AckermannDriveStamped ackermann_drive_state_;
 
 };
 
