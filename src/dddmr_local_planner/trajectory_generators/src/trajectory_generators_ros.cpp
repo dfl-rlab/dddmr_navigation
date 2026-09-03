@@ -112,21 +112,6 @@ void Trajectory_Generators_ROS::expertScoring(std::string pname,
 }
 
 
-/**
- * Create and return the next sample trajectory
- */
-bool Trajectory_Generators_ROS::hasMoreTrajectories(std::string pname) {
-  
-  return stacked_generator_->hasMoreTrajectories(pname);
-}
-
-/**
- * Create and return the next sample trajectory
- */
-bool Trajectory_Generators_ROS::nextTrajectory(std::string pname, base_trajectory::Trajectory& comp_traj) {
-  return stacked_generator_->nextTrajectory(pname, comp_traj);
-}
-
 void Trajectory_Generators_ROS::initializeTheories_wi_Shared_data() {
 
   stacked_generator_->initializeTheories_wi_Shared_data();

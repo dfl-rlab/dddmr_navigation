@@ -60,8 +60,6 @@ class StackedGenerator{
                       std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
                         base_trajectory::Trajectory& best_traj);
     
-    bool hasMoreTrajectories(std::string pname);
-    bool nextTrajectory(std::string pname, base_trajectory::Trajectory& comp_traj);
     bool theoryExists(std::string pname);
     // Provide a typedef to ease future code maintenance
     typedef std::recursive_mutex theory_mutex_t;

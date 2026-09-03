@@ -229,15 +229,10 @@ dddmr_sys_core::RecoveryState RotateInPlaceBehavior::runBehavior(
 
     trajectories_ = std::make_shared<std::vector<base_trajectory::Trajectory>>();
 
-    //@ We queue all trajectories in trajectories_, then score them one by one in getBestTrajectory()
-    while(trajectory_generators_ros_->hasMoreTrajectories(trajectory_generator_name_)){
-      base_trajectory::Trajectory a_traj;
-      if(trajectory_generators_ros_->nextTrajectory(trajectory_generator_name_, a_traj)){
-        //@ collected all trajectories here, for later scoring
-        trajectories_->push_back(a_traj);
+    trajectory_generators_ros_->generateAllTrajectories(trajectory_generator_name_, trajectories_);
+    for (auto& a_traj : *trajectories_) {
+      if(a_traj.getPosesSize()>1)
         trajectory2posearray_cuboids(a_traj, pose_arr, cuboids_pcl);
-      }
-
     }
 
     pose_arr.header.frame_id = perception_3d_ros_->getGlobalUtils()->getGblFrame();

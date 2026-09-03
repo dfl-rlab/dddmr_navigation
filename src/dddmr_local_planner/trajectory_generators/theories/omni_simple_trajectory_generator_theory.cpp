@@ -355,38 +355,6 @@ void OmniSimpleTrajectoryGeneratorTheory::getSamplingTrajectoryByIndex(size_t in
   generateTrajectory(sample_params_[index], _traj);
 }
 
-bool OmniSimpleTrajectoryGeneratorTheory::hasMoreTrajectories(){
-  return next_sample_index_ < sample_params_.size();
-}
-
-bool OmniSimpleTrajectoryGeneratorTheory::nextTrajectory(base_trajectory::Trajectory& _traj){
-  bool result = false;
-  /*
-  Because generateTrajectory will return false when sample params are not satisfied, 
-  the function will just sweep without generating any trajectory
-  */
-  bool generated_once = false;
-  if (hasMoreTrajectories()) {
-    
-    if (generateTrajectory(
-        sample_params_[next_sample_index_],
-        _traj)) {
-      result = true;
-      generated_once = true;
-    }
-    else{
-      _traj.resetPoses();
-    }
-    
-  }
-  else{
-    if(!generated_once)
-      RCLCPP_ERROR(node_->get_logger().get_child(name_), "None of trajectory is generated, maybe acc is too small or check the generateTrajectory function.");
-  }
-  next_sample_index_++;
-  return result;
-}
-
 /**
  * @param pos current position of robot
  * @param vel desired velocity for sampling
