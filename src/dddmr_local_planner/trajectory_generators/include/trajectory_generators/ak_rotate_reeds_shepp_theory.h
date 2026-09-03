@@ -89,9 +89,9 @@ private:
   void prepareSelectedCycle();
   bool buildReferencePlan(RSCandidate& candidate) const;
   bool buildTrajectory(base_trajectory::Trajectory& trajectory);
-  bool selectCandidate(char first_steer, const geometry_msgs::msg::PoseStamped& target,
+  bool selectCandidate(const geometry_msgs::msg::PoseStamped& target,
                        RSCandidate& candidate) const;
-  bool selectCandidateFromPose(char first_steer, double start_x, double start_y,
+  bool selectCandidateFromPose(double start_x, double start_y,
                                double start_yaw,
                                const geometry_msgs::msg::PoseStamped& target,
                                RSCandidate& candidate) const;
@@ -100,8 +100,7 @@ private:
   void publishCandidateMarkers(const std::vector<RSCandidate>& candidates,
                                double minimum_turn_radius) const;
   void clearActivePlan();
-  bool createActivePlan(PlanSide side,
-                        const geometry_msgs::msg::PoseStamped& target);
+  bool createActivePlan(const geometry_msgs::msg::PoseStamped& target);
   bool advanceElapsedStep();
   double candidateCost(const RSCandidate& candidate) const;
 
@@ -138,7 +137,6 @@ private:
   double closed_maneuver_reset_timeout_;
   double goal_heading_distance_;
   double forward_first_penalty_;
-  PlanSide initial_side_;
   PlanSide active_side_;
   bool active_plan_valid_;
   std::deque<RSControlStep> remaining_steps_;

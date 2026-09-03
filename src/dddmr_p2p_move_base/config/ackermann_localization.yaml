@@ -246,7 +246,6 @@ trajectory_generators:
       closed_maneuver_reset_timeout: 1.0 # New x/y anchor after this unused time [s].
       goal_heading_distance: 0.5      # Match local_planner.xy_goal_tolerance: use final goal quaternion inside it; otherwise use local path tangent [m].
       forward_first_penalty: 0.5     # [m] Larger = prefer reverse first; 0 disables.
-      initial_side: "left"            # First route for every new heading maneuver: "left" or "right".
 
       # -----------------------------------------------------------------
       # Fallback: the previous Ackermann turning-arc generator.

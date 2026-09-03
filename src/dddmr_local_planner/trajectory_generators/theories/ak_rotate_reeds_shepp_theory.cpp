@@ -65,7 +65,6 @@ AKRotateReedsSheppTheory::AKRotateReedsSheppTheory()
       closed_maneuver_reset_timeout_(1.00),
       goal_heading_distance_(0.30),
       forward_first_penalty_(0.0),
-      initial_side_(PlanSide::LEFT),
       active_side_(PlanSide::LEFT),
       active_plan_valid_(false),
       active_plan_total_steps_(0),
@@ -126,22 +125,6 @@ void AKRotateReedsSheppTheory::onInitialize()
   node_->get_parameter(name_ + ".forward_first_penalty",
                        forward_first_penalty_);
 
-  node_->declare_parameter(name_ + ".initial_side",
-                           rclcpp::ParameterValue("left"));
-  std::string initial_side;
-  node_->get_parameter(name_ + ".initial_side", initial_side);
-  if (initial_side == "left") {
-    initial_side_ = PlanSide::LEFT;
-  }
-  else if (initial_side == "right") {
-    initial_side_ = PlanSide::RIGHT;
-  }
-  else {
-    RCLCPP_FATAL(node_->get_logger().get_child(name_),
-                 "initial_side must be 'left' or 'right'.");
-  }
-  active_side_ = initial_side_;
-
   if (rs_speed_ <= 0.0 || limits_->wheelbase <= 0.0 ||
       limits_->max_steer_rad <= 0.0 || path_resolution_ <= 0.0 ||
       forward_first_penalty_ < 0.0 ||
@@ -164,8 +147,8 @@ void AKRotateReedsSheppTheory::onInitialize()
               closed_heading_maneuver_ ? "enabled" : "disabled",
               closed_maneuver_reset_timeout_, goal_heading_distance_);
   RCLCPP_INFO(node_->get_logger().get_child(name_),
-              "RS FIFO queue: initial_side=%s; each command advances after its planned duration.",
-              initial_side_ == PlanSide::LEFT ? "left" : "right");
+              "RS FIFO queue: choose the lowest-cost candidate from both sides; "
+              "each command advances after its planned duration.");
 
   candidate_markers_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(
       "ak_rotate_reeds_shepp_candidates", rclcpp::QoS(1).transient_local());
@@ -208,7 +191,6 @@ void AKRotateReedsSheppTheory::updateClosedHeadingTarget(
   }
 
   clearActivePlan();
-  active_side_ = initial_side_;
   closed_target_x_ = shared_data_->robot_pose_.transform.translation.x;
   closed_target_y_ = shared_data_->robot_pose_.transform.translation.y;
   const bool is_goal_heading = isGoalHeadingManeuver(target);
@@ -226,9 +208,8 @@ void AKRotateReedsSheppTheory::updateClosedHeadingTarget(
   has_closed_heading_target_ = true;
 
   RCLCPP_INFO(node_->get_logger().get_child(name_),
-              "RS path change: new %s-heading maneuver, target_yaw=%.3f, reset to %s side.",
-              is_goal_heading ? "goal" : "initial", closed_target_yaw_,
-              active_side_ == PlanSide::LEFT ? "left" : "right");
+              "RS path change: new %s-heading maneuver, target_yaw=%.3f.",
+              is_goal_heading ? "goal" : "initial", closed_target_yaw_);
 }
 
 bool AKRotateReedsSheppTheory::isGoalHeadingManeuver(
@@ -304,7 +285,6 @@ void AKRotateReedsSheppTheory::prepareSelectedCycle()
       (now - last_rs_trajectory_time_).seconds() > closed_maneuver_reset_timeout_;
   if (start_new_maneuver) {
     clearActivePlan();
-    active_side_ = initial_side_;
     has_closed_heading_target_ = false;
   }
   updateClosedHeadingTarget(target);
@@ -313,10 +293,9 @@ void AKRotateReedsSheppTheory::prepareSelectedCycle()
     advanceElapsedStep();
   }
 
-  if (!active_plan_valid_ && !createActivePlan(active_side_, target)) {
+  if (!active_plan_valid_ && !createActivePlan(target)) {
     RCLCPP_WARN_THROTTLE(node_->get_logger().get_child(name_), *node_->get_clock(),
-                         1000, "Cannot create %s Reeds-Shepp command queue.",
-                         active_side_ == PlanSide::LEFT ? "left" : "right");
+                         1000, "Cannot create Reeds-Shepp command queue.");
     return;
   }
 
@@ -371,11 +350,10 @@ void AKRotateReedsSheppTheory::clearActivePlan()
 }
 
 bool AKRotateReedsSheppTheory::createActivePlan(
-    PlanSide side, const geometry_msgs::msg::PoseStamped& target)
+    const geometry_msgs::msg::PoseStamped& target)
 {
   RSCandidate candidate;
-  const char first_steer = side == PlanSide::LEFT ? 'L' : 'R';
-  if (!selectCandidate(first_steer, target, candidate) ||
+  if (!selectCandidate(target, candidate) ||
       !buildReferencePlan(candidate)) {
     return false;
   }
@@ -385,7 +363,8 @@ bool AKRotateReedsSheppTheory::createActivePlan(
   if (remaining_steps_.empty()) {
     return false;
   }
-  active_side_ = side;
+  active_side_ = candidate.segments.front().steer == 'L'
+      ? PlanSide::LEFT : PlanSide::RIGHT;
   active_plan_total_steps_ = remaining_steps_.size();
   active_plan_cost_ = candidateCost(candidate);
   active_plan_valid_ = true;
@@ -438,18 +417,16 @@ double AKRotateReedsSheppTheory::candidateCost(
 }
 
 bool AKRotateReedsSheppTheory::selectCandidate(
-    char first_steer, const geometry_msgs::msg::PoseStamped& target,
-    RSCandidate& candidate) const
+    const geometry_msgs::msg::PoseStamped& target, RSCandidate& candidate) const
 {
   const auto& current = shared_data_->robot_pose_.transform;
-  return selectCandidateFromPose(first_steer, current.translation.x,
-                                 current.translation.y,
+  return selectCandidateFromPose(current.translation.x, current.translation.y,
                                  yawFromQuaternion(current.rotation), target,
                                  candidate);
 }
 
 bool AKRotateReedsSheppTheory::selectCandidateFromPose(
-    char first_steer, double start_x, double start_y, double start_yaw,
+    double start_x, double start_y, double start_yaw,
     const geometry_msgs::msg::PoseStamped& target,
     RSCandidate& candidate) const
 {
@@ -475,15 +452,8 @@ bool AKRotateReedsSheppTheory::selectCandidateFromPose(
 
   auto candidates = generateCandidates(x, y, phi);
   // Publish every original RS candidate before the existing selection logic
-  // filters by first steering direction and cost.
+  // ranks them by cost.
   publishCandidateMarkers(candidates, minimum_turn_radius);
-  candidates.erase(
-      std::remove_if(candidates.begin(), candidates.end(),
-                     [first_steer](const RSCandidate& path) {
-                       return path.segments.empty() ||
-                              path.segments.front().steer != first_steer;
-                     }),
-      candidates.end());
   if (candidates.empty()) {
     return false;
   }

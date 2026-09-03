@@ -7,9 +7,11 @@ Panels:
         - /Map1/Topic1
         - /WeightGround1/Topic1
         - /SubMap1/Topic1
+        - /Axes1
         - /mcl_euc_cluster1/Topic1
         - /GlobalMarking1/Topic1
         - /PoseArray2
+        - /MarkerArray2
       Splitter Ratio: 0.5823529362678528
     Tree Height: 1793
   - Class: rviz_common/Selection
@@ -208,7 +210,7 @@ Visualization Manager:
       Enabled: true
       Length: 0.5
       Name: Axes
-      Radius: 0.05000000074505806
+      Radius: 0.019999999552965164
       Reference Frame: base_link
       Value: true
     - Alpha: 1
@@ -510,6 +512,18 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /ak_rotate_reeds_shepp/rs_candidates
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray
+      Namespaces:
+        ak_rotate_reeds_shepp_candidates: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ak_rotate_reeds_shepp_candidates
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -555,26 +569,21 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rviz_default_plugins/ThirdPersonFollower
-      Distance: 5.438283920288086
+      Angle: 0
+      Class: rviz_default_plugins/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
-      Focal Point:
-        X: 0.6245518922805786
-        Y: 0.6802365779876709
-        Z: 0
-      Focal Shape Fixed Size: true
-      Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.5697963237762451
+      Scale: 551.77587890625
       Target Frame: <Fixed Frame>
-      Value: ThirdPersonFollower (rviz_default_plugins)
-      Yaw: 5.097386837005615
+      Value: TopDownOrtho (rviz_default_plugins)
+      X: 0.5125229954719543
+      Y: 4.525424003601074
     Saved: ~
 Window Geometry:
   Displays:
