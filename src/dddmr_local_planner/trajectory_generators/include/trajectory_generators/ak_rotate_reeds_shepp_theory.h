@@ -37,6 +37,7 @@
 #include <vector>
 
 #include <rclcpp/rclcpp.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include <trajectory_generators/trajectory_generator_theory.h>
 #include <trajectory_generators/ackermann_simple_trajectory_generator_limits.h>
@@ -96,6 +97,8 @@ private:
                                RSCandidate& candidate) const;
   std::vector<RSCandidate> generateCandidates(double x, double y,
                                               double phi) const;
+  void publishCandidateMarkers(const std::vector<RSCandidate>& candidates,
+                               double minimum_turn_radius) const;
   void clearActivePlan();
   bool createActivePlan(PlanSide side,
                         const geometry_msgs::msg::PoseStamped& target);
@@ -153,6 +156,8 @@ private:
   bool selection_cycle_prepared_;
   unsigned int next_trajectory_index_;
   std::vector<base_trajectory::Trajectory> trajectories_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
+      candidate_markers_pub_;
 };
 
 }  // namespace trajectory_generators

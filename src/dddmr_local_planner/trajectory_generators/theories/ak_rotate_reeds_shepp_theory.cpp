@@ -35,6 +35,9 @@
 #include <cmath>
 #include <limits>
 
+#include <geometry_msgs/msg/point.hpp>
+#include <visualization_msgs/msg/marker.hpp>
+
 PLUGINLIB_EXPORT_CLASS(trajectory_generators::AKRotateReedsSheppTheory,
                        trajectory_generators::TrajectoryGeneratorTheory)
 
@@ -163,6 +166,9 @@ void AKRotateReedsSheppTheory::onInitialize()
   RCLCPP_INFO(node_->get_logger().get_child(name_),
               "RS FIFO queue: initial_side=%s; each command advances after its planned duration.",
               initial_side_ == PlanSide::LEFT ? "left" : "right");
+
+  candidate_markers_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(
+      "ak_rotate_reeds_shepp_candidates", rclcpp::QoS(1).transient_local());
 
   // CollisionModel depends on this exact oriented-cuboid point ordering.
   params_->cuboid.push_back(readCuboidPoint("blb"));
@@ -468,6 +474,9 @@ bool AKRotateReedsSheppTheory::selectCandidateFromPose(
   const double phi = mod2pi(target_yaw - start_yaw);
 
   auto candidates = generateCandidates(x, y, phi);
+  // Publish every original RS candidate before the existing selection logic
+  // filters by first steering direction and cost.
+  publishCandidateMarkers(candidates, minimum_turn_radius);
   candidates.erase(
       std::remove_if(candidates.begin(), candidates.end(),
                      [first_steer](const RSCandidate& path) {
@@ -558,6 +567,65 @@ AKRotateReedsSheppTheory::generateCandidates(double x, double y,
     }
   }
   return candidates;
+}
+
+void AKRotateReedsSheppTheory::publishCandidateMarkers(
+    const std::vector<RSCandidate>& candidates,
+    double minimum_turn_radius) const
+{
+  if (!candidate_markers_pub_) {
+    return;
+  }
+
+  static const std::array<std::array<float, 3>, 12> kColors = {{
+      {{0.90F, 0.10F, 0.10F}}, {{0.10F, 0.35F, 0.95F}},
+      {{0.10F, 0.75F, 0.25F}}, {{0.95F, 0.60F, 0.05F}},
+      {{0.60F, 0.15F, 0.85F}}, {{0.05F, 0.75F, 0.75F}},
+      {{0.85F, 0.20F, 0.55F}}, {{0.55F, 0.80F, 0.10F}},
+      {{0.95F, 0.45F, 0.35F}}, {{0.20F, 0.20F, 0.20F}},
+      {{0.45F, 0.30F, 0.85F}}, {{0.20F, 0.55F, 0.45F}},
+  }};
+
+  visualization_msgs::msg::MarkerArray markers;
+  visualization_msgs::msg::Marker clear;
+  clear.header = shared_data_->robot_pose_.header;
+  clear.ns = "ak_rotate_reeds_shepp_candidates";
+  clear.action = visualization_msgs::msg::Marker::DELETEALL;
+  markers.markers.push_back(clear);
+
+  for (std::size_t i = 0; i < candidates.size(); ++i) {
+    RSCandidate visual_candidate = candidates[i];
+    for (auto& segment : visual_candidate.segments) {
+      segment.length *= minimum_turn_radius;
+    }
+    visual_candidate.total_length *= minimum_turn_radius;
+    if (!buildReferencePlan(visual_candidate)) {
+      continue;
+    }
+
+    visualization_msgs::msg::Marker marker;
+    marker.header = shared_data_->robot_pose_.header;
+    marker.ns = "ak_rotate_reeds_shepp_candidates";
+    marker.id = static_cast<int>(i);
+    marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    marker.pose.orientation.w = 1.0;
+    marker.scale.x = 0.035;
+    marker.color.r = kColors[i % kColors.size()][0];
+    marker.color.g = kColors[i % kColors.size()][1];
+    marker.color.b = kColors[i % kColors.size()][2];
+    marker.color.a = 1.0;
+
+    for (const auto& step : visual_candidate.steps) {
+      geometry_msgs::msg::Point point;
+      point.x = step.pose.pose.position.x;
+      point.y = step.pose.pose.position.y;
+      point.z = step.pose.pose.position.z + 0.05;
+      marker.points.push_back(point);
+    }
+    markers.markers.push_back(marker);
+  }
+  candidate_markers_pub_->publish(markers);
 }
 
 bool AKRotateReedsSheppTheory::lpSpLp(double x, double y, double phi,
