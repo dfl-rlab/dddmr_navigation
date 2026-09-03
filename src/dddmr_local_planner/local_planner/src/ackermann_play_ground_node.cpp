@@ -360,8 +360,8 @@ void AckermannPlayGround::trajectory2posearray_cuboids(
     const base_trajectory::Trajectory &a_traj,
     geometry_msgs::msg::PoseArray &pose_arr,
     pcl::PointCloud<pcl::PointXYZ> &cuboids_pcl) {
-  for (unsigned int i = 0; i < a_traj.getPointsSize(); i++) {
-    auto p = a_traj.getPoint(i);
+  for (unsigned int i = 0; i < a_traj.getPosesSize(); i++) {
+    auto p = a_traj.getPose(i);
     pose_arr.poses.push_back(p.pose);
   }
 }
@@ -475,13 +475,10 @@ void AckermannPlayGround::cbClickedPoint(
   pcl::PointCloud<pcl::PointXYZ> cuboids_pcl;
   trajectories_ = std::make_shared<std::vector<base_trajectory::Trajectory>>();
 
-  while (trajectory_generators_ros_->hasMoreTrajectories("ackermann_simple")) {
-    base_trajectory::Trajectory a_traj;
-    if (trajectory_generators_ros_->nextTrajectory("ackermann_simple",
-                                                   a_traj)) {
-      trajectories_->push_back(a_traj);
+  trajectory_generators_ros_->generateAllTrajectories("ackermann_simple", trajectories_);
+  for (auto& a_traj : *trajectories_) {
+    if(a_traj.getPosesSize()>1)
       trajectory2posearray_cuboids(a_traj, pose_arr, cuboids_pcl);
-    }
   }
 
   RCLCPP_INFO(this->get_logger(),
@@ -503,13 +500,13 @@ void AckermannPlayGround::cbClickedPoint(
   marker_id = 0;
 
   for (auto &traj : *trajectories_) {
-    int n = traj.getPointsSize();
+    int n = traj.getPosesSize();
     if (n <= 0) continue;
     std::set<int> display_idx = getDisplayIndices(n);
     double steer_angle = traj.thetav_; // steering angle δ for this trajectory
 
     for (int idx : display_idx) {
-      auto pt = traj.getPoint(idx);
+      auto pt = traj.getPose(idx);
       addFootprintMarker(footprint_ma, marker_id, pt.pose, steer_angle,
                          gbl_frame);
     }

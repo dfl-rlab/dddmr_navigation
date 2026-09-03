@@ -100,40 +100,6 @@ void StackedGenerator::expertScoring(std::string pname,
 }
 
 /**
- * Create and return the next sample trajectory
- */
-bool StackedGenerator::hasMoreTrajectories(std::string pname) {
-
-  if(theories_.find( pname ) != theories_.end()){
-    return theories_[pname]->hasMoreTrajectories();
-  }
-  else{
-    RCLCPP_FATAL(logger_->get_logger(), "Trajectory plugin name is not in the theories: %s", pname.c_str());
-    return false;
-  }
-
-  
-}
-
-/**
- * Create and return the next sample trajectory
- */
-bool StackedGenerator::nextTrajectory(std::string pname, base_trajectory::Trajectory& comp_traj) {
-
-  if(theories_[pname]->hasMoreTrajectories())
-  {
-    if(theories_[pname]->nextTrajectory(comp_traj)){
-      return true;
-    }
-    else
-      return false;
-  }
-  else
-    return false;
-
-}
-
-/**
  * Return existence of theory for the sanity check
  */
 bool StackedGenerator::theoryExists(std::string pname){

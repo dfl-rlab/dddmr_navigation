@@ -512,35 +512,12 @@ bool AckermannSimpleTrajectoryGeneratorTheory::isMotorConstraintSatisfied(
   return true;
 }
 
-bool AckermannSimpleTrajectoryGeneratorTheory::hasMoreTrajectories() {
-  return next_sample_index_ < sample_params_.size();
+size_t AckermannSimpleTrajectoryGeneratorTheory::getSamplingSize(){
+  return sample_params_.size();
 }
 
-bool AckermannSimpleTrajectoryGeneratorTheory::nextTrajectory(
-    base_trajectory::Trajectory &_traj) {
-  bool result = false;
-  /*
-  Because generateTrajectory will return false when sample params are not
-  satisfied, the function will just sweep without generating any trajectory
-  */
-  bool generated_once = false;
-  if (hasMoreTrajectories()) {
-
-    if (generateTrajectory(sample_params_[next_sample_index_], _traj)) {
-      result = true;
-      generated_once = true;
-    } else {
-      _traj.resetPoints();
-    }
-
-  } else {
-    if (!generated_once)
-      RCLCPP_ERROR(node_->get_logger().get_child(name_),
-                   "None of trajectory is generated, maybe acc is too small or "
-                   "check the generateTrajectory function.");
-  }
-  next_sample_index_++;
-  return result;
+void AckermannSimpleTrajectoryGeneratorTheory::getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj){
+  generateTrajectory(sample_params_[index], _traj);
 }
 
 /**
@@ -559,7 +536,7 @@ bool AckermannSimpleTrajectoryGeneratorTheory::generateTrajectory(
   double eps = 1e-4;
   traj.cost_ = 0.0; // placed here in case we return early
   // trajectory might be reused so we'll make sure to reset it
-  traj.resetPoints();
+  traj.resetPoses();
 
   // make sure that the robot would at least be moving with one of
   // the required minimum velocities for translation and rotation (if set)
@@ -666,7 +643,7 @@ bool AckermannSimpleTrajectoryGeneratorTheory::generateTrajectory(
     base_trajectory::cuboid_min_max_t cuboid_min_max;
     pcl::getMinMax3D(pc_out, cuboid_min_max.first, cuboid_min_max.second);
 
-    if (!traj.addPoint(ros_pose, pc_out, cuboid_min_max)) {
+    if (!traj.addPoseCuboid(ros_pose, pc_out, cuboid_min_max)) {
       return false;
     }
 
@@ -683,5 +660,11 @@ Eigen::Vector3f AckermannSimpleTrajectoryGeneratorTheory::computeNewPositions(
   //@ Ackermann bicycle model: yaw_rate = v * tan(δ) / L
   new_pos[2] = pos[2] + vel[0] * tan(vel[2]) / limits_->wheelbase * dt;
   return new_pos;
+}
+void AckermannSimpleTrajectoryGeneratorTheory::expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
+                                            std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
+                                              base_trajectory::Trajectory& best_traj){
+  //use default scoring
+  TrajectoryGeneratorTheory::expertScoring(accepted_trajectories, rejected_trajectories, best_traj); 
 }
 } // namespace trajectory_generators

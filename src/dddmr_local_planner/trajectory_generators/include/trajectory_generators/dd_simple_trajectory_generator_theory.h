@@ -46,8 +46,6 @@ class DDSimpleTrajectoryGeneratorTheory: public TrajectoryGeneratorTheory{
     DDSimpleTrajectoryGeneratorTheory();
     virtual size_t getSamplingSize();
     virtual void getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj);
-    virtual bool hasMoreTrajectories();
-    virtual bool nextTrajectory(base_trajectory::Trajectory& _traj);
     void expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
                         std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
                           base_trajectory::Trajectory& best_traj) override;

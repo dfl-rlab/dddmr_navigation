@@ -58,8 +58,6 @@ class TrajectoryGeneratorTheory{
     
     virtual size_t getSamplingSize() = 0;
     virtual void getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj) = 0;
-    virtual bool hasMoreTrajectories() = 0;
-    virtual bool nextTrajectory(base_trajectory::Trajectory& _traj) = 0;
     //@ initialise is used for stacked generators to call every time to initialize the genertator
     virtual void initialise() = 0;
 

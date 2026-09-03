@@ -208,7 +208,7 @@ void P2PMoveBase::publishVelocity(const base_trajectory::Trajectory& cmd_traj){
     stamped_ackermann_drive_pub_->publish(ackermann_drive_cmd);
   }
   else{
-    RCLCPP_WARN(this->get_logger(), "Actuator type is not defined in Commanding Trajectory!, Robot will be going to move.");
+    RCLCPP_WARN(this->get_logger(), "Actuator type is not defined in Commanding Trajectory!, Robot will not going to move.");
   }
 }
 

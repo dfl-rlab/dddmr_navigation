@@ -246,15 +246,10 @@ void PlayGround::cbClickedPoint(const geometry_msgs::msg::PointStamped::SharedPt
 
   trajectories_ = std::make_shared<std::vector<base_trajectory::Trajectory>>();
 
-  //@ Generate trajectory by differential_drive_simple which is defined in config ---> local_planner_play_ground.yaml line: 63-64
-  while(trajectory_generators_ros_->hasMoreTrajectories("differential_drive_simple")){
-    base_trajectory::Trajectory a_traj;
-    if(trajectory_generators_ros_->nextTrajectory("differential_drive_simple", a_traj)){
-      //@ collected all trajectories here, for later scoring
-      trajectories_->push_back(a_traj);
+  trajectory_generators_ros_->generateAllTrajectories("differential_drive_simple", trajectories_);
+  for (auto& a_traj : *trajectories_) {
+    if(a_traj.getPosesSize()>1)
       trajectory2posearray_cuboids(a_traj, pose_arr, cuboids_pcl);
-    }
-
   }
 
   pose_arr.header.frame_id = perception_3d_ros_->getGlobalUtils()->getGblFrame();
@@ -271,7 +266,6 @@ void PlayGround::cbClickedPoint(const geometry_msgs::msg::PointStamped::SharedPt
   //@ keep below for easy migration for ROS2
   mpc_critics_ros_->getSharedDataPtr()->robot_pose_ = trans_gbl2b;
   mpc_critics_ros_->getSharedDataPtr()->robot_state_ = robot_state;
-
 
   //@ Create a point cloud block in front of robot, so some trajectories will be reject due to collision model --> local_planner_play_ground.yaml line: 98-99
   pcl::PointCloud<pcl::PointXYZI>::Ptr obstacle;
