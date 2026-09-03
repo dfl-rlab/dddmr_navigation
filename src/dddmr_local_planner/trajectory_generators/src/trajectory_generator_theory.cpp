@@ -47,5 +47,21 @@ void TrajectoryGeneratorTheory::setSharedData(std::shared_ptr<trajectory_generat
   shared_data_ = shared_data;
 }
 
+void TrajectoryGeneratorTheory::expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
+                                                std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
+                                                  base_trajectory::Trajectory& best_traj){
+
+    best_traj.cost_ = -1;
+    best_traj.xv_ = 0.0;
+    best_traj.yv_ = 0.0;
+    double minimum_cost = 9999999;
+
+    for(auto& a_traj:accepted_trajectories){
+      if(a_traj.getPosesSize()>0 && a_traj.cost_>=0 && a_traj.cost_<=minimum_cost){
+        best_traj = a_traj;
+        minimum_cost = a_traj.cost_;
+      }
+    }
+}
 
 }//end of name space

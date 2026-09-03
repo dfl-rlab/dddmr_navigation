@@ -59,11 +59,11 @@ void PurePursuitModel::onInitialize(){
 
 double PurePursuitModel::scoreTrajectory(base_trajectory::Trajectory &traj){
 
-  if(shared_data_->prune_plan_.poses.empty() || traj.getPointsSize()<2){
+  if(shared_data_->prune_plan_.poses.empty() || traj.getPosesSize()<2){
     return -4.0;  
   }
 
-  geometry_msgs::msg::PoseStamped last_traj_pose = traj.getPoint(traj.getPointsSize()-1);
+  geometry_msgs::msg::PoseStamped last_traj_pose = traj.getPose(traj.getPosesSize()-1);
   geometry_msgs::msg::PoseStamped last_prune_plan_pose = shared_data_->prune_plan_.poses.back();
 
   //@ create tf pose for affine computation

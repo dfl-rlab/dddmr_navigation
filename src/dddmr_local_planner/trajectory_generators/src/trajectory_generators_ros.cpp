@@ -92,6 +92,26 @@ Trajectory_Generators_ROS::~Trajectory_Generators_ROS()
   delete stacked_generator_;
 }
 
+void Trajectory_Generators_ROS::generateAllTrajectories(std::string traj_gen_name, 
+  const std::shared_ptr<std::vector<base_trajectory::Trajectory>>& trajectories_ptr_){
+  size_t sample_size = stacked_generator_->getSamplingSize(traj_gen_name);
+  trajectories_ptr_->resize(sample_size);
+  #pragma omp parallel for if(sample_size > 1000)
+  for(size_t i=0; i<sample_size; i++){
+    stacked_generator_->getSamplingTrajectoryByIndex(traj_gen_name, i, trajectories_ptr_->at(i));
+  }
+
+}
+
+void Trajectory_Generators_ROS::expertScoring(std::string pname, 
+                        std::vector<base_trajectory::Trajectory>& accepted_trajectories,
+                          std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories,
+                            base_trajectory::Trajectory& best_traj){
+
+  stacked_generator_->expertScoring(pname, accepted_trajectories, rejected_trajectories, best_traj);
+}
+
+
 /**
  * Create and return the next sample trajectory
  */

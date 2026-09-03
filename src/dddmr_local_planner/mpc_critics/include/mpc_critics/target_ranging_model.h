@@ -28,43 +28,38 @@
 * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#ifndef TRAJECTORY_SAMPLE_GENERATOR_H_
-#define TRAJECTORY_SAMPLE_GENERATOR_H_
+#ifndef MPC_CRITICS_TARGET_RANGING_MODEL_H_
+#define MPC_CRITICS_TARGET_RANGING_MODEL_H_
 
-/*path for trajectory*/
-#include <base_trajectory/trajectory.h>
+#include <mpc_critics/scoring_model.h>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 
-namespace base_trajectory {
+namespace mpc_critics
+{
 
-/**
- * @class TrajectorySampleGenerator
- * @brief Provides an interface for navigation trajectory generators
- */
-class TrajectorySampleGenerator {
-public:
+class TargetRangingModel: public ScoringModel{
 
-  //virtual void readParameters(std::string name) = 0;
+  public:
+    
+    TargetRangingModel();
+    virtual double scoreTrajectory(base_trajectory::Trajectory &traj);
 
-  /**
-   * Whether this generator can create more trajectories
-   */
-  virtual bool hasMoreTrajectories() = 0;
+  protected:
 
-  /**
-   * Iterate to the next trajectory
-   */
-  virtual bool nextTrajectory(base_trajectory::Trajectory& comp_traj) = 0;
+    virtual void onInitialize();
 
-  /**
-   * @brief  Virtual destructor for the interface
-   */
-  virtual ~TrajectorySampleGenerator() {}
+  private:
 
-protected:
-  TrajectorySampleGenerator() {}
+    void targetPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
 
+    std::string topic_name_;
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr target_pose_sub_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr target_pose_pub_;
+    geometry_msgs::msg::PoseStamped target_pose_;
+    geometry_msgs::msg::TransformStamped target_to_base_tf_;
+    bool got_tf_{false};
 };
 
-} // end namespace
+}//end of name space
 
-#endif /* TRAJECTORY_SAMPLE_GENERATOR_H_ */
+#endif  // MPC_CRITICS_TARGET_RANGING_MODEL_H_

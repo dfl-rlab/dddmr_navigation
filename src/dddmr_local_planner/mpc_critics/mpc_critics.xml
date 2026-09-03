@@ -13,6 +13,10 @@
       <description>TBW</description>
     </class>
 
+    <class type="mpc_critics::TargetRangingModel"  base_class_type="mpc_critics::ScoringModel">
+      <description>TBW</description>
+    </class>
+
     <class type="mpc_critics::PurePursuitModel"  base_class_type="mpc_critics::ScoringModel">
       <description>TBW</description>
     </class>

@@ -29,7 +29,7 @@ find_package(pcl_conversions REQUIRED)
 find_package(base_trajectory REQUIRED)
 
 find_package(PCL REQUIRED)
-
+find_package(OpenMP REQUIRED)
 
 set(dependencies
   rclcpp
@@ -59,6 +59,7 @@ include_directories(
   include
   ${PCL_INCLUDE_DIRS}
   ${base_trajectory_INCLUDE_DIRS}
+  ${OpenMP_CXX_INCLUDE_DIRS}
 )
 
 # trajectory_generator_theory
@@ -67,6 +68,7 @@ add_library(trajectory_generator_theory SHARED
 )
 target_link_libraries(trajectory_generator_theory
   ${PCL_LIBRARIES}
+  OpenMP::OpenMP_CXX
 )
 ament_target_dependencies(trajectory_generator_theory
   ${dependencies}

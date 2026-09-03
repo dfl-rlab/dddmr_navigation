@@ -44,6 +44,12 @@ class Trajectory_Generators_ROS : public rclcpp::Node {
     
     bool hasMoreTrajectories(std::string pname);
     bool nextTrajectory(std::string pname, base_trajectory::Trajectory& comp_traj);
+    void generateAllTrajectories(std::string pname, const std::shared_ptr<std::vector<base_trajectory::Trajectory>>& trajectories_ptr_);
+    void expertScoring(std::string pname, 
+                        std::vector<base_trajectory::Trajectory>& accepted_trajectories,
+                          std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
+                            base_trajectory::Trajectory& best_traj);
+
     void initializeTheories_wi_Shared_data();
 
     std::shared_ptr<trajectory_generators::TrajectoryGeneratorSharedData> getSharedDataPtr(){return stacked_generator_->getSharedDataPtr();}

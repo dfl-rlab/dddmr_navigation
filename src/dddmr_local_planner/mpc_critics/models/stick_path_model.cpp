@@ -59,7 +59,7 @@ double StickPathModel::scoreTrajectory(base_trajectory::Trajectory &traj){
   prune_plan_kdtree.setInputCloud(shared_data_->pcl_prune_plan_);
   int K = 1;
   double normalized_distance = 0.0;
-  for(unsigned int i=0;i<traj.getPointsSize();i++){
+  for(unsigned int i=0;i<traj.getPosesSize();i++){
 
     pcl::PointXYZI pcl_traj_pose = traj.getPCLPoint(i);
     std::vector<int> pointIdxNKNSearch(K);
@@ -73,7 +73,7 @@ double StickPathModel::scoreTrajectory(base_trajectory::Trajectory &traj){
   }
   normalized_distance /= shared_data_->pcl_prune_plan_->points.size();
   //RCLCPP_INFO(this->get_logger(), "Normalized_distance: %f",normalized_distance);
-  return normalized_distance;
+  return normalized_distance * weight_;
 }
 
 }//end of name space

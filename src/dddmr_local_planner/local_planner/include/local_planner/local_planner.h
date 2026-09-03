@@ -168,7 +168,8 @@ class Local_Planner : public rclcpp::Node {
       double controller_frequency_;
 
       rclcpp::Time control_loop_time_;
-
+      
+      std::vector<base_trajectory::Trajectory> accepted_trajectories_;
       std::map<std::string, std::vector<base_trajectory::Trajectory>> rejected_trajectories_;
 
     protected:
