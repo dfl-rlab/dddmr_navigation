@@ -121,3 +121,16 @@ if [ "$d_bag9" != "${d_bag9#[Yy]}" ] ;then
   rm -f confirm.txt cookies.txt
   unzip perception_3d_multilayer_spinning_lidar_gpulidar.zip
 fi
+
+
+echo -n "Do you want to download mapping_jt128_t45 (Y/N):"
+read d_bag10
+if [ "$d_bag10" != "${d_bag10#[Yy]}" ] ;then 
+  echo "Download bag"
+  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='1VE6zUmlT21IA9MIoN36JZYuBUB6w6He2 \
+      | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
+  curl -L -b cookies.txt -o mapping_jt128_t45.zip \
+      'https://drive.usercontent.google.com/download?id='1VE6zUmlT21IA9MIoN36JZYuBUB6w6He2'&confirm='$(<confirm.txt)
+  rm -f confirm.txt cookies.txt
+  unzip mapping_jt128_t45.zip
+fi

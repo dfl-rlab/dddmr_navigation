@@ -243,8 +243,9 @@ int main(int argc, char** argv) {
         MO->run();
         LLV->trans_m2ci_af3_ = MO->trans_m2ci_af3_;
         LLV->has_m2ci_ = true;
-        *(LLV->cloudKeyPoses3D) = *(MO->cloudKeyPoses3D);
-        *(LLV->cloudKeyPoses6D) = *(MO->cloudKeyPoses6D);
+        
+        auto shared_6d_pose = std::make_shared<sensor_msgs::msg::PointCloud2>(MO->cloud_msg_pose_6d_);
+        LLV->cloudKeyPoses6D_callback(shared_6d_pose);
 
         gettimeofday(&inloop, NULL);
         double inloop_t = inloop.tv_sec + double(inloop.tv_usec) / 1e6;

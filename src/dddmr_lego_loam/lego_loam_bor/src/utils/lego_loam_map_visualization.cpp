@@ -153,7 +153,7 @@ void LegoLoamVisualization::processKeyFrameCloudResult(dddmr_sys_core::srv::GetK
   pcl::fromROSMsg(result->key_frame_ground, pcl_ground_cloud);
   if(pcl_ground_cloud.points.size()<1){
     RCLCPP_DEBUG(this->get_logger(), "Empty pcl_ground_cloud");
-    return;
+    //return;
   }
 
   pcl::fromROSMsg(result->key_frame_ground_edge, pcl_ground_edge_cloud);
@@ -225,19 +225,24 @@ void LegoLoamVisualization::pubMapThread()
   }
 
   //@ voxelize final aggregated result to relief communication bandwith
-  auto ds_map_cloud_temp = small_gicp::voxelgrid_sampling_omp(map_cloud, map_voxel_size_, 6);
-  sensor_msgs::msg::PointCloud2 cloud_msg_map;
-  pcl::toROSMsg(*ds_map_cloud_temp, cloud_msg_map);
-  cloud_msg_map.header.stamp = clock_->now();
-  cloud_msg_map.header.frame_id = "map";
-  pubMap->publish(cloud_msg_map);
-  
-  auto ds_ground_cloud_temp = small_gicp::voxelgrid_sampling_omp(ground_cloud, ground_voxel_size_, 6);
-  sensor_msgs::msg::PointCloud2 cloud_msg_ground;
-  pcl::toROSMsg(*ds_ground_cloud_temp, cloud_msg_ground);
-  cloud_msg_ground.header.stamp = clock_->now();
-  cloud_msg_ground.header.frame_id = "map";
-  pubGround->publish(cloud_msg_ground);
+  if(map_cloud.points.size()>5){
+    auto ds_map_cloud_temp = small_gicp::voxelgrid_sampling_omp(map_cloud, map_voxel_size_, 6);
+    sensor_msgs::msg::PointCloud2 cloud_msg_map;
+    pcl::toROSMsg(*ds_map_cloud_temp, cloud_msg_map);
+    cloud_msg_map.header.stamp = clock_->now();
+    cloud_msg_map.header.frame_id = "map";
+    pubMap->publish(cloud_msg_map);
+  }
+
+  if(ground_cloud.points.size()>5){
+    auto ds_ground_cloud_temp = small_gicp::voxelgrid_sampling_omp(ground_cloud, ground_voxel_size_, 6);
+    sensor_msgs::msg::PointCloud2 cloud_msg_ground;
+    pcl::toROSMsg(*ds_ground_cloud_temp, cloud_msg_ground);
+    cloud_msg_ground.header.stamp = clock_->now();
+    cloud_msg_ground.header.frame_id = "map";
+    pubGround->publish(cloud_msg_ground);
+  }
+
 }
 
 void LegoLoamVisualization::groundEdgeDetectionThread() {
@@ -279,6 +284,8 @@ void LegoLoamVisualization::groundEdgeDetectionThread() {
     }
   }
 
+  if(patched_ground->points.size()<5)
+    return;
   //@ generate ground kdtree for edge to search
   
   auto ds_patched_ground_cloud = small_gicp::voxelgrid_sampling_omp(*patched_ground, ground_voxel_size_, 6);

@@ -1,7 +1,8 @@
 bag_reader:
   ros__parameters:
     use_sim_time: true
-    bag_file_dir: "/root/dddmr_bags/dddmr_jt128_odom_bag"
+    bag_file_dir: "/root/dddmr_bags/cicdtest/mapping_jt128_t45"
+    bag_format: "mcap"
     point_cloud_topic: "/lidar_points"
     odometry_topic: "/odom"
     skip_frame: 1
@@ -10,8 +11,8 @@ lego_loam_ip:
   ros__parameters:
     use_sim_time: true
     laser:
-        odom_type: "laser_odometry"         #wheel_odometry/laser_odometry 
-        base_ground_frame: "base_footprint"
+        odom_type: "wheel_odometry"         #wheel_odometry/laser_odometry 
+        baselink_frame: "base_footprint"
         num_vertical_scans: 100
         num_horizontal_scans: 400
         vertical_angle_bottom: 0.0          # degrees
@@ -32,7 +33,7 @@ lego_loam_ip:
         ground_slope_tolerance: 0.3
         
         ground_fov_bottom: 0.0
-        ground_fov_top: 0.6
+        ground_fov_top: 0.61086
         ground_positive_start: 0.0
         ground_positive_stop: 1.5707
         ground_negative_start: 0.0
@@ -66,9 +67,12 @@ lego_loam_mo:
         history_keyframe_fitness_score: 0.2
         
         ground_voxel_size: 0.3
+        ground_edge_threshold_num: 8
+        generate_testing_pg: true
 
 lego_loam_map_visualization:
   ros__parameters:
-    use_sim_time: false
-    ground_voxel_size: 0.3
-    ground_edge_threshold_num: 50
+    use_sim_time: true
+    visualization_detail_level: 0 #0~2, larger number means the map will be denser and detailed. Thist is just for visualization purpose
+    ground_voxel_size: 0.3 #Ground voxel size for path planning when using mapping and navigation together. This does not affect the mapping result when using bag files.
+    map_voxel_size: 0.2 #Only for visualization experience
