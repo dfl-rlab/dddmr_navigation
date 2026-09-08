@@ -24,7 +24,7 @@ We provide multiple bags file for users to quickly configirate their Lidar TF se
 | Robosense Airy | 45 | 0 | |
 | Mid360 | 13 | 0 | |
 | Mid360 | 180 | 180 | Same as rolling=180, usually used in humanoid |
-| Hesai JT128 | x | x | coming soon|
+| Hesai JT128 | 45 (roll) | 90 | Supported in v2.1.0 with rolling correction |
 
 Found the details in our [CICD docs](https://github.com/dfl-rlab/dddmr_navigation/tree/main/CICD_setup#dddmr-lego-loam-ci)
 
@@ -208,5 +208,36 @@ Steps:
 #### Check the demo video:
 
 [![YouTube video thumbnail](https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/pose_graph_editor/merge_yt.png)](https://www.youtube.com/watch?v=QKRoJy30-ds)
-
-</details>
+ 
+ </details>
+ 
+---
+ 
+## 📋 Release Notes
+ 
+### 📦 v2.1.0
+ 
+#### 🔄 Support for Rolling LiDAR Configurations (Hesai JT128)
+- **Automatic Roll & Yaw Decoupling:** Added full support for LiDARs mounted with simultaneous roll and yaw angles (e.g., Hesai JT128 mounted with a 45° roll tilt).
+  - In `ImageProjection`, detects roll + yaw configurations (`fabs(sensor_install_yaw) > 0.0 && fabs(sensor_install_roll) > 0.0`), normalizes the base-to-sensor transform to isolate pure pitch in the LOAM camera coordinate system, and computes the relative offset `ideal_sensor_orientation2sensor`.
+  - Automatically applies horizontal yaw pre-rotation (`trans_lidar2horizontal`) to the raw point cloud before range image projection and feature extraction.
+- **True Sensor TF Reconstruction:** In `MapOptimization::publishTF()`, accurately reconstructs the full TF tree using the ideal sensor orientation (`map -> camera_init -> camera -> ideal_sensor -> actual_sensor -> base_link -> odom`), eliminating coordinate frame drift and map distortion caused by rolling mounts.
+- **Pipeline-Wide Orientation Propagation:** Extended `ProjectionOut` and `AssociationOut` channel data structures in `utility.h` to propagate `ideal_sensor_orientation2sensor` across all processing nodes.
+ 
+#### 🧪 Automated CI/CD Regression Test for Hesai JT128
+- **New Integration Test:** Added `mapping_jt128_t45.py` and configuration `mapping_jt128_t45.yaml` to the automated CI test suite.
+  - Automatically validates mapping accuracy and convergence using ICP scoring against verified ground truth datasets.
+  - Includes `correct_yaml_format_by_ros2_version()` to handle multi-distro bag playback compatibility (Humble through Jazzy+).
+- **Test Coordinate Fixes:** Corrected static transform arguments in `mapping_mid360_t180_test.py` to maintain consistent rotational conventions.
+ 
+#### ⏱️ Odometry & LiDAR Desync Tolerance
+- In `FeatureAssociation::assignMappingOdometry`, added timestamp drift detection between external odometry and LiDAR messages.
+- When timestamp difference exceeds 1.0s (`fabs(odom_time - cloud_time) > 1.0`), the system issues a throttled warning and synchronizes the odometry timestamp to the LiDAR header timestamp, preventing TF extrapolation errors and mapping halts caused by bag time desynchronization.
+ 
+#### ⚡ Thread Safety & Performance Optimizations
+- **Safe 6D Pose Sharing:** Refactored keyframe pose passing between `MapOptimization` and `LegoLoamVisualization` in `lego_loam_bag_node` to use `cloudKeyPoses6D_callback()` with shared pointers instead of direct raw pointer dereferencing.
+- **Sparse Cloud Publishing Guards:** Added safety checks in `LegoLoamVisualization` (`points.size() > 5`) before voxel grid filtering and publishing global map/ground clouds to prevent redundant computations and log warnings on sparse or empty frames.
+- **Reused Message Buffers:** Cached `cloud_msg_pose_6d_` as a class member in `MapOptimization` to reduce memory allocations during keyframe publishing.
+ 
+#### ⚙️ Configuration & Launch Updates
+- Updated `loam_bag_airy_config.yaml` and `lego_loam_bag_airy.launch` defaults for testing Hesai JT128 datasets and rolling mount static transforms.

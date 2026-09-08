@@ -151,3 +151,27 @@ Also you can play around the utils:
 ros2 launch perception_3d pc_delete_utils.launch
 ```
 [![YouTube video thumbnail](https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/perception_3d/point_cloud_delete.png)](https://www.youtube.com/watch?v=kmR9HWOe8NM)
+
+---
+
+## 📋 Release Notes
+
+### 📦 v2.6.0
+
+#### 🧹 Corrected Obstacle Clearing Mechanism (`multilayer_spinning_lidar` Plugin)
+- **Empty Observation Clearing Handling:** Fixed an issue where sparse or empty LiDAR point clouds (`pcl_msg_->points.size() <= 5`) caused `selfMark()` to return prematurely without updating the dynamic graph (`dGraph`), causing cleared obstacles to remain permanently marked.
+  - Introduced `observation_clear_` state tracking. When the sensor field of view is completely clear of obstacles, `updateDGraphInWindow()` is immediately triggered to clear stale ground costs.
+  - In `selfClear()`, ray casting now accurately identifies clear observations without requiring fallback KDTree checks, clearing previous markings cleanly.
+- **Eliminated Self-Blocking During Ray Casting:** Removed artificial cluster centroids from being added to the global point cloud (`pcl_msg_gbl_->push_back(pt_centroid)`). Previously, ray tracing could collide with its own cluster centroids and falsely treat the ray as blocked, skipping clearing.
+- **Sparse Marking KDTree Search Fallback (`radiusSearchWiCheck`):**
+  - Resolved FLANN/KDTree lookup failures on sparse clouds (< 5 points) in `KDTreeMarking`.
+  - Introduced `radiusSearchWiCheck()`: utilizes `kdtree_marking_->radiusSearch()` when points > 5, and seamlessly falls back to exact Euclidean distance iteration when <= 5 points remain, guaranteeing all marked obstacles are discovered and cleared down to the last point.
+- **Safe Dynamic Graph Updates (`updateDGraphInWindow`):**
+  - Consolidated perception-window centroid extraction, KDTree rebuilding, and ground inflation into `updateDGraphInWindow()`.
+  - Added an early return in `KDTreeMarking::updateDGraph()` when `centroids_for_dgraph` is empty, ensuring ground costs are cleared without attempting redundant point cloud projections.
+
+#### 🧪 Automated CI/CD Regression Test for GPU LiDAR
+- **New Static Clearing & Marking Test:** Added `perception_3d_multilayer_spinning_lidar_gpulidar_static.py` and `perception_3d_multilayer_spinning_lidar_gpulidar_static.yaml` to the automated CI test suite.
+  - Validates obstacle detection, dynamic graph updates, and clearing behavior with simulated GPU LiDARs in static environments.
+  - Includes multi-distro bag compatibility helper `correct_yaml_format_by_ros2_version()` supporting ROS 2 Humble through Jazzy+.
+- **Test Node State Initialization:** Initialized `latest_pc_time_` in `perception_3d_multilayer_spinning_lidar_lethal_test_node.cpp` to prevent timeout race conditions at startup.
