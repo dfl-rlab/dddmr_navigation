@@ -132,6 +132,8 @@ class MultiLayerSpinningLidar: public Sensor{
     
     /*For casting visualization*/
     void addCastingMarker(const pcl::PointXYZ& pt, size_t id, visualization_msgs::msg::MarkerArray& markerArray);
+    
+    void updateDGraphInWindow();
 
     /*pcl msg in cb*/
     pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_msg_;
@@ -191,6 +193,8 @@ class MultiLayerSpinningLidar: public Sensor{
     std::list<pcl::PointCloud<pcl::PointXYZ>> pcl_stitcher_;
 
     std_msgs::msg::Header last_sensor_receiving_time_;
+
+    bool observation_clear_;
 
 };
 

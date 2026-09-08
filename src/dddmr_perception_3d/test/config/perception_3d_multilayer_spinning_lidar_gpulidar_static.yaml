@@ -1,0 +1,86 @@
+perception_3d_multilayer_spinning_lidar_lethal_test_node:
+  ros__parameters:
+    check_points:
+      p1: [1.06, -2.81, -0.3]
+    search_radius: 0.2
+    
+dddmr_pg_map_server_manager:
+  ros__parameters:
+    maps: ["map1"]
+
+map1:
+  ros__parameters:
+    pose_graph_dir: "/root/dddmr_bags/cicdtest/perception_3d_multilayer_spinning_lidar_gpulidar_static/pg"
+    complete_map_voxel_size: 0.3
+
+sub_maps:
+  ros__parameters:
+    use_sim_time: true
+    pg_map_server_name: "map1" #options from line#3
+    sub_map_search_radius: 50.0
+    sub_map_warmup_trigger_distance: 20.0
+
+perception_3d_global:
+  ros__parameters:
+    global_frame: "map"
+    robot_base_frame: "base_footprint"
+    max_obstacle_distance: 9999.0
+    inscribed_radius: 0.5
+    inflation_descending_rate: 2.0
+    inflation_radius: 1.5
+    sensors_collected_frequency: 20.0
+    plugins: ["map", "gpu_lidar"]
+    dgraph_publish_frequency: 5.0
+    map:
+      plugin: "perception_3d::StaticLayer"
+      is_local_planner: false
+      use_adaptive_connection: false #If true: the neighbors of node is sparse, it will automatically increase search radius.
+      adaptive_connection_number: 20
+      radius_of_ground_connection: 1.5 #If use_adaptive_connection=false, the radius search of the node is applied.
+      intensity_search_radius: 1.0 #this value is suggested to be 1.0 meters, because if it is too large, the narrow passage will be miscalculated
+      intensity_search_punish_weight: 0.1 #the weight for a node. Set this value higher means we dont like path planning cross a orphan node.
+      static_imposing_radius: 1.5 #use map to add weight on each ground node
+      map_topic: "map1/mapcloud"
+      ground_topic: "map1/mapground"
+      support:
+        mapping_mode: false
+          #if mapping mode is true, edge detection is automatically disabled
+        enable_edge_detection: true
+        generate_static_graph: false
+          #the connection radius will be used
+          #enable this value when using super dense ground say ground voxel size<=10 cm
+
+    gpu_lidar:
+      plugin: "perception_3d::MultiLayerSpinningLidar"
+      is_local_planner: false
+      topic: "cloud"
+      pub_gbl_marking_for_visualization: true
+      vertical_FOV_top: 30.0
+      vertical_FOV_bottom: -30.0
+      scan_effective_positive_start: 0.0
+      scan_effective_positive_end: 180.0
+      scan_effective_negative_start: -0.0
+      scan_effective_negative_end: -180.0
+      euclidean_cluster_extraction_tolerance: 0.1
+      euclidean_cluster_minimum_accepted_size: 5
+      xy_resolution: 0.05
+      height_resolution: 0.05
+      marking_height: 2.0
+      marking_minimum_height: 0.3
+      perception_window_size: 3.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
+      segmentation_ignore_ratio: 1.1 #f a segmentation match static pc with this ratio, we ignore it. ex: a wall
+      expected_sensor_time: 0.1
+
+
+global_planner:
+  ros__parameters:
+    turning_weight: 0.1 #Punish the zig-zag path
+    enable_detail_log: false
+    a_star_expanding_radius: 0.4
+
+#if we use get_dwa_plan in global_plan_manager, we setup parameters for dwa_global_planner
+dynamic_window_aware_global_planner:
+  ros__parameters:
+    look_ahead_distance: 2.0
+    recompute_frequency: 2.0
+    

@@ -52,7 +52,8 @@ public:
     sub_lethal_cloud_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "perception_3d_global/front_lidar/lethal", 2,
         std::bind(&P3dMplLaserscan::cbLethal, this, std::placeholders::_1));
-
+    
+    latest_pc_time_ = std::chrono::system_clock::now();
     timer_ = this->create_wall_timer(
         100ms, std::bind(&P3dMplLaserscan::testCb, this));
 
@@ -192,6 +193,7 @@ private:
   }
   
   void testCb() {
+    
     switch (current_state_) {
 
     case State::WAIT_B2M_TF: {
