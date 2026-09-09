@@ -50,14 +50,14 @@ mcl_ip:
         segment_valid_point_num: 5
         segment_valid_line_num: 2
         segment_theta: 60.0                      # decrese this value may improve accuracy
-        minimum_detection_range: 0.5
-        maximum_detection_range: 100.0            # point cloud within this range will be used to project image
+        minimum_detection_range: 0.2
+        maximum_detection_range: 6.0            # point cloud within this range will be used to project image
         distance_for_patch_between_rings: 1.0    # patch ground between rings within this range, i.e. ring0 and ring1 is smaller than 1 meter, patch them
         stitcher_num: 0                          # for non-repetitive scan lidar use 2~4 (i.e. mid360)
         trt_model_path: ""                       # provide trt engine for yolo
         projected_image_stack_size: 1            # Stack this number of image for yolo11n to inference as time elapsed yolo (only work when TRT is loaded)
         
-        ground_fov_bottom: -0.2617994 # -15deg
+        ground_fov_bottom: -0.5235988 # -30deg
         ground_fov_top: -0.087266 # -5deg
         ground_positive_start: 0.0
         ground_positive_stop: 3.1415926
@@ -186,14 +186,14 @@ local_planner:
     cuboid:
       # 3x collision footprint in x/y relative to base_link; retain the
       # Gazebo vehicle's real vertical envelope to avoid ground false hits.
-      flb: [0.4455, 0.3000, -0.0365]
-      frb: [0.4455, -0.3000, -0.0365]
-      flt: [0.4455, 0.3000, 0.1200]
-      frt: [0.4455, -0.3000, 0.1200]
-      blb: [-0.4500, 0.3000, -0.0365]
-      brb: [-0.4500, -0.3000, -0.0365]
-      blt: [-0.4500, 0.3000, 0.1200]
-      brt: [-0.4500, -0.3000, 0.1200]
+      flb: [0.42, 0.36, 0.0] #front left buttom
+      frb: [0.42, -0.36, 0.0]
+      flt: [0.42, 0.36, 0.6] #front left top
+      frt: [0.42, -0.36, 0.6]
+      blb: [-0.35, 0.36, 0.0] #back left buttom
+      brb: [-0.35, -0.36, 0.0]
+      blt: [-0.35, 0.36, 0.6]
+      brt: [-0.35, -0.36, 0.6]
 
 recovery_behaviors:
   ros__parameters:
@@ -229,14 +229,14 @@ trajectory_generators:
       sim_granularity: 0.05
       debug_trajectory: false
       cuboid:
-        flb: [0.4455, 0.3000, -0.0365]
-        frb: [0.4455, -0.3000, -0.0365]
-        flt: [0.4455, 0.3000, 0.1200]
-        frt: [0.4455, -0.3000, 0.1200]
-        blb: [-0.4500, 0.3000, -0.0365]
-        brb: [-0.4500, -0.3000, -0.0365]
-        blt: [-0.4500, 0.3000, 0.1200]
-        brt: [-0.4500, -0.3000, 0.1200]
+        flb: [0.42, 0.36, 0.0] #front left buttom
+        frb: [0.42, -0.36, 0.0]
+        flt: [0.42, 0.36, 0.6] #front left top
+        frt: [0.42, -0.36, 0.6]
+        blb: [-0.35, 0.36, 0.0] #back left buttom
+        brb: [-0.35, -0.36, 0.0]
+        blt: [-0.35, 0.36, 0.6]
+        brt: [-0.35, -0.36, 0.6]
     ak_rotate_reeds_shepp:
       plugin: "trajectory_generators::AKRotateReedsSheppTheory"
       # Start with one complete side only. Its fixed RS word is a FIFO queue.
@@ -265,19 +265,19 @@ trajectory_generators:
       # angular_sim_granularity: 0.05
       # -----------------------------------------------------------------
       cuboid:
-        flb: [0.4455, 0.3000, -0.0365]
-        frb: [0.4455, -0.3000, -0.0365]
-        flt: [0.4455, 0.3000, 0.1200]
-        frt: [0.4455, -0.3000, 0.1200]
-        blb: [-0.4500, 0.3000, -0.0365]
-        brb: [-0.4500, -0.3000, -0.0365]
-        blt: [-0.4500, 0.3000, 0.1200]
-        brt: [-0.4500, -0.3000, 0.1200]
+        flb: [0.42, 0.36, 0.0] #front left buttom
+        frb: [0.42, -0.36, 0.0]
+        flt: [0.42, 0.36, 0.6] #front left top
+        frt: [0.42, -0.36, 0.6]
+        blb: [-0.35, 0.36, 0.0] #back left buttom
+        brb: [-0.35, -0.36, 0.0]
+        blt: [-0.35, 0.36, 0.6]
+        brt: [-0.35, -0.36, 0.6]
 
     ak_rotate_inplace:
       plugin: "trajectory_generators::AKRotateInPlaceTheory"
       # Same vehicle model for recovery behavior.
-      rotate_linear_speed: 0.10
+      rotate_linear_speed: 0.20
       wheelbase: 0.2255
       max_steer_rad: 0.37
       max_lat_accel: 0.0
@@ -287,14 +287,14 @@ trajectory_generators:
       sim_granularity: 0.05
       angular_sim_granularity: 0.05
       cuboid:
-        flb: [0.4455, 0.3000, -0.0365]
-        frb: [0.4455, -0.3000, -0.0365]
-        flt: [0.4455, 0.3000, 0.1200]
-        frt: [0.4455, -0.3000, 0.1200]
-        blb: [-0.4500, 0.3000, -0.0365]
-        brb: [-0.4500, -0.3000, -0.0365]
-        blt: [-0.4500, 0.3000, 0.1200]
-        brt: [-0.4500, -0.3000, 0.1200]
+        flb: [0.42, 0.36, 0.0] #front left buttom
+        frb: [0.42, -0.36, 0.0]
+        flt: [0.42, 0.36, 0.6] #front left top
+        frt: [0.42, -0.36, 0.6]
+        blb: [-0.35, 0.36, 0.0] #back left buttom
+        brb: [-0.35, -0.36, 0.0]
+        blt: [-0.35, 0.36, 0.6]
+        brt: [-0.35, -0.36, 0.6]
     
     differential_drive_simple:
       plugin: "trajectory_generators::DDSimpleTrajectoryGeneratorTheory"
@@ -318,14 +318,14 @@ trajectory_generators:
       angular_sim_granularity: 0.025
 
       cuboid:
-        flb: [0.4455, 0.3000, -0.0365]
-        frb: [0.4455, -0.3000, -0.0365]
-        flt: [0.4455, 0.3000, 0.1200]
-        frt: [0.4455, -0.3000, 0.1200]
-        blb: [-0.4500, 0.3000, -0.0365]
-        brb: [-0.4500, -0.3000, -0.0365]
-        blt: [-0.4500, 0.3000, 0.1200]
-        brt: [-0.4500, -0.3000, 0.1200]
+        flb: [0.42, 0.36, 0.0] #front left buttom
+        frb: [0.42, -0.36, 0.0]
+        flt: [0.42, 0.36, 0.6] #front left top
+        frt: [0.42, -0.36, 0.6]
+        blb: [-0.35, 0.36, 0.0] #back left buttom
+        brb: [-0.35, -0.36, 0.0]
+        blt: [-0.35, 0.36, 0.6]
+        brt: [-0.35, -0.36, 0.6]
 
 mpc_critics:
   ros__parameters:
@@ -363,13 +363,13 @@ mpc_critics:
 perception_3d_local:
   ros__parameters:
     global_frame: "map"
-    robot_base_frame: "base_link"
+    robot_base_frame: "base_footprint"
     max_obstacle_distance: 9999.0
     inscribed_radius: 0.5
     inflation_descending_rate: 2.0
     inflation_radius: 1.5
     sensors_collected_frequency: 10.0
-    plugins: ["map", "path_blocked_strategy"]
+    plugins: ["map","lidar"]
     map:
       plugin: "perception_3d::StaticLayer"
       is_local_planner: true
@@ -383,38 +383,41 @@ perception_3d_local:
       plugin: "perception_3d::MultiLayerSpinningLidar"
       is_local_planner: true
       topic: "segmented_cloud_pure"
-      pub_gbl_marking_for_visualization: false
+      pub_gbl_marking_for_visualization: true
       vertical_FOV_top: 30.0
       vertical_FOV_bottom: -30.0
-      scan_effective_positive_start: 30.0
+      scan_effective_positive_start: 0.0
       scan_effective_positive_end: 180.0
-      scan_effective_negative_start: -30.0
+      scan_effective_negative_start: -0.0
       scan_effective_negative_end: -180.0
-      resolution: 0.05
+      euclidean_cluster_extraction_tolerance: 0.1
+      euclidean_cluster_minimum_accepted_size: 5
+      xy_resolution: 0.05
       height_resolution: 0.05
       marking_height: 2.0
-      perception_window_size: 3.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
-      segmentation_ignore_ratio: 0.5 #f a segmentation match static pc with this ratio, we ignore it. ex: a wall
-      expected_sensor_time: 0.2
+      marking_minimum_height: 0.3
+      perception_window_size: 5.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
+      segmentation_ignore_ratio: 1.1 #f a segmentation match static pc with this ratio, we ignore it. ex: a wall
+      expected_sensor_time: 1.0
 
 perception_3d_global:
   ros__parameters:
     global_frame: "map"
-    robot_base_frame: "base_link"
+    robot_base_frame: "base_footprint"
     max_obstacle_distance: 9999.0
     inscribed_radius: 0.5
     inflation_descending_rate: 2.0
     inflation_radius: 1.5
-    sensors_collected_frequency: 10.0
-    plugins: ["map"]
-    dgraph_publish_frequency: 1.0
+    sensors_collected_frequency: 20.0
+    plugins: ["map","gpu_lidar"]
+    dgraph_publish_frequency: 5.0
     map:
       plugin: "perception_3d::StaticLayer"
       is_local_planner: false
       use_adaptive_connection: false #If true: the neighbors of node is sparse, it will automatically increase search radius.
       adaptive_connection_number: 20
       radius_of_ground_connection: 1.5 #If use_adaptive_connection=false, the radius search of the node is applied.
-      intensity_search_radius: 3.0 #this value is suggested to be 1.0 meters, because if it is too large, the narrow passage will be miscalculated
+      intensity_search_radius: 1.0 #this value is suggested to be 1.0 meters, because if it is too large, the narrow passage will be miscalculated
       intensity_search_punish_weight: 0.1 #the weight for a node. Set this value higher means we dont like path planning cross a orphan node.
       static_imposing_radius: 1.5 #use map to add weight on each ground node
       map_topic: "map1/mapcloud"
@@ -426,26 +429,27 @@ perception_3d_global:
         generate_static_graph: false
           #the connection radius will be used
           #enable this value when using super dense ground say ground voxel size<=10 cm
-
-    lidar:
+    gpu_lidar:
       plugin: "perception_3d::MultiLayerSpinningLidar"
       is_local_planner: false
       topic: "segmented_cloud_pure"
       pub_gbl_marking_for_visualization: true
       vertical_FOV_top: 30.0
       vertical_FOV_bottom: -30.0
-      scan_effective_positive_start: 30.0
+      scan_effective_positive_start: 0.0
       scan_effective_positive_end: 180.0
-      scan_effective_negative_start: -30.0
+      scan_effective_negative_start: -0.0
       scan_effective_negative_end: -180.0
       euclidean_cluster_extraction_tolerance: 0.1
-      euclidean_cluster_extraction_min_cluster_size: 1
+      euclidean_cluster_minimum_accepted_size: 5
       xy_resolution: 0.05
       height_resolution: 0.05
       marking_height: 2.0
+      marking_minimum_height: 0.3
       perception_window_size: 5.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
       segmentation_ignore_ratio: 1.1 #f a segmentation match static pc with this ratio, we ignore it. ex: a wall
-      expected_sensor_time: 0.1
+      expected_sensor_time: 1.0
+
 
 global_planner:
   ros__parameters:

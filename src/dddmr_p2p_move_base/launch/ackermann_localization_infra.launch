@@ -24,10 +24,10 @@
   </node>
 
   <!-- 3D Monte Carlo Localization. -->
-  <node pkg="mcl_3dl" exec="mcl_3dl" output="screen" respawn="false">
+  <!--node pkg="mcl_3dl" exec="mcl_3dl" output="screen" respawn="false">
     <param from="$(find-pkg-share p2p_move_base)/config/ackermann_localization.yaml" />
     <param name="use_sim_time" value="$(var use_sim)"/>
-  </node>
+  </node-->
 
   <!-- Odom-only localization: Gazebo /odom is ground truth. -->
   <node pkg="tf2_ros" exec="static_transform_publisher" name="map_to_odom"
