@@ -103,7 +103,8 @@ void KDTreeMarking::removePCPtr(const PointXYZU64& centroid){
 }
 
 void KDTreeMarking::updateDGraph(const pcl::PointCloud<PointXYZU64>::Ptr& centroids_for_dgraph, 
-                                  const std::vector<pcl::index_t>& ground_region_idx){
+                                  const std::vector<pcl::index_t>& ground_region_idx,
+                                    pcl::PointCloud<pcl::PointXYZI>& aggregated_projections_out){
   //if ground region is empty
   //RCLCPP_INFO(rclcpp::get_logger("cluster_marking"),"ground region size: %lu", ground_region_idx.size());
   if(ground_region_idx.size()<1)
@@ -127,6 +128,8 @@ void KDTreeMarking::updateDGraph(const pcl::PointCloud<PointXYZU64>::Ptr& centro
   }
 
   aggregated_projections_ds = small_gicp::voxelgrid_sampling_omp(*aggregated_projections, 0.1, 4);
+  aggregated_projections_out = *aggregated_projections_ds;
+  //RCLCPP_INFO(rclcpp::get_logger("cluster_marking"),"%lu", aggregated_projections_out.points.size());
   pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtree_aggregated_projections_ds(new pcl::KdTreeFLANN<pcl::PointXYZI>());
   if(aggregated_projections_ds->points.size()>5){
     kdtree_aggregated_projections_ds->setInputCloud(aggregated_projections_ds);

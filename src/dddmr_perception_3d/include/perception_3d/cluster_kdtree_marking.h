@@ -150,7 +150,8 @@ class KDTreeMarking{
 
     void updateKDTree();
     void updateDGraph(const pcl::PointCloud<PointXYZU64>::Ptr& centroids_for_dgraph, 
-                                  const std::vector<pcl::index_t>& ground_region_idx);
+                                  const std::vector<pcl::index_t>& ground_region_idx,
+                                    pcl::PointCloud<pcl::PointXYZI>& aggregated_projections_out);
 
     static std::uint64_t convertInt16ToUint64(std::int16_t x, std::int16_t y, std::int16_t z) {
       return (static_cast<std::uint64_t>(static_cast<std::uint16_t>(x)) << 32) |

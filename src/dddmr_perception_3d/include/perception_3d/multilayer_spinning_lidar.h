@@ -195,8 +195,8 @@ class MultiLayerSpinningLidar: public Sensor{
     std_msgs::msg::Header last_sensor_receiving_time_;
 
     bool observation_clear_;
-
+    
+    pcl::PointCloud<pcl::PointXYZI> projected_cloud_clusters_;
 };
-
 }//end of name space
 #endif

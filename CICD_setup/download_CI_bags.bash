@@ -139,10 +139,11 @@ echo -n "Do you want to download perception_3d_multilayer_spinning_lidar_gpulida
 read d_bag11
 if [ "$d_bag11" != "${d_bag11#[Yy]}" ] ;then 
   echo "Download bag"
-  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='1sujBRNK_Es7V02nbn3PvCwubJMcOqN2C \
+  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='1mIJIGwdDQF0AzbRxjiQDBRSqv79YaX8v \
       | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
   curl -L -b cookies.txt -o perception_3d_multilayer_spinning_lidar_gpulidar_static.zip \
-      'https://drive.usercontent.google.com/download?id='1sujBRNK_Es7V02nbn3PvCwubJMcOqN2C'&confirm='$(<confirm.txt)
+      'https://drive.usercontent.google.com/download?id='1mIJIGwdDQF0AzbRxjiQDBRSqv79YaX8v'&confirm='$(<confirm.txt)
   rm -f confirm.txt cookies.txt
   unzip perception_3d_multilayer_spinning_lidar_gpulidar_static.zip
 fi
+
