@@ -77,6 +77,7 @@ struct ProjectionOut
   int vertical_scans;
   int horizontal_scans;
   double scan_period;
+  tf2::Stamped<tf2::Transform> ideal_sensor_orientation2sensor;
 };
 
 
@@ -93,6 +94,7 @@ struct AssociationOut
   nav_msgs::msg::Odometry decisive_odometry; //in the lego_loam definition frame
   nav_msgs::msg::Odometry external_odometry; //external odom, odom->baselink frame
   bool broadcast_odom_tf;
+  tf2::Stamped<tf2::Transform> ideal_sensor_orientation2sensor;
 };
 
 inline void OdometryToTransform(const nav_msgs::msg::Odometry& odometry,

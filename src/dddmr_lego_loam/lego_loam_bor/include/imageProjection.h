@@ -129,7 +129,7 @@ class ImageProjection : public rclcpp::Node
     int first_frame_processed_;
     bool got_baselink2sensor_tf_;
     geometry_msgs::msg::TransformStamped trans_b2s_;
-    tf2::Transform tf2_trans_b2s_, tf2_trans_c2s_;
+    tf2::Stamped<tf2::Transform> tf2_trans_b2s_, tf2_trans_c2s_;
     geometry_msgs::msg::TransformStamped trans_c2s_;
     geometry_msgs::msg::TransformStamped trans_c2b_;
     geometry_msgs::msg::TransformStamped trans_m2ci_;
@@ -171,6 +171,10 @@ class ImageProjection : public rclcpp::Node
 
     bool use_sensor_height_to_filter_out_ground_;
     
+    double yaw_correction_;
+    double pitch_correction_;
+    tf2::Stamped<tf2::Transform> ideal_sensor_orientation2sensor_;
+
 #ifdef TRT_ENABLED
     std::shared_ptr<YoloV8> yolov8_;
 #endif

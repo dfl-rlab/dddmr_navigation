@@ -23,6 +23,7 @@ public:
   void groundEdgeDetectionThread();
   void syncMapAndGroundThread();
   void processKeyFrameCloudResult(dddmr_sys_core::srv::GetKeyFrameCloud::Response::SharedPtr result);
+  void cloudKeyPoses6D_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
   std::vector<pcl::PointCloud<PointType>::Ptr> corner_key_frame_clouds_;
   std::vector<pcl::PointCloud<PointType>::Ptr> surf_key_frame_clouds_;
   std::vector<pcl::PointCloud<PointType>::Ptr> outlier_key_frame_clouds_;
@@ -41,7 +42,6 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubGroundEdge;
 
   void m2ci_callback(const geometry_msgs::msg::TransformStamped::SharedPtr msg);
-  void cloudKeyPoses6D_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
   pcl::PointCloud<PointType>::Ptr transformPointCloud(pcl::PointCloud<PointType>::Ptr cloudIn, PointTypePose *transformIn);
   pcl::PointCloud<PointType>::Ptr transformPointCloudInverse(pcl::PointCloud<PointType>::Ptr cloudIn, PointTypePose *transformIn);
 

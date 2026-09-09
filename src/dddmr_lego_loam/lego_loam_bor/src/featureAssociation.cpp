@@ -1353,6 +1353,12 @@ void FeatureAssociation::assignMappingOdometry(float (&ts)[6]){
     //-------------------------------------------
     quat_tf.setRPY(ts[2], -ts[0], -ts[1]);
     tf2::convert(quat_tf, geoQuat);
+    double odom_time = static_cast<double>(exteralOdometry.header.stamp.sec) + static_cast<double>(exteralOdometry.header.stamp.nanosec) * 1e-9;
+    double cloud_time = static_cast<double>(cloudHeader.stamp.sec) + static_cast<double>(cloudHeader.stamp.nanosec) * 1e-9;
+    if(fabs(odom_time-cloud_time)>1.0){
+      RCLCPP_WARN_THROTTLE(this->get_logger(), *clock_, 5000, "Time differ from odom msg and lidar msg: %.3f, overwrite odom stamp by lidar stamp", fabs(odom_time-cloud_time));
+      exteralOdometry.header.stamp = cloudHeader.stamp;
+    }
     mappingOdometry.header.stamp = cloudHeader.stamp;
     mappingOdometry.pose.pose.orientation.x = -geoQuat.y;
     mappingOdometry.pose.pose.orientation.y = -geoQuat.z;
@@ -1577,6 +1583,7 @@ void FeatureAssociation::runFeatureAssociation() {
     out.trans_b2s = projection.trans_b2s;
     out.trans_m2ci = projection.trans_m2ci;
     out.external_odometry = exteralOdometry;
+    out.ideal_sensor_orientation2sensor = projection.ideal_sensor_orientation2sensor;
     _output_channel.send(std::move(out));
   }
   

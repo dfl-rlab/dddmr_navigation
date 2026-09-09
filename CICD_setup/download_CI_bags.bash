@@ -109,3 +109,40 @@ if [ "$d_bag8" != "${d_bag8#[Yy]}" ] ;then
   rm -f confirm.txt cookies.txt
   unzip perception_3d_multilayer_spinning_lidar_hokuyo2d.zip
 fi
+
+echo -n "Do you want to download perception_3d_multilayer_spinning_lidar_gpulidar (Y/N):"
+read d_bag9
+if [ "$d_bag9" != "${d_bag9#[Yy]}" ] ;then 
+  echo "Download bag"
+  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='1IbOGpiooe1YNonGCNgCpt8IkuH4qhazg \
+      | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
+  curl -L -b cookies.txt -o perception_3d_multilayer_spinning_lidar_gpulidar.zip \
+      'https://drive.usercontent.google.com/download?id='1IbOGpiooe1YNonGCNgCpt8IkuH4qhazg'&confirm='$(<confirm.txt)
+  rm -f confirm.txt cookies.txt
+  unzip perception_3d_multilayer_spinning_lidar_gpulidar.zip
+fi
+
+
+echo -n "Do you want to download mapping_jt128_t45 (Y/N):"
+read d_bag10
+if [ "$d_bag10" != "${d_bag10#[Yy]}" ] ;then 
+  echo "Download bag"
+  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='1VE6zUmlT21IA9MIoN36JZYuBUB6w6He2 \
+      | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
+  curl -L -b cookies.txt -o mapping_jt128_t45.zip \
+      'https://drive.usercontent.google.com/download?id='1VE6zUmlT21IA9MIoN36JZYuBUB6w6He2'&confirm='$(<confirm.txt)
+  rm -f confirm.txt cookies.txt
+  unzip mapping_jt128_t45.zip
+fi
+
+echo -n "Do you want to download perception_3d_multilayer_spinning_lidar_gpulidar_static (Y/N):"
+read d_bag11
+if [ "$d_bag11" != "${d_bag11#[Yy]}" ] ;then 
+  echo "Download bag"
+  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='1sujBRNK_Es7V02nbn3PvCwubJMcOqN2C \
+      | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
+  curl -L -b cookies.txt -o perception_3d_multilayer_spinning_lidar_gpulidar_static.zip \
+      'https://drive.usercontent.google.com/download?id='1sujBRNK_Es7V02nbn3PvCwubJMcOqN2C'&confirm='$(<confirm.txt)
+  rm -f confirm.txt cookies.txt
+  unzip perception_3d_multilayer_spinning_lidar_gpulidar_static.zip
+fi

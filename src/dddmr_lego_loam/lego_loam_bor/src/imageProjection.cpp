@@ -38,6 +38,8 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
   //supress the no intensity found log
   pcl::console::setVerbosityLevel(pcl::console::L_ERROR);
   clock_ = this->get_clock();
+  yaw_correction_ = 0.0;
+  pitch_correction_ = 0.0;
   last_save_depth_img_time_ = 0;
   sensor_install_pitch_ = 0.0;
   is_trt_engine_exist_ = false;
@@ -326,7 +328,30 @@ bool ImageProjection::allEssentialTFReady(std::string sensor_frame){
       //@ When pitch is greater than 1.5707, getRPY will return roll factor due to shortest angle
       m.getRPY(sensor_install_roll, sensor_install_pitch_, sensor_install_yaw);
       //RCLCPP_INFO(this->get_logger(), "%.2f, %.2f, %.2f", sensor_install_roll, sensor_install_pitch_, sensor_install_yaw);
+      
+      //@when there is a yaw + roll, we need to correct it by yaw+pitch
+      if(fabs(sensor_install_yaw)>0.0 && fabs(sensor_install_roll)>0.0){
+        yaw_correction_ = sensor_install_yaw;
+        pitch_correction_ = sensor_install_roll;
+        sensor_install_pitch_ = pitch_correction_;
+        sensor_install_roll = 0.0;
+        sensor_install_yaw = 0.0;
+        //@ so now the base_link to sensor only contains pitch
+        tf2::Stamped<tf2::Transform> b2is, b2s;
+        b2s = tf2_trans_b2s_;
+        tf2::Quaternion q;
+        q.setRPY(sensor_install_roll, sensor_install_pitch_, sensor_install_yaw);
+        tf2_trans_b2s_.setRotation(q);
+        b2is.setRotation(q); b2is.setOrigin(tf2::Vector3(0,0,0));
+        ideal_sensor_orientation2sensor_.mult(b2is.inverse(), b2s);
+      }
+      else{
+        ideal_sensor_orientation2sensor_.setRotation(tf2::Quaternion(0,0,0,1));
+        ideal_sensor_orientation2sensor_.setOrigin(tf2::Vector3(0,0,0));
+      }
+
       qm2ci.setRPY(1.570795 + sensor_install_pitch_, sensor_install_roll, 1.570795);
+
       trans_m2ci_.transform.translation.x = 0.0; trans_m2ci_.transform.translation.y = 0.0; trans_m2ci_.transform.translation.z = 0.0;
       trans_m2ci_.transform.rotation.x = qm2ci.x(); trans_m2ci_.transform.rotation.y = qm2ci.y();
       trans_m2ci_.transform.rotation.z = qm2ci.z(); trans_m2ci_.transform.rotation.w = qm2ci.w();
@@ -406,6 +431,15 @@ void ImageProjection::cloudHandler(
   _seg_msg.header = laserCloudMsg->header;
   _seg_msg.header.stamp = laserCloudMsg->header.stamp;
   _seg_msg.header.frame_id = laserCloudMsg->header.frame_id;
+
+  geometry_msgs::msg::TransformStamped trans_lidar2horizontal;
+  tf2::Quaternion q;
+  q.setRPY( 0, 0, yaw_correction_);
+  trans_lidar2horizontal.transform.rotation.x = q.x(); trans_lidar2horizontal.transform.rotation.y = q.y();
+  trans_lidar2horizontal.transform.rotation.z = q.z(); trans_lidar2horizontal.transform.rotation.w = q.w();
+  Eigen::Affine3d trans_lidar2horizontal_af3 = tf2::transformToEigen(trans_lidar2horizontal);
+  pcl::transformPointCloud(*_laser_cloud_in, *_laser_cloud_in, trans_lidar2horizontal_af3);
+
 
   findStartEndAngle();
   // Range image projection
@@ -1113,7 +1147,8 @@ void ImageProjection::publishClouds() {
   out.vertical_scans = _vertical_scans;
   out.horizontal_scans = _horizontal_scans;
   out.scan_period = _scan_period;
-  
+  out.ideal_sensor_orientation2sensor = ideal_sensor_orientation2sensor_;
+
   std::swap(out.seg_msg, _seg_msg);
   std::swap(out.outlier_cloud, _outlier_cloud);
   std::swap(out.segmented_cloud, _segmented_cloud);

@@ -10,6 +10,6 @@
 
   <!--- TF -->
   <node pkg="tf2_ros" exec="static_transform_publisher" name="baselink2footprint"  args="0.0 0 -0.32 0.0 0.0 0 base_link base_footprint" />
-  <node pkg="tf2_ros" exec="static_transform_publisher" name="baselink2airy"  args="0.235 0 0.16 0.0 1.570795 0 base_link airy" />
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="baselink2airy"  args="0.235 0 0.16 1.5707963 0.0 0.785398 base_link hesai_lidar" />
   
 </launch>

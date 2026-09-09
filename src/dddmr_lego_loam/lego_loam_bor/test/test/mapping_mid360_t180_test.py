@@ -116,7 +116,7 @@ def generate_test_description():
     package="tf2_ros",
     executable="static_transform_publisher",
     output="screen" ,
-    arguments=["0.0", "0.0", "1.0", "3.1415926535", "3.1415926535", "0.0", "base_link", "livox_frame"]
+    arguments=["0.0", "0.0", "1.0", "0.0", "0.0", "3.1415926535", "base_link", "livox_frame"]
   )
 
   the_yaml = os.path.join(

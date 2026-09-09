@@ -114,6 +114,9 @@ void KDTreeMarking::updateDGraph(const pcl::PointCloud<PointXYZU64>::Ptr& centro
     dGraph_->clearValue(idx_ground, 9999.0);
     lethal_map_.erase(idx_ground);
   }
+  
+  if(centroids_for_dgraph->points.empty())
+    return;
 
   //@loop marking_map_ to get projected point cloud
   pcl::PointCloud<pcl::PointXYZI>::Ptr aggregated_projections(new pcl::PointCloud<pcl::PointXYZI>);
@@ -215,6 +218,25 @@ pcl::PointCloud<pcl::PointXYZI>::Ptr KDTreeMarking::getMarkingCloudFromHash(std:
   } else {
     pcl::PointCloud<pcl::PointXYZI>::Ptr empty_cloud(new pcl::PointCloud<pcl::PointXYZI>());
     return empty_cloud;
+  }
+}
+
+void KDTreeMarking::radiusSearchWiCheck(PointXYZU64 robot_position_u64, double radius, std::vector<pcl::index_t>& idx_centroids, std::vector<float>& sqdist_centroids){
+  //@handling marking_pc_->points.size()<5 makeing kdtree search fail
+  if(marking_pc_->points.size()>5){
+    kdtree_marking_->radiusSearch(robot_position_u64, radius, idx_centroids, sqdist_centroids);
+  }
+  else{
+    for(size_t index=0; index<marking_pc_->points.size(); index++){
+      float dx = robot_position_u64.x - marking_pc_->points[index].x;
+      float dy = robot_position_u64.y - marking_pc_->points[index].y;
+      float dz = robot_position_u64.z - marking_pc_->points[index].z;
+      float sq_dis = dx*dx+dy*dy+dz*dz;
+      if(sqrt(sq_dis)<radius){
+        idx_centroids.push_back(index);
+        sqdist_centroids.push_back(sq_dis);
+      }
+    }
   }
 }
 

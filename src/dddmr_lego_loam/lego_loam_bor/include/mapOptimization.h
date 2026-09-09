@@ -113,6 +113,7 @@ public:
 
   pcl::PointCloud<PointType>::Ptr cloudKeyPoses3D;
   pcl::PointCloud<PointTypePose>::Ptr cloudKeyPoses6D;
+  sensor_msgs::msg::PointCloud2 cloud_msg_pose_6d_;
   pcl::PointCloud<PointType>::Ptr
   transformPointCloud(pcl::PointCloud<PointType>::Ptr cloudIn,
                       PointTypePose *transformIn);
@@ -361,6 +362,7 @@ private:
   size_t current_ground_size_;
   bool generate_testing_pg_;
   double corner_voxel_size_, surface_voxel_size_, outlier_voxel_size_, surface_icp_voxel_size_;
+  tf2::Stamped<tf2::Transform> ideal_sensor_orientation2sensor_;
 };
 
 #endif // MAPOPTIMIZATION_H

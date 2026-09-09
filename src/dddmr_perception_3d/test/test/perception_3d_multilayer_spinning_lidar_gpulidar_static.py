@@ -23,7 +23,6 @@ from launch_testing.asserts import assertInStdout
 
 import pytest
 
-
 class NoAliasDumper(yaml.SafeDumper):
     def ignore_aliases(self, data):
         return True
@@ -106,7 +105,7 @@ def generate_test_description():
           package="rviz2",
           executable="rviz2",
           output="screen",
-          arguments=['-d', os.path.join(get_package_share_directory('perception_3d'), 'rviz', 'p3d_mpl_laserscan_test.rviz')], # <-- FIXED CLOSING BRACKET HERE
+          arguments=['-d', os.path.join(get_package_share_directory('perception_3d'), 'rviz', 'perception_3d_multilayer_spinning_lidar_gpulidar.rviz')], # <-- FIXED CLOSING BRACKET HERE
           condition=IfCondition(enable_rviz_config)
   )  
 
@@ -120,71 +119,52 @@ def generate_test_description():
   # Reference the launch argument value
   use_sim_time = LaunchConfiguration('use_sim_time')
 
-  ###
-  test_name = 'perception_3d_multilayer_spinning_lidar_hokuyo2d'
-  b2s = Node(
-    package='tf2_ros',
-    executable='static_transform_publisher',
-    name='baselink2laser',
-    arguments=['0.34', '0.26', '0.0', '0.785398163', '0.0', '0', 'base_link', 'laser'],
-    parameters=[{'use_sim_time': use_sim_time}]
-  )
+  ### Change test name, TF, and remap lidar topic only
+  lidar_topic = "cloud"
+  test_name = 'perception_3d_multilayer_spinning_lidar_gpulidar_static'
 
-  b2s2 = Node(
-    package='tf2_ros',
-    executable='static_transform_publisher',
-    name='baselink2laser2',
-    arguments=['-0.34', '0.26', '0.0', '-2.38', '0.0', '0', 'base_link', 'laser2'],
-    parameters=[{'use_sim_time': use_sim_time}]
-  )
+  map2baselink = Node(
+          package="tf2_ros",
+          executable="static_transform_publisher",
+          output="screen" ,
+          arguments=["0.0", "0.0", "0.037", "0.0", "0.0", "0.0", "1.0", "map", "base_link"]
+      )
 
-  config_yaml = os.path.join(
+  b2f = Node(
+          package="tf2_ros",
+          executable="static_transform_publisher",
+          output="screen" ,
+          arguments=["0.0", "0.0", "-0.219", "0.0", "0.0", "0.0", "1.0","base_link", "base_footprint"]
+      )
+
+  b2l = Node(
+          package="tf2_ros",
+          executable="static_transform_publisher",
+          output="screen" ,
+          arguments=["0.0", "0.0", "-0.09", "0.0", "0.0", "0.0", "1.0","base_link", "saye/base_link/gpu_lidar"]
+      )
+
+  test_yaml = os.path.join(
     get_package_share_directory('perception_3d'),
     'test', 'config',
     test_name+'.yaml'
   )
 
-  p3d = Node(
-    package='perception_3d',
-    executable='laserscan2pointcloud_node',
-    name='scan_front',
-    output='screen',
-    respawn=False,
-    parameters=[config_yaml, {'use_sim_time': use_sim_time}],
-    remappings=[
-      ('scan', '/scan_front'),
-      ('point_cloud_from_scan', '/front_cloud')
-    ]
-  ) 
-
-  l2p = Node(
-    package='perception_3d',
-    executable='laserscan2pointcloud_node',
-    name='scan_back',
-    output='screen',
-    respawn=False,
-    parameters=[config_yaml, {'use_sim_time': use_sim_time}],
-    remappings=[
-      ('scan', '/scan_back'),
-      ('point_cloud_from_scan', '/back_cloud')
-    ]
-  )
-
-  o2g = Node(
-    package='global_planner',
-    executable='occupancy2ground',
-    output='screen',
-    respawn=False,
-    parameters=[config_yaml, {'use_sim_time': use_sim_time}]
-  )
+  dddmr_pg_map_server = Node(
+    package="dddmr_pg_map_server",
+    executable="dddmr_pg_map_server_node",
+    output="screen",
+    parameters = [test_yaml, {'use_sim_time': use_sim_time}]
+  )  
 
   gpl = Node(
     package='global_planner',
     executable='global_planner_node',
     output='screen',
     respawn=False,
-    parameters=[config_yaml, {'use_sim_time': use_sim_time}]
+    parameters=[test_yaml, {'use_sim_time': use_sim_time}]
   )
+
 
   #for test node
   test_node = Node(
@@ -192,10 +172,13 @@ def generate_test_description():
     executable="perception_3d_multilayer_spinning_lidar_lethal_test_node",
     name="perception_3d_multilayer_spinning_lidar_lethal_test_node",
     output="screen",
-    parameters = [config_yaml, {'use_sim_time': use_sim_time}]
+    parameters = [test_yaml, {'use_sim_time': use_sim_time}],
+    remappings=[
+      ('front_cloud', '/cloud')
+    ]
   )  
 
-  bag_path = "/root/dddmr_bags/cicdtest/" + test_name + "/" + test_name
+  bag_path = "/root/dddmr_bags/cicdtest/" + test_name
   correct_yaml_format_by_ros2_version(bag_path)
 
   bag_player = ExecuteProcess(
@@ -212,13 +195,12 @@ def generate_test_description():
 
   return LaunchDescription([
       use_sim_time_arg,
-      b2s,
-      b2s2,
-      p3d,
-      l2p,
-      o2g,
+      map2baselink,
+      b2f,
+      b2l,
+      dddmr_pg_map_server,
       gpl,
-      TimerAction(period=5.0, actions=[bag_player]),
+      TimerAction(period=3.0, actions=[bag_player]),
       rviz,
       TimerAction(period=3.0, actions=[test_node]),
       launch_testing.actions.ReadyToTest()

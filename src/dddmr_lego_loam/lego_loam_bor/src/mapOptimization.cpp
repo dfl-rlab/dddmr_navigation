@@ -716,12 +716,16 @@ void MapOptimization::publishTF() {
   tf2_trans_o2b.setRotation(tf2::Quaternion(externalOdometry.pose.pose.orientation.x, externalOdometry.pose.pose.orientation.y, externalOdometry.pose.pose.orientation.z, externalOdometry.pose.pose.orientation.w));
 
   tf2::Stamped<tf2::Transform> tf2_trans_m2c;
+  tf2::Stamped<tf2::Transform> tf2_trans_m2is;
   tf2::Stamped<tf2::Transform> tf2_trans_m2s;
   tf2::Stamped<tf2::Transform> tf2_trans_m2b;
   tf2::Stamped<tf2::Transform> tf2_trans_m2o;
 
   tf2_trans_m2c.mult(tf2_trans_m2ci_, tf2_trans_ci2c);
-  tf2_trans_m2s.mult(tf2_trans_m2c, tf2_trans_c2s_);
+  //@sensor an is ideal sensor orientation (rolling removed)
+  tf2_trans_m2is.mult(tf2_trans_m2c, tf2_trans_c2s_);
+  //@so true sensor tf
+  tf2_trans_m2s.mult(tf2_trans_m2is, ideal_sensor_orientation2sensor_);
   tf2_trans_m2b.mult(tf2_trans_m2s, tf2_trans_b2s_.inverse());
   tf2_trans_m2o.mult(tf2_trans_m2b, tf2_trans_o2b.inverse());
   
@@ -846,11 +850,10 @@ void MapOptimization::publishKeyPosesAndFrames() {
   }
   pub_pose_graph_->publish(markerArray);
   
-  sensor_msgs::msg::PointCloud2 cloud_msg_pose_6d;
-  pcl::toROSMsg(*cloudKeyPoses6D, cloud_msg_pose_6d);
-  cloud_msg_pose_6d.header.stamp = timeLaserOdometry_header_.stamp;
-  cloud_msg_pose_6d.header.frame_id = "map";
-  pubcloudKeyPoses6D->publish(cloud_msg_pose_6d);
+  pcl::toROSMsg(*cloudKeyPoses6D, cloud_msg_pose_6d_);
+  cloud_msg_pose_6d_.header.stamp = timeLaserOdometry_header_.stamp;
+  cloud_msg_pose_6d_.header.frame_id = "map";
+  pubcloudKeyPoses6D->publish(cloud_msg_pose_6d_);
   
 }
 
@@ -1918,7 +1921,7 @@ void MapOptimization::run() {
   tf2_trans_m2ci_.setOrigin(tf2::Vector3(association.trans_m2ci.transform.translation.x, association.trans_m2ci.transform.translation.y, association.trans_m2ci.transform.translation.z));
   has_m2ci_af3_ = true;
   externalOdometry = association.external_odometry;
-  
+  ideal_sensor_orientation2sensor_ = association.ideal_sensor_orientation2sensor;
   
   pcl::transformPointCloud(*association.cloud_patched_ground_last, *laserCloudPatchedGroundLast, trans_c2s_af3_);
   pcl::transformPointCloud(*association.cloud_patched_ground_edge_last, *laserCloudPatchedGroundEdgeLast, trans_c2s_af3_);
@@ -1974,6 +1977,7 @@ void MapOptimization::runWoLO(){
   external_odometry.stamp = odom.stamp
   */
   externalOdometry = association.external_odometry;
+  ideal_sensor_orientation2sensor_ = association.ideal_sensor_orientation2sensor;
 
   pcl::transformPointCloud(*association.cloud_patched_ground_last, *laserCloudPatchedGroundLast, trans_c2s_af3_);
   pcl::transformPointCloud(*association.cloud_patched_ground_edge_last, *laserCloudPatchedGroundEdgeLast, trans_c2s_af3_);

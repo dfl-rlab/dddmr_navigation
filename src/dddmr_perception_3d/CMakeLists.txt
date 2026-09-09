@@ -265,20 +265,20 @@ if(TEST_ENABLED)
   )
 
   #testing node
-  add_executable(perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node
-    test/test_node/perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node.cpp
+  add_executable(perception_3d_multilayer_spinning_lidar_lethal_test_node
+    test/test_node/perception_3d_multilayer_spinning_lidar_lethal_test_node.cpp
   )
-  target_link_libraries(perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node 
+  target_link_libraries(perception_3d_multilayer_spinning_lidar_lethal_test_node 
     ${PCL_LIBRARIES}
   )
-  ament_target_dependencies(perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node
+  ament_target_dependencies(perception_3d_multilayer_spinning_lidar_lethal_test_node
     ${dependencies}
   )
 
 
   #install testing node
   install(TARGETS
-    perception_3d_multilayer_spinning_lidar_hokuyo2d_test_node    
+    perception_3d_multilayer_spinning_lidar_lethal_test_node    
     RUNTIME DESTINATION lib/${PROJECT_NAME}
   )
 

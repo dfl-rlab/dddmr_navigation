@@ -136,11 +136,13 @@ class KDTreeMarking{
     void addPCPtr(PointXYZU64 centroid, 
       const pcl::PointCloud<pcl::PointXYZI>::Ptr& pcptr, 
       const pcl::ModelCoefficients::Ptr& pcplaneptr);
+  
+    void radiusSearchWiCheck(PointXYZU64 robot_position_u64, double radius, std::vector<pcl::index_t>& idx_centroids, std::vector<float>& sqdist_centroids);
 
-  void computeProjection(  
-    const pcl::PointCloud<pcl::PointXYZI>::Ptr& pcptr, 
-    const pcl::ModelCoefficients::Ptr& pcplaneptr,
-    pcl::PointCloud<pcl::PointXYZI>::Ptr& projectedptr);
+    void computeProjection(  
+      const pcl::PointCloud<pcl::PointXYZI>::Ptr& pcptr, 
+      const pcl::ModelCoefficients::Ptr& pcplaneptr,
+      pcl::PointCloud<pcl::PointXYZI>::Ptr& projectedptr);
 
     void removePCPtr(const PointXYZU64& centroid);
     
