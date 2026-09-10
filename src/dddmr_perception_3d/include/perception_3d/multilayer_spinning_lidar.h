@@ -135,6 +135,11 @@ class MultiLayerSpinningLidar: public Sensor{
     
     void updateDGraphInWindow();
 
+    void transformToPlaneEquation(
+      const geometry_msgs::msg::TransformStamped& transform,
+      pcl::ModelCoefficients::Ptr& coefficients,
+      const Eigen::Vector3d& local_normal);
+
     /*pcl msg in cb*/
     pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_msg_;
     pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_msg_gbl_;

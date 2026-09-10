@@ -147,6 +147,7 @@ class KDTreeMarking{
     void removePCPtr(const PointXYZU64& centroid);
     
     pcl::PointCloud<pcl::PointXYZI>::Ptr getMarkingCloudFromHash(std::uint64_t pt_hash);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr getProjectedMarkingCloudFromHash(std::uint64_t pt_hash);
 
     void updateKDTree();
     void updateDGraph(const pcl::PointCloud<PointXYZU64>::Ptr& centroids_for_dgraph, 

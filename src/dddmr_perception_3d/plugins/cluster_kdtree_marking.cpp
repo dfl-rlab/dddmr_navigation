@@ -53,7 +53,10 @@ void KDTreeMarking::computeProjection(
   sor.setInputCloud (projectedptr);
   sor.setLeafSize (0.05f, 0.05f, 0.05f);
   sor.filter (*projectedptr);
-
+  
+  //for(auto i=projectedptr->points.begin(); i!=projectedptr->points.end(); i++){
+  //  RCLCPP_ERROR(rclcpp::get_logger("cluster_kdtree_marking"),"%.2f, %.2f, %.2f", (*i).x, (*i).y, (*i).z);
+  //}
 }
 
 std::int16_t KDTreeMarking::safeConvert(int32_t large_value) {
@@ -124,7 +127,7 @@ void KDTreeMarking::updateDGraph(const pcl::PointCloud<PointXYZU64>::Ptr& centro
   pcl::PointCloud<pcl::PointXYZI>::Ptr aggregated_projections_ds(new pcl::PointCloud<pcl::PointXYZI>);
   for(auto a_pt: centroids_for_dgraph->points){
     std::uint64_t pt_hash = int16ToUint64(a_pt.xshort, a_pt.yshort, a_pt.zshort);
-    *aggregated_projections += (*getMarkingCloudFromHash(pt_hash));
+    *aggregated_projections += (*getProjectedMarkingCloudFromHash(pt_hash));
   }
 
   aggregated_projections_ds = small_gicp::voxelgrid_sampling_omp(*aggregated_projections, 0.1, 4);
@@ -218,6 +221,16 @@ pcl::PointCloud<pcl::PointXYZI>::Ptr KDTreeMarking::getMarkingCloudFromHash(std:
   auto it = marking_map_.find(pt_hash);
   if (it != marking_map_.end()) {
     return marking_map_[pt_hash].pc_;
+  } else {
+    pcl::PointCloud<pcl::PointXYZI>::Ptr empty_cloud(new pcl::PointCloud<pcl::PointXYZI>());
+    return empty_cloud;
+  }
+}
+
+pcl::PointCloud<pcl::PointXYZI>::Ptr KDTreeMarking::getProjectedMarkingCloudFromHash(std::uint64_t pt_hash){
+  auto it = marking_map_.find(pt_hash);
+  if (it != marking_map_.end()) {
+    return marking_map_[pt_hash].projection_;
   } else {
     pcl::PointCloud<pcl::PointXYZI>::Ptr empty_cloud(new pcl::PointCloud<pcl::PointXYZI>());
     return empty_cloud;

@@ -89,6 +89,11 @@ class DepthCameraLayer: public Sensor{
 
     void pubUpdateLoop();
 
+    void transformToPlaneEquation(
+      const geometry_msgs::msg::TransformStamped& transform,
+      pcl::ModelCoefficients::Ptr& coefficients,
+      const Eigen::Vector3d& local_normal);
+      
     std::map<std::string, rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr> sub_pc_map_; 
     std::map<std::string, std::shared_ptr<perception_3d::DepthCameraObservationBuffer>> observation_buffers_;
     
