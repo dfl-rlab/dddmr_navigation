@@ -49,7 +49,7 @@ void Local_Planner::initial(
   this->get_parameter("odom_topic", odom_topic_);
   RCLCPP_INFO(this->get_logger(), "odom_topic: %s", odom_topic_.c_str());
 
-  declare_parameter("odom_topic_qos", rclcpp::ParameterValue("reliable"));
+  declare_parameter("odom_topic_qos", rclcpp::ParameterValue("best_effort"));
   this->get_parameter("odom_topic_qos", odom_topic_qos_);
   RCLCPP_INFO(this->get_logger(), "odom_topic_qos: %s", odom_topic_qos_.c_str());
   
