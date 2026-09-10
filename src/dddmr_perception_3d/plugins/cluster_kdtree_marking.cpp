@@ -129,7 +129,8 @@ void KDTreeMarking::updateDGraph(const pcl::PointCloud<PointXYZU64>::Ptr& centro
     std::uint64_t pt_hash = int16ToUint64(a_pt.xshort, a_pt.yshort, a_pt.zshort);
     *aggregated_projections += (*getProjectedMarkingCloudFromHash(pt_hash));
   }
-
+  
+  bool small_number = false;
   aggregated_projections_ds = small_gicp::voxelgrid_sampling_omp(*aggregated_projections, 0.1, 4);
   aggregated_projections_out = *aggregated_projections_ds;
   //RCLCPP_INFO(rclcpp::get_logger("cluster_marking"),"%lu", aggregated_projections_out.points.size());
@@ -138,8 +139,8 @@ void KDTreeMarking::updateDGraph(const pcl::PointCloud<PointXYZU64>::Ptr& centro
     kdtree_aggregated_projections_ds->setInputCloud(aggregated_projections_ds);
   }
   else{
-    RCLCPP_DEBUG(rclcpp::get_logger("cluster_marking"),"only few projection");
-    return;
+    RCLCPP_INFO(rclcpp::get_logger("cluster_marking"),"only few projection");
+    small_number = true;
   }
 
   //@ loop ground and find closest one
@@ -155,7 +156,23 @@ void KDTreeMarking::updateDGraph(const pcl::PointCloud<PointXYZU64>::Ptr& centro
       auto idx_ground = ground_region_idx[i];
       std::vector<int> id_tmp;
       std::vector<float> sqdist_tmp;
-      kdtree_aggregated_projections_ds->nearestKSearch(shared_data_->pcl_ground_->points[idx_ground], 1, id_tmp, sqdist_tmp);
+      if(!small_number){
+        kdtree_aggregated_projections_ds->nearestKSearch(shared_data_->pcl_ground_->points[idx_ground], 1, id_tmp, sqdist_tmp);
+      }
+      else{
+        sqdist_tmp.clear();
+        sqdist_tmp.push_back(inflation_radius_*inflation_radius_);
+        for(size_t aggre_i=0;aggre_i<aggregated_projections_ds->points.size(); aggre_i++){
+          auto pt = aggregated_projections_ds->points[aggre_i];
+          float dx = shared_data_->pcl_ground_->points[idx_ground].x - pt.x;
+          float dy = shared_data_->pcl_ground_->points[idx_ground].y - pt.y;
+          float dz = shared_data_->pcl_ground_->points[idx_ground].z - pt.z;
+          float sq = dx*dx + dy*dy + dz*dz;
+          if(sq<sqdist_tmp[0]){
+            sqdist_tmp[0] = sq;
+          }
+        }
+      }
       double distance = sqrt(sqdist_tmp[0]);
       if(distance>inflation_radius_){
         //@ out of inflation range
