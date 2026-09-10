@@ -40,6 +40,7 @@ TrajectoryGeneratorTheory::TrajectoryGeneratorTheory(){
 void TrajectoryGeneratorTheory::initialize(const std::string name, const rclcpp::Node::WeakPtr& weak_node){
   name_ = name;
   node_ = weak_node.lock();
+  configurateActuatorType();
   onInitialize();
 }
 
