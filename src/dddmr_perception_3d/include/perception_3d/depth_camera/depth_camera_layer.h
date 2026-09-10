@@ -32,7 +32,7 @@
 #define PERCEPTION_3D_DEPTH_CAMERA_LAYER_H_
 
 #include <perception_3d/sensor.h>
-#include <perception_3d/cluster_marking.h>
+#include <perception_3d/cluster_kdtree_marking.h>
 #include <perception_3d/depth_camera/depth_camera_observation_buffer.hpp>
 #include <perception_3d/depth_camera/frustum_utils.h>
 
@@ -58,7 +58,7 @@ class DepthCameraLayer: public Sensor{
 
   private:
     
-    std::shared_ptr<perception_3d::Marking> pct_marking_;
+    std::shared_ptr<perception_3d::KDTreeMarking> pct_marking_;
     std::shared_ptr<perception_3d::FrustumUtils> frustum_utils_;
 
     rclcpp::Clock::SharedPtr clock_;
@@ -71,9 +71,11 @@ class DepthCameraLayer: public Sensor{
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_current_projected_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_current_window_marking_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_cleared_window_marking_;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_marked_voxel_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_casting_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_gbl_marking_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_dGraph_;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_lethal_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_frustum_;
 
     void cbSensor(const sensor_msgs::msg::PointCloud2::SharedPtr msg,
@@ -83,8 +85,15 @@ class DepthCameraLayer: public Sensor{
     //@ For casting visualization
     void addCastingMarker(const pcl::PointXYZI& pt, size_t id, visualization_msgs::msg::MarkerArray& markerArray);
     
+    void updateDGraphInWindow();
+
     void pubUpdateLoop();
 
+    void transformToPlaneEquation(
+      const geometry_msgs::msg::TransformStamped& transform,
+      pcl::ModelCoefficients::Ptr& coefficients,
+      const Eigen::Vector3d& local_normal);
+      
     std::map<std::string, rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr> sub_pc_map_; 
     std::map<std::string, std::shared_ptr<perception_3d::DepthCameraObservationBuffer>> observation_buffers_;
     
@@ -97,10 +106,12 @@ class DepthCameraLayer: public Sensor{
     double marking_height_;
     double euclidean_cluster_extraction_tolerance_;
     int euclidean_cluster_extraction_min_cluster_size_;
+    int euclidean_cluster_minimum_accepted_size_;
     geometry_msgs::msg::TransformStamped trans_gbl2b_;
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr pc_current_window_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_msg_gbl_;
+    pcl::PointCloud<pcl::PointXYZI> projected_cloud_clusters_;
 };
 
 }//end of name space

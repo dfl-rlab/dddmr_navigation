@@ -1,0 +1,89 @@
+depthimg2pointcloud:
+  ros__parameters:
+    topic: "/camera/camera/depth/image_rect_raw"
+    info: "/camera/camera/depth/camera_info"
+
+perception_3d_multilayer_spinning_lidar_lethal_test_node:
+  ros__parameters:
+    check_points:
+      p1: [1.06, -2.81, -0.3]
+    search_radius: 0.2
+    
+dddmr_pg_map_server_manager:
+  ros__parameters:
+    maps: ["map1"]
+
+map1:
+  ros__parameters:
+    pose_graph_dir: "/root/dddmr_bags/cicdtest/perception_3d_depth_camera_rs457/pg"
+    complete_map_voxel_size: 0.3
+
+
+perception_3d_global:
+  ros__parameters:
+    global_frame: "map"
+    robot_base_frame: "base_footprint"
+    max_obstacle_distance: 9999.0
+    inscribed_radius: 0.5
+    inflation_descending_rate: 2.0
+    inflation_radius: 1.5
+    sensors_collected_frequency: 20.0
+    plugins: ["map", "rs457"]
+    dgraph_publish_frequency: 5.0
+    map:
+      plugin: "perception_3d::StaticLayer"
+      is_local_planner: false
+      use_adaptive_connection: false #If true: the neighbors of node is sparse, it will automatically increase search radius.
+      adaptive_connection_number: 20
+      radius_of_ground_connection: 1.5 #If use_adaptive_connection=false, the radius search of the node is applied.
+      intensity_search_radius: 1.0 #this value is suggested to be 1.0 meters, because if it is too large, the narrow passage will be miscalculated
+      intensity_search_punish_weight: 0.1 #the weight for a node. Set this value higher means we dont like path planning cross a orphan node.
+      static_imposing_radius: 1.5 #use map to add weight on each ground node
+      map_topic: "map1/mapcloud"
+      ground_topic: "map1/mapground"
+      support:
+        mapping_mode: false
+          #if mapping mode is true, edge detection is automatically disabled
+        enable_edge_detection: true
+        generate_static_graph: false
+          #the connection radius will be used
+          #enable this value when using super dense ground say ground voxel size<=10 cm
+
+    rs457:
+      plugin: "perception_3d::DepthCameraLayer"
+      pub_gbl_marking_for_visualization: true
+      pub_gbl_marking_frequency: 10.0
+      is_local_planner: false
+      euclidean_cluster_extraction_tolerance: 0.1
+      euclidean_cluster_extraction_min_cluster_size: 1
+      euclidean_cluster_minimum_accepted_size: 5
+      xy_resolution: 0.05
+      height_resolution: 0.05
+      perception_window_size: 5.0 
+      segmentation_ignore_ratio: 1.0
+      observation_sources: camera
+      camera:
+        topic: "/cloud"
+        sensor_frame: "camera_link"
+        observation_persistence: 0.0
+        expected_update_rate: 0.1
+        min_obstacle_height: 0.1
+        max_obstacle_height: 2.0
+        obstacle_max_range: 5.0
+        obstacle_min_range: 0.3
+        FOV_W: 1.5184 #RS D455
+        FOV_V: 1.0123 #RS D455
+
+
+global_planner:
+  ros__parameters:
+    turning_weight: 0.1 #Punish the zig-zag path
+    enable_detail_log: false
+    a_star_expanding_radius: 0.4
+
+#if we use get_dwa_plan in global_plan_manager, we setup parameters for dwa_global_planner
+dynamic_window_aware_global_planner:
+  ros__parameters:
+    look_ahead_distance: 2.0
+    recompute_frequency: 2.0
+    

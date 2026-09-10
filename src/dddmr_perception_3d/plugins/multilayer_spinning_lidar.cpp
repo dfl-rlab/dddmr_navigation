@@ -190,6 +190,28 @@ void MultiLayerSpinningLidar::onInitialize()
 
 }
 
+
+void MultiLayerSpinningLidar::transformToPlaneEquation(
+    const geometry_msgs::msg::TransformStamped& transform,
+    pcl::ModelCoefficients::Ptr& coefficients,
+    const Eigen::Vector3d& local_normal)
+{
+    coefficients->values.resize (4);
+
+    Eigen::Isometry3d eigen_transform = tf2::transformToEigen(transform);
+
+    Eigen::Vector3d position = eigen_transform.translation();
+
+    Eigen::Vector3d normal = eigen_transform.rotation() * local_normal.normalized();
+
+    double D = -normal.dot(position);
+
+    coefficients->values[0] = normal.x();
+    coefficients->values[1] = normal.y();
+    coefficients->values[2] = normal.z();
+    coefficients->values[3] = D;
+}
+
 void MultiLayerSpinningLidar::cbSensor(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 { 
 
@@ -377,7 +399,8 @@ void MultiLayerSpinningLidar::updateDGraphInWindow(){
   }
 
   //@ update dgraph of ground region based on marked centroids
-  pct_marking_->updateDGraph(centroids_for_dgraph, idx_ground_filtered);
+  projected_cloud_clusters_.clear();
+  pct_marking_->updateDGraph(centroids_for_dgraph, idx_ground_filtered, projected_cloud_clusters_);
 }
 
 void MultiLayerSpinningLidar::selfMark(){
@@ -433,7 +456,6 @@ void MultiLayerSpinningLidar::selfMark(){
 
   float intensity_cnt = 100;
   pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_clusters (new pcl::PointCloud<pcl::PointXYZI>);
-  pcl::PointCloud<pcl::PointXYZI>::Ptr projected_cloud_clusters (new pcl::PointCloud<pcl::PointXYZI>);
   for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices_segmentation.begin (); it != cluster_indices_segmentation.end (); ++it)
   {
 
@@ -498,7 +520,7 @@ void MultiLayerSpinningLidar::selfMark(){
       //@ Project pc base on robot RPY:
       // This is not the perfect solution, because the robot may stand on the ground but the obstalce in on slope
       // Maybe the best approach is to project base on the ground normal
-      
+      /*
       tf2::Quaternion rotation(trans_gbl2b_.transform.rotation.x, trans_gbl2b_.transform.rotation.y, trans_gbl2b_.transform.rotation.z, trans_gbl2b_.transform.rotation.w);
       tf2::Vector3 vector(0, 0, 1);
       tf2::Vector3 base_link_normal = tf2::quatRotate(rotation, vector);
@@ -510,17 +532,9 @@ void MultiLayerSpinningLidar::selfMark(){
       coefficients->values[2] = base_link_normal[2];
       double d = -trans_gbl2b_.transform.translation.x*base_link_normal[0]-trans_gbl2b_.transform.translation.y*base_link_normal[1]-trans_gbl2b_.transform.translation.z*base_link_normal[2];
       coefficients->values[3] = d;
-      // Create the filtering object
-      
-      //pcl::PointCloud<pcl::PointXYZI>::Ptr projected_cloud_cluster (new pcl::PointCloud<pcl::PointXYZI>);
-      //pcl::ProjectInliers<pcl::PointXYZI> proj;
-      //proj.setModelType (pcl::SACMODEL_PLANE);
-      //proj.setInputCloud (cloud_cluster);
-      //proj.setModelCoefficients (coefficients);
-      //proj.filter (*projected_cloud_cluster);
-      //*projected_cloud_clusters += (*projected_cloud_cluster);
-      
-
+      */
+      pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
+      transformToPlaneEquation(trans_gbl2b_, coefficients, Eigen::Vector3d::UnitZ());
       //@ store the cluster in marking
       //@ consider rounding problem, we have to convert the centroid coordinate back by resolution
       pcl::PointXYZ voxelized_centroid;
@@ -550,8 +564,8 @@ void MultiLayerSpinningLidar::selfMark(){
 
   if(pub_current_projected_->get_subscription_count()>0){
     sensor_msgs::msg::PointCloud2 ros_pc2_msg;
-    projected_cloud_clusters->header.frame_id = gbl_utils_->getGblFrame();
-    pcl::toROSMsg(*projected_cloud_clusters, ros_pc2_msg);
+    projected_cloud_clusters_.header.frame_id = gbl_utils_->getGblFrame();
+    pcl::toROSMsg(projected_cloud_clusters_, ros_pc2_msg);
     pub_current_projected_->publish(ros_pc2_msg);
   }
 

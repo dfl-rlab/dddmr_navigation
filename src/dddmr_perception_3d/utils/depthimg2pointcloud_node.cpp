@@ -179,7 +179,7 @@ int main(int argc, char * argv[])
   // Initialize ROS 2
   rclcpp::init(argc, argv);
   
-  DepthImg2PointCloud DI2PC = DepthImg2PointCloud("depthimg2pointcloud_right");
+  DepthImg2PointCloud DI2PC = DepthImg2PointCloud("depthimg2pointcloud");
 
   rclcpp::executors::MultiThreadedExecutor::SharedPtr mulexecutor_;
 

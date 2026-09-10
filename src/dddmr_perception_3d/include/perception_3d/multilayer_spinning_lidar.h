@@ -135,6 +135,11 @@ class MultiLayerSpinningLidar: public Sensor{
     
     void updateDGraphInWindow();
 
+    void transformToPlaneEquation(
+      const geometry_msgs::msg::TransformStamped& transform,
+      pcl::ModelCoefficients::Ptr& coefficients,
+      const Eigen::Vector3d& local_normal);
+
     /*pcl msg in cb*/
     pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_msg_;
     pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_msg_gbl_;
@@ -195,8 +200,8 @@ class MultiLayerSpinningLidar: public Sensor{
     std_msgs::msg::Header last_sensor_receiving_time_;
 
     bool observation_clear_;
-
+    
+    pcl::PointCloud<pcl::PointXYZI> projected_cloud_clusters_;
 };
-
 }//end of name space
 #endif
