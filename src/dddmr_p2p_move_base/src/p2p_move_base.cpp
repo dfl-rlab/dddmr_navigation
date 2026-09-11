@@ -570,7 +570,7 @@ bool P2PMoveBase::executeCycle(const std::shared_ptr<rclcpp_action::ServerGoalHa
           STATE_->last_valid_plan_ = clock_->now();
           STATE_->setDecision("d_planning");  
         }
-
+        publishZeroVelocity();
         return false;
       }
 
@@ -715,6 +715,7 @@ bool P2PMoveBase::executeCycle(const std::shared_ptr<rclcpp_action::ServerGoalHa
           STATE_->last_valid_plan_ = clock_->now();
           STATE_->setDecision("d_planning");  
         }
+        publishZeroVelocity();
       }
 
       else if(PS == dddmr_sys_core::PlannerState::PATH_BLOCKED_WAIT || PS == dddmr_sys_core::PlannerState::PATH_BLOCKED_REPLANNING){
