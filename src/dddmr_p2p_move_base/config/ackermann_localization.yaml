@@ -10,8 +10,9 @@ p2p_move_base:
     waiting_patience: 10.0
     # Use the Ackermann bicycle-model generator while following a plan.
     main_trajectory_generator: "ackermann_simple"
-    # Override the default DD heading generator with the Ackermann RS plugin.
-    heading_trajectory_generator: "ak_rotate_reeds_shepp"
+    # Switch heading alignment between RS and the existing Ackermann turning arc.
+    # heading_trajectory_generator: "ak_rotate_reeds_shepp"
+    heading_trajectory_generator: "ak_rotate_inplace"
 
 # Output adapter for the current Gazebo plugin, which receives /cmd_vel rather
 # than AckermannDriveStamped directly.  Change only these values when a
@@ -252,7 +253,7 @@ trajectory_generators:
       rs_speed: 0.2                 # Command magnitude [m/s]; path decides +/- direction.
       wheelbase: 0.2255               # Rear-to-front axle distance [m].
       max_steer_rad: 0.37             # Larger = tighter turning arc.
-      path_resolution: 0.2           # Reference-step and collision spacing [m].
+      path_resolution: 0.05           # Reference-step and collision spacing [m].
       closed_heading_maneuver: true   # Return to alignment-start x/y; change yaw only.
       closed_maneuver_reset_timeout: 1.0 # New x/y anchor after this unused time [s].
       goal_heading_distance: 0.5      # Match local_planner.xy_goal_tolerance: use final goal quaternion inside it; otherwise use local path tangent [m].
@@ -284,7 +285,7 @@ trajectory_generators:
 
     ak_rotate_inplace:
       plugin: "trajectory_generators::AKRotateInPlaceTheory"
-      # Same vehicle model for recovery behavior.
+      # Used for heading alignment and recovery behavior.
       rotate_linear_speed: 0.20
       wheelbase: 0.2255
       max_steer_rad: 0.37
