@@ -48,10 +48,9 @@
 namespace trajectory_generators
 {
 
-// A single-side Reeds-Shepp word becomes a FIFO command queue.  Heading
-// alignment drives its front command for the command's planned duration, then
-// advances to the next command.  It deliberately does not use vehicle
-// feedback or a timeout to decide whether to change sides.
+// Offer all RS candidates to critics before committing one in expertScoring.
+// The selected word persists as a timed FIFO; subsequent cycles collision-check
+// only its remainder. Rejection discards the queue so the next call replans.
 class AKRotateReedsSheppTheory : public TrajectoryGeneratorTheory
 {
 public:
@@ -91,19 +90,18 @@ private:
   void initialise() override;
   void prepareSelectedCycle();
   bool buildReferencePlan(RSCandidate& candidate) const;
-  bool buildTrajectory(base_trajectory::Trajectory& trajectory);
-  bool selectCandidate(const geometry_msgs::msg::PoseStamped& target,
-                       RSCandidate& candidate) const;
-  bool selectCandidateFromPose(double start_x, double start_y,
-                               double start_yaw,
-                               const geometry_msgs::msg::PoseStamped& target,
-                               RSCandidate& candidate) const;
+  bool buildTrajectory(const std::deque<RSControlStep>& steps, double cost,
+                       base_trajectory::Trajectory& trajectory) const;
+  bool matchesCandidate(const RSCandidate& candidate,
+                        const base_trajectory::Trajectory& trajectory) const;
+  std::vector<RSCandidate> buildCandidates(
+      const geometry_msgs::msg::PoseStamped& target) const;
   std::vector<RSCandidate> generateCandidates(double x, double y,
                                               double phi) const;
   void publishCandidateMarkers(const std::vector<RSCandidate>& candidates,
                                double minimum_turn_radius) const;
   void clearActivePlan();
-  bool createActivePlan(const geometry_msgs::msg::PoseStamped& target);
+  void createActivePlan(const RSCandidate& candidate);
   bool advanceElapsedStep();
   double candidateCost(const RSCandidate& candidate) const;
 
@@ -134,6 +132,7 @@ private:
 
   std::shared_ptr<AckermannTrajectoryGeneratorLimits> limits_;
   std::shared_ptr<AckermannTrajectoryGeneratorParams> params_;
+  bool debug_detail_;
   double rs_speed_;
   double path_resolution_;
   bool closed_heading_maneuver_;
@@ -155,7 +154,7 @@ private:
   bool has_last_rs_trajectory_time_;
   rclcpp::Time last_rs_trajectory_time_;
   bool selection_cycle_prepared_;
-  unsigned int next_trajectory_index_;
+  std::vector<RSCandidate> cycle_candidates_;
   std::vector<base_trajectory::Trajectory> trajectories_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
       candidate_markers_pub_;

@@ -50,8 +50,8 @@ mcl_ip:
         segment_valid_point_num: 5
         segment_valid_line_num: 2
         segment_theta: 60.0                      # decrese this value may improve accuracy
-        minimum_detection_range: 0.2
-        maximum_detection_range: 6.0            # point cloud within this range will be used to project image
+        minimum_detection_range: 0.1
+        maximum_detection_range: 5.0            # point cloud within this range will be used to project image
         distance_for_patch_between_rings: 1.0    # patch ground between rings within this range, i.e. ring0 and ring1 is smaller than 1 meter, patch them
         stitcher_num: 0                          # for non-repetitive scan lidar use 2~4 (i.e. mid360)
         trt_model_path: ""                       # provide trt engine for yolo
@@ -106,7 +106,7 @@ mcl_3dl:
     init_var_pitch: 0.005
     init_var_yaw: 0.5
     map_frame: "map"
-    robot_frame: "base_link"
+    robot_frame: "base_footprint"
     odom_frame: "odom"
     map_downsample_x: 0.1
     map_downsample_y: 0.1
@@ -184,16 +184,23 @@ local_planner:
     controller_frequency: 10.0
     
     cuboid:
-      # 3x collision footprint in x/y relative to base_link; retain the
-      # Gazebo vehicle's real vertical envelope to avoid ground false hits.
-      flb: [0.42, 0.36, 0.0] #front left buttom
-      frb: [0.42, -0.36, 0.0]
-      flt: [0.42, 0.36, 0.6] #front left top
-      frt: [0.42, -0.36, 0.6]
-      blb: [-0.35, 0.36, 0.0] #back left buttom
-      brb: [-0.35, -0.36, 0.0]
-      blt: [-0.35, 0.36, 0.6]
-      brt: [-0.35, -0.36, 0.6]
+      # saye_spawn.launch.py -> saye_description/models/saye/model.sdf.
+      # Enclose collision geometry + visible body, including front-wheel steering
+      # over the SDF joint limits (+/-0.6 rad); bounds rounded outward to 1 mm.
+      # base_link bounds: x=[-0.200,0.160], y=[-0.121,0.121], z=[-0.037,0.202].
+      # Planner uses base_footprint. Both ackermann_localization launch files
+      # place it 0.219 m below base_link, so add 0.219 to the cuboid's z values.
+      # Add 0.050 m to total length and width (0.025 m padding on each side).
+      # Extend the bottom to base_footprint z=0; add 0.150 m above model top z=0.421.
+      # Padded dimensions: 0.410 x 0.292 x 0.571 m. Keep generator cuboids identical.
+      flb: [0.185, 0.146, 0.000] # front left bottom
+      frb: [0.185, -0.146, 0.000]
+      flt: [0.185, 0.146, 0.571] # front left top
+      frt: [0.185, -0.146, 0.571]
+      blb: [-0.225, 0.146, 0.000] # back left bottom
+      brb: [-0.225, -0.146, 0.000]
+      blt: [-0.225, 0.146, 0.571]
+      brt: [-0.225, -0.146, 0.571]
 
 recovery_behaviors:
   ros__parameters:
@@ -225,22 +232,23 @@ trajectory_generators:
       controller_frequency: 10.0
       sim_time: 1.0
       linear_x_sample: 15.0
-      angular_z_sample: 35.0
+      angular_z_sample: 15.0
       sim_granularity: 0.05
       debug_trajectory: false
       cuboid:
-        flb: [0.42, 0.36, 0.0] #front left buttom
-        frb: [0.42, -0.36, 0.0]
-        flt: [0.42, 0.36, 0.6] #front left top
-        frt: [0.42, -0.36, 0.6]
-        blb: [-0.35, 0.36, 0.0] #back left buttom
-        brb: [-0.35, -0.36, 0.0]
-        blt: [-0.35, 0.36, 0.6]
-        brt: [-0.35, -0.36, 0.6]
+        flb: [0.185, 0.146, 0.000] # front left bottom
+        frb: [0.185, -0.146, 0.000]
+        flt: [0.185, 0.146, 0.571] # front left top
+        frt: [0.185, -0.146, 0.571]
+        blb: [-0.225, 0.146, 0.000] # back left bottom
+        brb: [-0.225, -0.146, 0.000]
+        blt: [-0.225, 0.146, 0.571]
+        brt: [-0.225, -0.146, 0.571]
     ak_rotate_reeds_shepp:
       plugin: "trajectory_generators::AKRotateReedsSheppTheory"
-      # Start with one complete side only. Its fixed RS word is a FIFO queue.
-      # Each command remains active for its planned duration, then FIFO advances.
+      debug_detail: false          # true: log target, plan selection and each FIFO command.
+      # Collision-check all candidates, then retain the shortest accepted FIFO.
+      # Recheck only its remainder each cycle; rejection clears it for replanning.
       rs_speed: 0.2                 # Command magnitude [m/s]; path decides +/- direction.
       wheelbase: 0.2255               # Rear-to-front axle distance [m].
       max_steer_rad: 0.37             # Larger = tighter turning arc.
@@ -248,7 +256,7 @@ trajectory_generators:
       closed_heading_maneuver: true   # Return to alignment-start x/y; change yaw only.
       closed_maneuver_reset_timeout: 1.0 # New x/y anchor after this unused time [s].
       goal_heading_distance: 0.5      # Match local_planner.xy_goal_tolerance: use final goal quaternion inside it; otherwise use local path tangent [m].
-      forward_first_penalty: 0.5     # [m] Larger = prefer reverse first; 0 disables.
+      forward_first_penalty: 0.0     # [m] 0 selects shortest; positive prefers reverse first.
 
       # -----------------------------------------------------------------
       # Fallback: the previous Ackermann turning-arc generator.
@@ -265,14 +273,14 @@ trajectory_generators:
       # angular_sim_granularity: 0.05
       # -----------------------------------------------------------------
       cuboid:
-        flb: [0.42, 0.36, 0.0] #front left buttom
-        frb: [0.42, -0.36, 0.0]
-        flt: [0.42, 0.36, 0.6] #front left top
-        frt: [0.42, -0.36, 0.6]
-        blb: [-0.35, 0.36, 0.0] #back left buttom
-        brb: [-0.35, -0.36, 0.0]
-        blt: [-0.35, 0.36, 0.6]
-        brt: [-0.35, -0.36, 0.6]
+        flb: [0.185, 0.146, 0.000] # front left bottom
+        frb: [0.185, -0.146, 0.000]
+        flt: [0.185, 0.146, 0.571] # front left top
+        frt: [0.185, -0.146, 0.571]
+        blb: [-0.225, 0.146, 0.000] # back left bottom
+        brb: [-0.225, -0.146, 0.000]
+        blt: [-0.225, 0.146, 0.571]
+        brt: [-0.225, -0.146, 0.571]
 
     ak_rotate_inplace:
       plugin: "trajectory_generators::AKRotateInPlaceTheory"
@@ -287,14 +295,14 @@ trajectory_generators:
       sim_granularity: 0.05
       angular_sim_granularity: 0.05
       cuboid:
-        flb: [0.42, 0.36, 0.0] #front left buttom
-        frb: [0.42, -0.36, 0.0]
-        flt: [0.42, 0.36, 0.6] #front left top
-        frt: [0.42, -0.36, 0.6]
-        blb: [-0.35, 0.36, 0.0] #back left buttom
-        brb: [-0.35, -0.36, 0.0]
-        blt: [-0.35, 0.36, 0.6]
-        brt: [-0.35, -0.36, 0.6]
+        flb: [0.185, 0.146, 0.000] # front left bottom
+        frb: [0.185, -0.146, 0.000]
+        flt: [0.185, 0.146, 0.571] # front left top
+        frt: [0.185, -0.146, 0.571]
+        blb: [-0.225, 0.146, 0.000] # back left bottom
+        brb: [-0.225, -0.146, 0.000]
+        blt: [-0.225, 0.146, 0.571]
+        brt: [-0.225, -0.146, 0.571]
     
     differential_drive_simple:
       plugin: "trajectory_generators::DDSimpleTrajectoryGeneratorTheory"
@@ -318,18 +326,18 @@ trajectory_generators:
       angular_sim_granularity: 0.025
 
       cuboid:
-        flb: [0.42, 0.36, 0.0] #front left buttom
-        frb: [0.42, -0.36, 0.0]
-        flt: [0.42, 0.36, 0.6] #front left top
-        frt: [0.42, -0.36, 0.6]
-        blb: [-0.35, 0.36, 0.0] #back left buttom
-        brb: [-0.35, -0.36, 0.0]
-        blt: [-0.35, 0.36, 0.6]
-        brt: [-0.35, -0.36, 0.6]
+        flb: [0.185, 0.146, 0.000] # front left bottom
+        frb: [0.185, -0.146, 0.000]
+        flt: [0.185, 0.146, 0.571] # front left top
+        frt: [0.185, -0.146, 0.571]
+        blb: [-0.225, 0.146, 0.000] # back left bottom
+        brb: [-0.225, -0.146, 0.000]
+        blt: [-0.225, 0.146, 0.571]
+        brt: [-0.225, -0.146, 0.571]
 
 mpc_critics:
   ros__parameters:
-    plugins: ["collision", "stick_path", "pure_pursuit", "toward_global_plan", "collision_rotate", "collision_rotate_shortest", "prefer_rotate_shortest"]
+    plugins: ["collision", "stick_path", "pure_pursuit", "toward_global_plan", "collision_rotate", "collision_rotate_shortest"]
     collision:
       plugin: "mpc_critics::CollisionModel"
       trajectory_generator: ackermann_simple
@@ -353,10 +361,6 @@ mpc_critics:
       weight: 1.0
     collision_rotate_shortest:
       plugin: "mpc_critics::CollisionModel"
-      trajectory_generator: ak_rotate_reeds_shepp
-      weight: 1.0
-    prefer_rotate_shortest:
-      plugin: "mpc_critics::ShortestAngleModel"
       trajectory_generator: ak_rotate_reeds_shepp
       weight: 1.0
 
@@ -395,8 +399,8 @@ perception_3d_local:
       xy_resolution: 0.05
       height_resolution: 0.05
       marking_height: 2.0
-      marking_minimum_height: 0.3
-      perception_window_size: 5.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
+      marking_minimum_height: 0.25
+      perception_window_size: 4.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
       segmentation_ignore_ratio: 1.1 #f a segmentation match static pc with this ratio, we ignore it. ex: a wall
       expected_sensor_time: 1.0
 
@@ -445,8 +449,8 @@ perception_3d_global:
       xy_resolution: 0.05
       height_resolution: 0.05
       marking_height: 2.0
-      marking_minimum_height: 0.3
-      perception_window_size: 5.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
+      marking_minimum_height: 0.25
+      perception_window_size: 4.0 #the window for marking/clearing in meter, we dont casting to maximum range of the sensor even it is gbl map
       segmentation_ignore_ratio: 1.1 #f a segmentation match static pc with this ratio, we ignore it. ex: a wall
       expected_sensor_time: 1.0
 

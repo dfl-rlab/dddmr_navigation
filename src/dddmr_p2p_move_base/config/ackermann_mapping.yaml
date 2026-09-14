@@ -3,7 +3,7 @@ lego_loam_ip:
     # velodyne
     laser:
         odom_type: "wheel_odometry"         #wheel_odometry/laser_odometry 
-        baselink_frame: "base_link"
+        baselink_frame: "base_footprint"
         # Matches saye_description/models/saye/model.sdf GPU LiDAR.
         num_vertical_scans: 128
         num_horizontal_scans: 1024

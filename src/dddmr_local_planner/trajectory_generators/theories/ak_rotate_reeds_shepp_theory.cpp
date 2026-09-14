@@ -59,7 +59,8 @@ double yawFromQuaternion(const geometry_msgs::msg::Quaternion& orientation)
 }  // namespace
 
 AKRotateReedsSheppTheory::AKRotateReedsSheppTheory()
-    : rs_speed_(0.10),
+    : debug_detail_(false),
+      rs_speed_(0.10),
       path_resolution_(0.05),
       closed_heading_maneuver_(true),
       closed_maneuver_reset_timeout_(1.00),
@@ -75,8 +76,7 @@ AKRotateReedsSheppTheory::AKRotateReedsSheppTheory()
       closed_target_y_(0.0),
       closed_target_yaw_(0.0),
       has_last_rs_trajectory_time_(false),
-      selection_cycle_prepared_(false),
-      next_trajectory_index_(0)
+      selection_cycle_prepared_(false)
 {
   return;
 }
@@ -90,6 +90,9 @@ void AKRotateReedsSheppTheory::onInitialize()
 {
   limits_ = std::make_shared<AckermannTrajectoryGeneratorLimits>();
   params_ = std::make_shared<AckermannTrajectoryGeneratorParams>();
+
+  node_->declare_parameter(name_ + ".debug_detail", rclcpp::ParameterValue(false));
+  node_->get_parameter(name_ + ".debug_detail", debug_detail_);
 
   node_->declare_parameter(name_ + ".rs_speed", rclcpp::ParameterValue(0.10));
   node_->get_parameter(name_ + ".rs_speed", rs_speed_);
@@ -136,19 +139,21 @@ void AKRotateReedsSheppTheory::onInitialize()
 
   RCLCPP_INFO(node_->get_logger().get_child(name_),
               "Reeds-Shepp: speed=%.3f m/s, wheelbase=%.4f m, "
-              "max_steer=%.4f rad, resolution=%.3f m",
+              "max_steer=%.4f rad, resolution=%.3f m, debug_detail=%s",
               rs_speed_, limits_->wheelbase, limits_->max_steer_rad,
-              path_resolution_);
-  RCLCPP_INFO(node_->get_logger().get_child(name_),
-              "RS first-gear preference: forward penalty=%.3f m",
-              forward_first_penalty_);
-  RCLCPP_INFO(node_->get_logger().get_child(name_),
-              "RS closed heading maneuver: %s (reset after %.2f s idle, goal distance %.2f m)",
-              closed_heading_maneuver_ ? "enabled" : "disabled",
-              closed_maneuver_reset_timeout_, goal_heading_distance_);
-  RCLCPP_INFO(node_->get_logger().get_child(name_),
-              "RS FIFO queue: choose the lowest-cost candidate from both sides; "
-              "each command advances after its planned duration.");
+              path_resolution_, debug_detail_ ? "true" : "false");
+  if (debug_detail_) {
+    RCLCPP_INFO(node_->get_logger().get_child(name_),
+                "RS first-gear preference: forward penalty=%.3f m",
+                forward_first_penalty_);
+    RCLCPP_INFO(node_->get_logger().get_child(name_),
+                "RS closed heading maneuver: %s (reset after %.2f s idle, goal distance %.2f m)",
+                closed_heading_maneuver_ ? "enabled" : "disabled",
+                closed_maneuver_reset_timeout_, goal_heading_distance_);
+    RCLCPP_INFO(node_->get_logger().get_child(name_),
+                "RS FIFO queue: score all candidates before selecting; "
+                "recheck the selected remainder each cycle and replan after rejection.");
+  }
 
   candidate_markers_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(
       "ak_rotate_reeds_shepp_candidates", rclcpp::QoS(1).transient_local());
@@ -201,15 +206,17 @@ void AKRotateReedsSheppTheory::updateClosedHeadingTarget(
     closed_target_yaw_ = yawFromQuaternion(target.pose.orientation);
   }
   else if (!initialPathTangentYaw(closed_target_yaw_)) {
-    RCLCPP_WARN(node_->get_logger().get_child(name_),
-                "RS could not find a forward path pair; using prune-end yaw for initial alignment.");
+    RCLCPP_WARN_THROTTLE(node_->get_logger().get_child(name_), *node_->get_clock(),
+                         5000, "RS could not find a forward path pair; using prune-end yaw for initial alignment.");
     closed_target_yaw_ = yawFromQuaternion(target.pose.orientation);
   }
   has_closed_heading_target_ = true;
 
-  RCLCPP_INFO(node_->get_logger().get_child(name_),
-              "RS path change: new %s-heading maneuver, target_yaw=%.3f.",
-              is_goal_heading ? "goal" : "initial", closed_target_yaw_);
+  if (debug_detail_) {
+    RCLCPP_INFO(node_->get_logger().get_child(name_),
+                "RS path change: new %s-heading maneuver, target_yaw=%.3f.",
+                is_goal_heading ? "goal" : "initial", closed_target_yaw_);
+  }
 }
 
 bool AKRotateReedsSheppTheory::isGoalHeadingManeuver(
@@ -260,7 +267,7 @@ void AKRotateReedsSheppTheory::initialise()
   // reset an RS plan here: that work belongs to prepareSelectedCycle(), which
   // is reached only through getSamplingSize() for the selected theory.
   trajectories_.clear();
-  next_trajectory_index_ = 0;
+  cycle_candidates_.clear();
   selection_cycle_prepared_ = false;
 }
 
@@ -272,6 +279,7 @@ void AKRotateReedsSheppTheory::prepareSelectedCycle()
   selection_cycle_prepared_ = true;
 
   if (shared_data_->prune_plan_.poses.empty()) {
+    clearActivePlan();
     RCLCPP_WARN_THROTTLE(node_->get_logger().get_child(name_), *node_->get_clock(),
                          5000, "Cannot generate Reeds-Shepp path: prune plan is empty.");
     return;
@@ -288,20 +296,31 @@ void AKRotateReedsSheppTheory::prepareSelectedCycle()
     has_closed_heading_target_ = false;
   }
   updateClosedHeadingTarget(target);
+  last_rs_trajectory_time_ = now;
+  has_last_rs_trajectory_time_ = true;
 
   if (active_plan_valid_) {
     advanceElapsedStep();
   }
 
-  if (!active_plan_valid_ && !createActivePlan(target)) {
-    RCLCPP_WARN_THROTTLE(node_->get_logger().get_child(name_), *node_->get_clock(),
-                         1000, "Cannot create Reeds-Shepp command queue.");
+  if (active_plan_valid_) {
+    base_trajectory::Trajectory trajectory;
+    if (buildTrajectory(remaining_steps_, active_plan_cost_, trajectory)) {
+      trajectories_.push_back(trajectory);
+    }
     return;
   }
 
-  base_trajectory::Trajectory trajectory;
-  if (buildTrajectory(trajectory)) {
-    trajectories_.push_back(trajectory);
+  // No commitment here: critics must see every candidate before expertScoring
+  // chooses which command queue to keep. Candidate matching stays inside RS.
+  cycle_candidates_ = buildCandidates(target);
+  for (std::size_t i = 0; i < cycle_candidates_.size(); ++i) {
+    const auto& candidate = cycle_candidates_[i];
+    const std::deque<RSControlStep> steps(candidate.steps.begin(), candidate.steps.end());
+    base_trajectory::Trajectory trajectory;
+    if (buildTrajectory(steps, candidateCost(candidate), trajectory)) {
+      trajectories_.push_back(trajectory);
+    }
   }
 }
 
@@ -317,23 +336,8 @@ size_t AKRotateReedsSheppTheory::getSamplingSize()
 void AKRotateReedsSheppTheory::getSamplingTrajectoryByIndex(
     size_t index, base_trajectory::Trajectory& trajectory)
 {
-  trajectory = trajectories_[index];
-  const rclcpp::Time now = node_->get_clock()->now();
-  last_rs_trajectory_time_ = now;
-  has_last_rs_trajectory_time_ = true;
-
-  if (active_plan_valid_ && !command_in_progress_ && !remaining_steps_.empty()) {
-    in_flight_step_ = remaining_steps_.front();
-    in_flight_offer_time_ = now;
-    command_in_progress_ = true;
-    const std::size_t current_step = active_plan_total_steps_ -
-        remaining_steps_.size() + 1;
-    RCLCPP_INFO(node_->get_logger().get_child(name_),
-                "RS path get %zu, cur at %zu, v=%.3f, angle=%.3f, side=%s",
-                active_plan_total_steps_, current_step, in_flight_step_.speed,
-                in_flight_step_.steering_angle,
-                active_side_ == PlanSide::LEFT ? "left" : "right");
-  }
+  // Sampling may run in parallel. It must not start a command or mutate the FIFO.
+  trajectory = trajectories_.at(index);
 }
 
 void AKRotateReedsSheppTheory::clearActivePlan()
@@ -345,20 +349,10 @@ void AKRotateReedsSheppTheory::clearActivePlan()
   command_in_progress_ = false;
 }
 
-bool AKRotateReedsSheppTheory::createActivePlan(
-    const geometry_msgs::msg::PoseStamped& target)
+void AKRotateReedsSheppTheory::createActivePlan(const RSCandidate& candidate)
 {
-  RSCandidate candidate;
-  if (!selectCandidate(target, candidate) ||
-      !buildReferencePlan(candidate)) {
-    return false;
-  }
-
   remaining_steps_ = std::deque<RSControlStep>(candidate.steps.begin(),
-                                                 candidate.steps.end());
-  if (remaining_steps_.empty()) {
-    return false;
-  }
+                                             candidate.steps.end());
   active_side_ = candidate.segments.front().steer == 'L'
       ? PlanSide::LEFT : PlanSide::RIGHT;
   active_plan_total_steps_ = remaining_steps_.size();
@@ -366,11 +360,12 @@ bool AKRotateReedsSheppTheory::createActivePlan(
   active_plan_valid_ = true;
   command_in_progress_ = false;
 
-  RCLCPP_INFO(node_->get_logger().get_child(name_),
-              "RS path change: create %s FIFO path with %zu point(s), %.3f m.",
-              active_side_ == PlanSide::LEFT ? "left" : "right",
-              remaining_steps_.size(), candidate.total_length);
-  return true;
+  if (debug_detail_) {
+    RCLCPP_INFO(node_->get_logger().get_child(name_),
+                "RS path change: create %s FIFO path with %zu point(s), %.3f m.",
+                active_side_ == PlanSide::LEFT ? "left" : "right",
+                remaining_steps_.size(), candidate.total_length);
+  }
 }
 
 bool AKRotateReedsSheppTheory::advanceElapsedStep()
@@ -388,15 +383,18 @@ bool AKRotateReedsSheppTheory::advanceElapsedStep()
     remaining_steps_.pop_front();
   }
   command_in_progress_ = false;
-  RCLCPP_DEBUG(node_->get_logger().get_child(name_),
-               "Completed one RS command duration; %zu step(s) remain.",
-               remaining_steps_.size());
+  if (debug_detail_) {
+    RCLCPP_INFO(node_->get_logger().get_child(name_),
+                 "Completed one RS command duration; %zu step(s) remain.",
+                 remaining_steps_.size());
+  }
 
   if (remaining_steps_.empty()) {
-    RCLCPP_INFO(node_->get_logger().get_child(name_),
-                "RS path change: completed %s FIFO path; reuse %s if P2P asks again.",
-                active_side_ == PlanSide::LEFT ? "left" : "right",
-                active_side_ == PlanSide::LEFT ? "left" : "right");
+    if (debug_detail_) {
+      RCLCPP_INFO(node_->get_logger().get_child(name_),
+                  "RS path change: completed %s FIFO path; score new candidates if P2P asks again.",
+                  active_side_ == PlanSide::LEFT ? "left" : "right");
+    }
     clearActivePlan();
   }
   return true;
@@ -412,20 +410,14 @@ double AKRotateReedsSheppTheory::candidateCost(
       (candidate.segments.front().gear > 0 ? forward_first_penalty_ : 0.0);
 }
 
-bool AKRotateReedsSheppTheory::selectCandidate(
-    const geometry_msgs::msg::PoseStamped& target, RSCandidate& candidate) const
+std::vector<AKRotateReedsSheppTheory::RSCandidate>
+AKRotateReedsSheppTheory::buildCandidates(
+    const geometry_msgs::msg::PoseStamped& target) const
 {
   const auto& current = shared_data_->robot_pose_.transform;
-  return selectCandidateFromPose(current.translation.x, current.translation.y,
-                                 yawFromQuaternion(current.rotation), target,
-                                 candidate);
-}
-
-bool AKRotateReedsSheppTheory::selectCandidateFromPose(
-    double start_x, double start_y, double start_yaw,
-    const geometry_msgs::msg::PoseStamped& target,
-    RSCandidate& candidate) const
-{
+  const double start_x = current.translation.x;
+  const double start_y = current.translation.y;
+  const double start_yaw = yawFromQuaternion(current.rotation);
   const double target_yaw = closed_heading_maneuver_ && has_closed_heading_target_
       ? closed_target_yaw_ : yawFromQuaternion(target.pose.orientation);
   const double target_x = closed_heading_maneuver_ && has_closed_heading_target_
@@ -437,7 +429,7 @@ bool AKRotateReedsSheppTheory::selectCandidateFromPose(
 
   const double tangent = std::tan(limits_->max_steer_rad);
   if (std::fabs(tangent) < kSegmentEpsilon) {
-    return false;
+    return {};
   }
   const double minimum_turn_radius = limits_->wheelbase / tangent;
   const double c = std::cos(start_yaw);
@@ -447,32 +439,15 @@ bool AKRotateReedsSheppTheory::selectCandidateFromPose(
   const double phi = mod2pi(target_yaw - start_yaw);
 
   auto candidates = generateCandidates(x, y, phi);
-  // Publish every original RS candidate before the existing selection logic
-  // ranks them by cost.
   publishCandidateMarkers(candidates, minimum_turn_radius);
-  if (candidates.empty()) {
-    return false;
+  for (auto& candidate : candidates) {
+    for (auto& segment : candidate.segments) {
+      segment.length *= minimum_turn_radius;
+    }
+    candidate.total_length *= minimum_turn_radius;
+    buildReferencePlan(candidate);
   }
-
-  std::sort(candidates.begin(), candidates.end(),
-            [this, minimum_turn_radius](const RSCandidate& lhs,
-                                        const RSCandidate& rhs) {
-              // Candidate lengths are normalized by the minimum radius here;
-              // this user-facing preference is expressed in metres.
-              const double lhs_score = lhs.total_length +
-                  (lhs.segments.front().gear > 0
-                       ? forward_first_penalty_ / minimum_turn_radius : 0.0);
-              const double rhs_score = rhs.total_length +
-                  (rhs.segments.front().gear > 0
-                       ? forward_first_penalty_ / minimum_turn_radius : 0.0);
-              return lhs_score < rhs_score;
-            });
-  candidate = candidates.front();
-  for (auto& segment : candidate.segments) {
-    segment.length *= minimum_turn_radius;
-  }
-  candidate.total_length *= minimum_turn_radius;
-  return true;
+  return candidates;
 }
 
 std::vector<AKRotateReedsSheppTheory::RSCandidate>
@@ -684,8 +659,8 @@ bool AKRotateReedsSheppTheory::buildReferencePlan(
     return false;
   }
 
-  // This integration is done exactly once, before the L/R candidate is
-  // offered to CollisionModel.  After a candidate is selected these absolute
+  // Build each candidate before it is offered to CollisionModel.
+  // After a candidate is selected these absolute
   // map-frame points are the persistent reference plan, not a fresh solve.
   const Eigen::Affine3d global_to_base =
       tf2::transformToEigen(shared_data_->robot_pose_);
@@ -725,18 +700,19 @@ bool AKRotateReedsSheppTheory::buildReferencePlan(
 }
 
 bool AKRotateReedsSheppTheory::buildTrajectory(
-    base_trajectory::Trajectory& trajectory)
+    const std::deque<RSControlStep>& steps, double cost,
+    base_trajectory::Trajectory& trajectory) const
 {
-  if (!active_plan_valid_ || remaining_steps_.empty()) {
+  if (steps.empty()) {
     return false;
   }
 
   // P2P publishes xv_/steering_angle_, not Trajectory::points.  The FIFO
   // front is therefore the one command offered this loop; all points remain
   // in the trajectory solely as CollisionModel's future collision horizon.
-  const RSControlStep& command = remaining_steps_.front();
+  const RSControlStep& command = steps.front();
   trajectory.actuator_type_ = actuator_type_;
-  trajectory.cost_ = active_plan_cost_;
+  trajectory.cost_ = cost;
   trajectory.resetPoses();
   trajectory.xv_ = command.speed;
   trajectory.yv_ = 0.0;
@@ -746,7 +722,7 @@ bool AKRotateReedsSheppTheory::buildTrajectory(
   trajectory.steering_angle_velocity_ = 0.0;
   trajectory.time_delta_ = command.duration;
 
-  for (const RSControlStep& step : remaining_steps_) {
+  for (const RSControlStep& step : steps) {
     geometry_msgs::msg::PoseStamped pose = step.pose;
     pose.header.stamp = shared_data_->robot_pose_.header.stamp;
 
@@ -772,10 +748,93 @@ bool AKRotateReedsSheppTheory::buildTrajectory(
   return trajectory.getPosesSize() > 0;
 }
 
+bool AKRotateReedsSheppTheory::matchesCandidate(
+    const RSCandidate& candidate, const base_trajectory::Trajectory& trajectory) const
+{
+  if (candidate.steps.empty() || candidate.steps.size() != trajectory.getPosesSize()) {
+    return false;
+  }
+  const auto& command = candidate.steps.front();
+  if (trajectory.xv_ != command.speed ||
+      trajectory.steering_angle_ != command.steering_angle ||
+      trajectory.time_delta_ != command.duration) {
+    return false;
+  }
+  // Critics score copies without changing their path or command. Compare the
+  // complete path, not just its first command: candidates can share a prefix.
+  // Ignore cost, rejection labels and timestamps, which are not path identity.
+  // Exact comparison is intentional: these poses are copied, not recomputed.
+  for (std::size_t i = 0; i < candidate.steps.size(); ++i) {
+    if (trajectory.getPose(i).pose != candidate.steps[i].pose.pose) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void AKRotateReedsSheppTheory::expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
                                               std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories,
                                               base_trajectory::Trajectory& best_traj){
-  //use default scoring
+  // Do not leave stale geometry or Ackermann commands in an invalid result.
+  best_traj.resetPoses();
+  best_traj.rejected_by_.clear();
+  best_traj.thetav_ = 0.0;
+  best_traj.actuator_type_ = actuator_type_;
+  best_traj.steering_angle_ = 0.0;
+  best_traj.steering_angle_velocity_ = 0.0;
+  best_traj.time_delta_ = 0.0;
   TrajectoryGeneratorTheory::expertScoring(accepted_trajectories, rejected_trajectories, best_traj);
+
+  if (best_traj.cost_ < 0.0) {
+    if (!trajectories_.empty()) {
+      std::string reasons;
+      for (const auto& entry : rejected_trajectories) {
+        const auto count = std::count_if(entry.second.begin(), entry.second.end(),
+            [](const base_trajectory::Trajectory& trajectory) { return trajectory.cost_ < 0.0; });
+        if (count > 0) {
+          if (!reasons.empty()) { reasons += ", "; }
+          reasons += entry.first + "=" + std::to_string(count);
+        }
+      }
+      RCLCPP_WARN_THROTTLE(node_->get_logger().get_child(name_), *node_->get_clock(),
+                          3000, "RS %s rejected (%s); discard FIFO and replan on next RS call.",
+                          active_plan_valid_ ? "remaining path" : "all candidates",
+                          reasons.empty() ? "no valid scored trajectory" : reasons.c_str());
+    }
+    clearActivePlan();
+    return;
+  }
+
+  if (!active_plan_valid_) {
+    const auto selected = std::find_if(cycle_candidates_.begin(), cycle_candidates_.end(),
+        [&](const RSCandidate& candidate) { return matchesCandidate(candidate, best_traj); });
+    if (selected == cycle_candidates_.end()) {
+      RCLCPP_ERROR(node_->get_logger().get_child(name_), "RS best trajectory has no matching command queue.");
+      best_traj.cost_ = -1.0;
+      best_traj.xv_ = 0.0;
+      best_traj.thetav_ = 0.0;
+      best_traj.steering_angle_ = 0.0;
+      best_traj.resetPoses();
+      clearActivePlan();
+      return;
+    }
+    createActivePlan(*selected);
+  }
+
+  // Start timing only after critics accept this command. Further accepted
+  // cycles keep the same start time until prepareSelectedCycle advances it.
+  if (!command_in_progress_ && !remaining_steps_.empty()) {
+    in_flight_step_ = remaining_steps_.front();
+    in_flight_offer_time_ = node_->get_clock()->now();
+    command_in_progress_ = true;
+    if (debug_detail_) {
+      const std::size_t current_step = active_plan_total_steps_ - remaining_steps_.size() + 1;
+      RCLCPP_INFO(node_->get_logger().get_child(name_),
+                  "RS path get %zu, cur at %zu, v=%.3f, angle=%.3f, side=%s",
+                  active_plan_total_steps_, current_step, in_flight_step_.speed,
+                  in_flight_step_.steering_angle,
+                  active_side_ == PlanSide::LEFT ? "left" : "right");
+    }
+  }
 }
 }  // namespace trajectory_generators

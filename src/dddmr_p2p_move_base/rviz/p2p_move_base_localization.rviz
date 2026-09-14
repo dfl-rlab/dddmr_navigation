@@ -9,12 +9,9 @@ Panels:
         - /SubMap1/Topic1
         - /mcl_euc_cluster1/Topic1
         - /GlobalMarking1/Topic1
-        - /ClearingTracing1
-        - /ClearingTracing1/Status1
         - /ClearingTracing1/Topic1
         - /PointCloud21
         - /PointCloud21/Topic1
-        - /PointCloud23
       Splitter Ratio: 0.5823529362678528
     Tree Height: 1793
   - Class: rviz_common/Selection
@@ -486,7 +483,7 @@ Visualization Manager:
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        steering: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -498,7 +495,7 @@ Visualization Manager:
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        ak_rotate_reeds_shepp_candidates: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -515,7 +512,7 @@ Visualization Manager:
       Axis: Z
       Channel Name: intensity
       Class: rviz_default_plugins/PointCloud2
-      Color: 255; 255; 0
+      Color: 0; 255; 0
       Color Transformer: FlatColor
       Decay Time: 0
       Enabled: true
@@ -528,7 +525,7 @@ Visualization Manager:
       Position Transformer: XYZ
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.014999999664723873
+      Size (m): 0.02500000037252903
       Style: Flat Squares
       Topic:
         Depth: 5
@@ -536,7 +533,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Best Effort
-        Value: /segmented_cloud_pure
+        Value: /perception_3d_local/lidar/current_observation
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -654,25 +651,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/ThirdPersonFollower
-      Distance: 11.218103408813477
+      Distance: 7.6448235511779785
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -1.9595119953155518
-        Y: 5.63915491104126
-        Z: 0
+        X: 1.3386046886444092
+        Y: -0.6457947492599487
+        Z: 1.1920928955078125e-06
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.11479601263999939
+      Pitch: 0.3047963082790375
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz_default_plugins)
-      Yaw: 2.61053204536438
+      Yaw: 4.735533714294434
     Saved: ~
 Window Geometry:
   Displays:

@@ -14,7 +14,7 @@
     </class>
 
     <class type="trajectory_generators::AKRotateReedsSheppTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
-      <description>Re-solves left-first and right-first Ackermann Reeds-Shepp curves every control cycle; full curves are collision checked while only the first command is published.</description>
+      <description>Scores all Reeds-Shepp candidates before retaining one timed command FIFO; collision-checks its remainder each cycle and replans after rejection.</description>
     </class>
 
     <class type="trajectory_generators::OmniSimpleTrajectoryGeneratorTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
