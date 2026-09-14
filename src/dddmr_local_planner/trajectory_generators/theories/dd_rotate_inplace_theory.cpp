@@ -346,6 +346,8 @@ bool DDRotateInplaceTheory::generateTrajectory(
   // assuming sample_vel is our target velocity within acc limits for one timestep
   loop_vel = sample_target_vel;
   traj.xv_     = sample_target_vel[0];
+  traj.yv_     = 0.0;
+  traj.zv_     = 0.0;
   traj.thetav_ = sample_target_vel[2];
 
   /*We first create trajectory based on robot_frame, then we use affine to transform it to global frame*/

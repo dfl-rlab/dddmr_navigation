@@ -29,9 +29,6 @@ RUN apt-get update && apt-get install -y git
 RUN apt install -y ros-humble-desktop
 # --- Humble has been installed
 
-# ROS2 that are not included in Desktop but required for DDDMR
-RUN apt install -y ros-humble-ackermann-msgs ros-humble-rqt-tf-tree ros-humble-rosbag2-storage-mcap ros-humble-apriltag-msgs
-
 #install some tool
 RUN apt install -y nano openssh-server usbutils
 #for ping hardware etc...
@@ -88,6 +85,9 @@ RUN cd /tmp && git clone https://github.com/AprilRobotics/apriltag.git && cd apr
 
 #install can stuff for scout
 RUN apt install -y libasio-dev can-utils
+
+# ROS2 that are not included in Desktop but required for DDDMR
+RUN apt install -y ros-humble-ackermann-msgs ros-humble-rqt-tf-tree ros-humble-rosbag2-storage-mcap ros-humble-apriltag-msgs ros-humble-vision-msgs
 
 RUN echo "function ws_build(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release\n}" >> ~/.bashrc
 RUN echo "function ws_build_wi_test(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=OFF -DTEST_ENABLED=ON\n}" >> ~/.bashrc

@@ -28,26 +28,26 @@
 * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include <trajectory_generators/dd_simple_trajectory_generator_theory.h>
+#include <trajectory_generators/uuv_simple_trajectory_generator_theory.h>
 
-PLUGINLIB_EXPORT_CLASS(trajectory_generators::DDSimpleTrajectoryGeneratorTheory, trajectory_generators::TrajectoryGeneratorTheory)
+PLUGINLIB_EXPORT_CLASS(trajectory_generators::UUVSimpleTrajectoryGeneratorTheory, trajectory_generators::TrajectoryGeneratorTheory)
 
 namespace trajectory_generators
 {
 
-DDSimpleTrajectoryGeneratorTheory::DDSimpleTrajectoryGeneratorTheory(){
+UUVSimpleTrajectoryGeneratorTheory::UUVSimpleTrajectoryGeneratorTheory(){
   return;
 }
 
-void DDSimpleTrajectoryGeneratorTheory::configurateActuatorType(){
+void UUVSimpleTrajectoryGeneratorTheory::configurateActuatorType(){
   actuator_type_ = dddmr_sys_core::ActuatorType::MOTOR;
 }
 
 
-void DDSimpleTrajectoryGeneratorTheory::onInitialize(){
+void UUVSimpleTrajectoryGeneratorTheory::onInitialize(){
 
   //@initialize trajectory generator
-  limits_ = std::make_shared<trajectory_generators::DDTrajectoryGeneratorLimits>();
+  limits_ = std::make_shared<trajectory_generators::UUVTrajectoryGeneratorLimits>();
   
   node_->declare_parameter(name_ + ".min_vel_x", rclcpp::ParameterValue(0.01));
   node_->get_parameter(name_ + ".min_vel_x", limits_->min_vel_x);
@@ -56,6 +56,30 @@ void DDSimpleTrajectoryGeneratorTheory::onInitialize(){
   node_->declare_parameter(name_ + ".max_vel_x", rclcpp::ParameterValue(0.1));
   node_->get_parameter(name_ + ".max_vel_x", limits_->max_vel_x);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "max_vel_x: %.2f", limits_->max_vel_x);
+
+  node_->declare_parameter(name_ + ".min_vel_y", rclcpp::ParameterValue(0.01));
+  node_->get_parameter(name_ + ".min_vel_y", limits_->min_vel_y);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "min_vel_y: %.2f", limits_->min_vel_y);
+
+  node_->declare_parameter(name_ + ".max_vel_y", rclcpp::ParameterValue(0.1));
+  node_->get_parameter(name_ + ".max_vel_y", limits_->max_vel_y);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "max_vel_y: %.2f", limits_->max_vel_y);
+
+  node_->declare_parameter(name_ + ".min_vel_z", rclcpp::ParameterValue(0.01));
+  node_->get_parameter(name_ + ".min_vel_z", limits_->min_vel_z);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "min_vel_z: %.2f", limits_->min_vel_z);
+
+  node_->declare_parameter(name_ + ".max_vel_z", rclcpp::ParameterValue(0.1));
+  node_->get_parameter(name_ + ".max_vel_z", limits_->max_vel_z);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "max_vel_z: %.2f", limits_->max_vel_z);
+
+  node_->declare_parameter(name_ + ".min_vel_trans", rclcpp::ParameterValue(0.01));
+  node_->get_parameter(name_ + ".min_vel_trans", limits_->min_vel_trans);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "min_vel_trans: %.2f", limits_->min_vel_trans);
+
+  node_->declare_parameter(name_ + ".max_vel_trans", rclcpp::ParameterValue(0.1));
+  node_->get_parameter(name_ + ".max_vel_trans", limits_->max_vel_trans);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "max_vel_trans: %.2f", limits_->max_vel_trans);
 
   node_->declare_parameter(name_ + ".min_vel_theta", rclcpp::ParameterValue(0.1));
   node_->get_parameter(name_ + ".min_vel_theta", limits_->min_vel_theta);
@@ -69,6 +93,14 @@ void DDSimpleTrajectoryGeneratorTheory::onInitialize(){
   node_->get_parameter(name_ + ".acc_lim_x", limits_->acc_lim_x);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "acc_lim_x: %.2f", limits_->acc_lim_x);
 
+  node_->declare_parameter(name_ + ".acc_lim_y", rclcpp::ParameterValue(0.3));
+  node_->get_parameter(name_ + ".acc_lim_y", limits_->acc_lim_y);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "acc_lim_y: %.2f", limits_->acc_lim_y);
+
+  node_->declare_parameter(name_ + ".acc_lim_z", rclcpp::ParameterValue(0.3));
+  node_->get_parameter(name_ + ".acc_lim_z", limits_->acc_lim_z);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "acc_lim_z: %.2f", limits_->acc_lim_z);
+
   node_->declare_parameter(name_ + ".acc_lim_theta", rclcpp::ParameterValue(0.5));
   node_->get_parameter(name_ + ".acc_lim_theta", limits_->acc_lim_theta);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "acc_lim_theta: %.2f", limits_->acc_lim_theta);
@@ -81,6 +113,7 @@ void DDSimpleTrajectoryGeneratorTheory::onInitialize(){
   node_->get_parameter(name_ + ".prune_backward", limits_->prune_backward);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "prune_backward: %.2f", limits_->prune_backward);
 
+
   //@deceleration allow the robot to consider the deceleration based on the current_speed/deceleration_ratio
   //@for example, if current speed of robot is 1.2 then the considered min_vel will be 0.6 instead of current_speed-dt*acc
   node_->declare_parameter(name_ + ".deceleration_ratio", rclcpp::ParameterValue(2.0));
@@ -91,28 +124,16 @@ void DDSimpleTrajectoryGeneratorTheory::onInitialize(){
     RCLCPP_FATAL(node_->get_logger().get_child(name_), "The min velocity of the robot should be positive!");
 
   /*Motor constraint*/
-  node_->declare_parameter(name_ + ".use_motor_constraint", rclcpp::ParameterValue(false));
-  node_->get_parameter(name_ + ".use_motor_constraint", limits_->use_motor_constraint);
-  RCLCPP_INFO(node_->get_logger().get_child(name_), "use_motor_constraint: %d", limits_->use_motor_constraint);
-
-  node_->declare_parameter(name_ + ".max_motor_shaft_rpm", rclcpp::ParameterValue(3000.0));
-  node_->get_parameter(name_ + ".max_motor_shaft_rpm", limits_->max_motor_shaft_rpm);
-  RCLCPP_INFO(node_->get_logger().get_child(name_), "max_motor_shaft_rpm: %.2f", limits_->max_motor_shaft_rpm);
-
-  node_->declare_parameter(name_ + ".wheel_diameter", rclcpp::ParameterValue(0.15));
-  node_->get_parameter(name_ + ".wheel_diameter", limits_->wheel_diameter);
-  RCLCPP_INFO(node_->get_logger().get_child(name_), "wheel_diameter: %.2f", limits_->wheel_diameter);
-
-  node_->declare_parameter(name_ + ".gear_ratio", rclcpp::ParameterValue(30.0));
-  node_->get_parameter(name_ + ".gear_ratio", limits_->gear_ratio);
-  RCLCPP_INFO(node_->get_logger().get_child(name_), "gear_ratio: %.2f", limits_->gear_ratio);
+  node_->declare_parameter(name_ + ".use_power_constraint", rclcpp::ParameterValue(false));
+  node_->get_parameter(name_ + ".use_power_constraint", limits_->use_power_constraint);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "use_power_constraint: %d", limits_->use_power_constraint);
 
   node_->declare_parameter(name_ + ".robot_radius", rclcpp::ParameterValue(0.25));
   node_->get_parameter(name_ + ".robot_radius", limits_->robot_radius);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "robot_radius: %.2f", limits_->robot_radius);
 
   //@initial params
-  params_ = std::make_shared<trajectory_generators::DDTrajectoryGeneratorParams>();
+  params_ = std::make_shared<trajectory_generators::UUVTrajectoryGeneratorParams>();
 
   node_->declare_parameter(name_ + ".controller_frequency", rclcpp::ParameterValue(10.0));
   node_->get_parameter(name_ + ".controller_frequency", params_->controller_frequency);
@@ -125,6 +146,14 @@ void DDSimpleTrajectoryGeneratorTheory::onInitialize(){
   node_->declare_parameter(name_ + ".linear_x_sample", rclcpp::ParameterValue(10.0));
   node_->get_parameter(name_ + ".linear_x_sample", params_->linear_x_sample);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "linear_x_sample: %.2f", params_->linear_x_sample);
+
+  node_->declare_parameter(name_ + ".linear_y_sample", rclcpp::ParameterValue(10.0));
+  node_->get_parameter(name_ + ".linear_y_sample", params_->linear_y_sample);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "linear_y_sample: %.2f", params_->linear_y_sample);
+
+  node_->declare_parameter(name_ + ".linear_z_sample", rclcpp::ParameterValue(10.0));
+  node_->get_parameter(name_ + ".linear_z_sample", params_->linear_z_sample);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "linear_z_sample: %.2f", params_->linear_z_sample);
 
   node_->declare_parameter(name_ + ".angular_z_sample", rclcpp::ParameterValue(10.0));
   node_->get_parameter(name_ + ".angular_z_sample", params_->angular_z_sample);
@@ -238,97 +267,112 @@ void DDSimpleTrajectoryGeneratorTheory::onInitialize(){
 
 }
 
-void DDSimpleTrajectoryGeneratorTheory::initialise(){
+void UUVSimpleTrajectoryGeneratorTheory::initialise(){
+  /*
+   * We actually generate all velocity sample vectors here, from which to generate trajectories later on
+   */
   /*
    * We actually generate all velocity sample vectors here, from which to generate trajectories later on
    */
   double max_vel_th = limits_->max_vel_theta;
   double min_vel_th = -1.0 * max_vel_th;
-  Eigen::Vector3f acc_lim = limits_->getAccLimits();
+  auto acc_lim = limits_->getAccLimits();
   next_sample_index_ = 0;
   sample_params_.clear();
 
   double min_vel_x = limits_->min_vel_x;
   double max_vel_x = limits_->max_vel_x;
 
+  double min_vel_y = limits_->min_vel_y;
+  double max_vel_y = limits_->max_vel_y;
+
+  double min_vel_z = limits_->min_vel_z;
+  double max_vel_z = limits_->max_vel_z;
 
   // if sampling number is zero in any dimension, we don't generate samples generically
   if (params_->linear_x_sample * params_->angular_z_sample > 0) {
     //compute the feasible velocity space based on the rate at which we run
-    Eigen::Vector3f max_vel = Eigen::Vector3f::Zero();
-    Eigen::Vector3f min_vel = Eigen::Vector3f::Zero();
+    Eigen::VectorXf max_vel6d = Eigen::VectorXf::Zero(6); //xyzrpy
+    Eigen::VectorXf min_vel6d = Eigen::VectorXf::Zero(6);
+
 
     // with dwa do not accelerate beyond the first step, we only sample within velocities we reach in sim_period
     double sim_period = 1.0/params_->controller_frequency;
     
-    // allow max speed to be changed by speed zone/perception features
-    if(shared_data_->current_allowed_max_linear_speed_>0.0){
-      max_vel_x = std::min(max_vel_x, shared_data_->current_allowed_max_linear_speed_);
-    }
-    max_vel[0] = std::min(max_vel_x, shared_data_->robot_state_.twist.twist.linear.x + acc_lim[0] * sim_period);
-    //@when using high frequency, the first step will be diluted to a small speed, therefore, use the min_vel
-    if(max_vel[0]<min_vel_x){
-      max_vel[0] = min_vel_x;
-    }
-    max_vel[2] = std::min(max_vel_th, shared_data_->robot_state_.twist.twist.angular.z + acc_lim[2] * sim_period);
-    //@when using high frequency, the first step will be diluted to a small speed, therefore, use the min_vel
-    if(max_vel[2]<min_vel_th){
-      max_vel[2] = min_vel_th;
-    }
 
-    min_vel[0] = std::max(min_vel_x, shared_data_->robot_state_.twist.twist.linear.x/limits_->deceleration_ratio);
-    min_vel[2] = std::max(min_vel_th, shared_data_->robot_state_.twist.twist.angular.z - acc_lim[2] * sim_period);
+    max_vel6d[0] = std::min(max_vel_x, shared_data_->robot_state_.twist.twist.linear.x + acc_lim[0] * sim_period);
+    max_vel6d[1] = std::min(max_vel_y, shared_data_->robot_state_.twist.twist.linear.y + acc_lim[1] * sim_period);
+    max_vel6d[2] = std::min(max_vel_z, shared_data_->robot_state_.twist.twist.linear.z + acc_lim[2] * sim_period);
+    max_vel6d[5] = std::min(max_vel_th, shared_data_->robot_state_.twist.twist.angular.z + acc_lim[5] * sim_period);
+
+    min_vel6d[0] = std::max(min_vel_x, shared_data_->robot_state_.twist.twist.linear.x - acc_lim[0] * sim_period);
+    min_vel6d[1] = std::max(min_vel_y, shared_data_->robot_state_.twist.twist.linear.y - acc_lim[1] * sim_period);
+    min_vel6d[2] = std::max(min_vel_z, shared_data_->robot_state_.twist.twist.linear.z - acc_lim[2] * sim_period);
+    min_vel6d[5] = std::max(min_vel_th, shared_data_->robot_state_.twist.twist.angular.z - acc_lim[5] * sim_period);
     
-    // because the speed zone might introduce huge deceleration than robot kinematic
-    // which will cause max_vel[0]<min_vel[0]
-    // the min admissible will be shared_data_->robot_state_.twist.twist.linear.x/limits_->deceleration_ratio
-    // because the robot will never decelerate enough to meet shared_data_->current_allowed_max_linear_speed_
-    if(max_vel[0]<min_vel[0]){
-      min_vel[0] = shared_data_->robot_state_.twist.twist.linear.x/limits_->deceleration_ratio;
-      max_vel[0] = shared_data_->robot_state_.twist.twist.linear.x/limits_->deceleration_ratio;
+    
+    if(shared_data_->robot_state_.twist.twist.linear.x >= max_vel_x/limits_->deceleration_ratio){
+      //@ robot reach max speed at forward/backward
+      min_vel6d[0] = std::max(min_vel_x, shared_data_->robot_state_.twist.twist.linear.x/limits_->deceleration_ratio);
+    }
+    else if(shared_data_->robot_state_.twist.twist.linear.x <= min_vel_x/limits_->deceleration_ratio){
+      max_vel6d[0] = std::min(max_vel_x, shared_data_->robot_state_.twist.twist.linear.x/limits_->deceleration_ratio);
     }
 
-    Eigen::Vector3f vel_samp = Eigen::Vector3f::Zero();
-    trajectory_generators::VelocityIterator x_it(min_vel[0], max_vel[0], params_->linear_x_sample);
-    trajectory_generators::VelocityIterator th_it(min_vel[2], max_vel[2], params_->angular_z_sample);
+    if(shared_data_->robot_state_.twist.twist.linear.y >= max_vel_y/limits_->deceleration_ratio){
+      //@ robot reach max speed at lateral
+      min_vel6d[1] = std::max(min_vel_y, shared_data_->robot_state_.twist.twist.linear.y/limits_->deceleration_ratio);
+    }
+    else if(shared_data_->robot_state_.twist.twist.linear.y <= min_vel_y/limits_->deceleration_ratio){
+      max_vel6d[1] = std::min(max_vel_y, shared_data_->robot_state_.twist.twist.linear.y/limits_->deceleration_ratio);
+    }
+
+    if(shared_data_->robot_state_.twist.twist.linear.z >= max_vel_z/limits_->deceleration_ratio){
+      //@ robot reach max speed at z
+      min_vel6d[2] = std::max(min_vel_z, shared_data_->robot_state_.twist.twist.linear.z/limits_->deceleration_ratio);
+    }
+    else if(shared_data_->robot_state_.twist.twist.linear.z <= min_vel_z/limits_->deceleration_ratio){
+      max_vel6d[2] = std::min(max_vel_z, shared_data_->robot_state_.twist.twist.linear.z/limits_->deceleration_ratio);
+    }
+
+    Eigen::VectorXf vel_sample_6d = Eigen::VectorXf::Zero(6); //xyzrpy
+    trajectory_generators::VelocityIterator x_it(min_vel6d[0], max_vel6d[0], params_->linear_x_sample);
+    trajectory_generators::VelocityIterator y_it(min_vel6d[1], max_vel6d[1], params_->linear_y_sample);
+    trajectory_generators::VelocityIterator z_it(min_vel6d[2], max_vel6d[2], params_->linear_z_sample);
+    trajectory_generators::VelocityIterator th_it(min_vel6d[5], max_vel6d[5], params_->angular_z_sample);
     for(; !x_it.isFinished(); x_it++) {
-      vel_samp[0] = x_it.getVelocity();
-
-      for(; !th_it.isFinished(); th_it++) {
-        vel_samp[2] = th_it.getVelocity();
-        //ROS_DEBUG("Sample %f, %f, %f", vel_samp[0], vel_samp[1], vel_samp[2]);
-        if(isMotorConstraintSatisfied(vel_samp))
-          sample_params_.push_back(vel_samp);
+      vel_sample_6d[0] = x_it.getVelocity();
+      for(; !y_it.isFinished(); y_it++) {
+        vel_sample_6d[1] = y_it.getVelocity();
+        for(; !z_it.isFinished(); z_it++){
+          vel_sample_6d[2] = z_it.getVelocity();
+          for(; !th_it.isFinished(); th_it++) {
+            vel_sample_6d[5] = th_it.getVelocity();
+            sample_params_.push_back(vel_sample_6d);
+          }
+          th_it.reset();
+        }
+        z_it.reset();
       }
-      th_it.reset();
-
+      y_it.reset();
     }
-    //ROS_WARN("%f,%f, %lu",vel.twist.twist.linear.x, vel.twist.twist.angular.z, sample_params_.size());
   }    
 }
 
-bool DDSimpleTrajectoryGeneratorTheory::isMotorConstraintSatisfied(Eigen::Vector3f& vel_samp){
+bool UUVSimpleTrajectoryGeneratorTheory::isPowerConstraintSatisfied(Eigen::VectorXf& vel6d){
   
   //@ if we dont want motor constraint, return constraint is atisfied
-  if(!limits_->use_motor_constraint)
+  if(!limits_->use_power_constraint)
     return true;
-
-  double vr,vl;
-  vr = vel_samp[0] + limits_->robot_radius * vel_samp[2];
-  vl = vel_samp[0] - limits_->robot_radius * vel_samp[2];
-  double rpm_r, rpm_l;
-  rpm_r = vr * limits_->gear_ratio * 60./3.1415926/limits_->wheel_diameter;
-  rpm_l = vl * limits_->gear_ratio * 60./3.1415926/limits_->wheel_diameter;
-  if(fabs(rpm_r)>=limits_->max_motor_shaft_rpm || fabs(rpm_l)>=limits_->max_motor_shaft_rpm)
-    return false;
   return true;
+  //@ compute thrust command that will not cause over current
 }
 
-size_t DDSimpleTrajectoryGeneratorTheory::getSamplingSize(){
+size_t UUVSimpleTrajectoryGeneratorTheory::getSamplingSize(){
   return sample_params_.size();
 }
 
-void DDSimpleTrajectoryGeneratorTheory::getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj){
+void UUVSimpleTrajectoryGeneratorTheory::getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj){
   generateTrajectory(sample_params_[index], _traj);
 }
 
@@ -336,8 +380,8 @@ void DDSimpleTrajectoryGeneratorTheory::getSamplingTrajectoryByIndex(size_t inde
  * @param pos current position of robot
  * @param vel desired velocity for sampling
  */
-bool DDSimpleTrajectoryGeneratorTheory::generateTrajectory(
-      Eigen::Vector3f sample_target_vel,
+bool UUVSimpleTrajectoryGeneratorTheory::generateTrajectory(
+      Eigen::VectorXf& sample_target_vel,
       base_trajectory::Trajectory& traj) {
 
   //@ assign actuator type to trajectory, so that when move base publishing the cmd_vel,
@@ -345,7 +389,7 @@ bool DDSimpleTrajectoryGeneratorTheory::generateTrajectory(
   traj.actuator_type_ = actuator_type_;
   
   Eigen::Affine3d pos_af3 = tf2::transformToEigen(shared_data_->robot_pose_);
-  double vmag = fabs(sample_target_vel[0]);
+  double vmag = sample_target_vel.head<3>().norm();
   double eps = 1e-4;
   traj.cost_ = 0.0; // placed here in case we return early
   //trajectory might be reused so we'll make sure to reset it
@@ -353,12 +397,12 @@ bool DDSimpleTrajectoryGeneratorTheory::generateTrajectory(
 
   // make sure that the robot would at least be moving with one of
   // the required minimum velocities for translation and rotation (if set)
-  if ((limits_->min_vel_x >= 0 && vmag + eps < limits_->min_vel_x) &&
-      (limits_->min_vel_theta >= 0 && fabs(sample_target_vel[2]) + eps < limits_->min_vel_theta)) {
+  if ((limits_->min_vel_trans >= 0 && vmag + eps < limits_->min_vel_trans) &&
+      (limits_->min_vel_theta >= 0 && fabs(sample_target_vel[5]) + eps < limits_->min_vel_theta)) {
     return false;
   }
-  // make sure we do not exceed max diagonal (x+y) translational velocity (if set)
-  if (limits_->max_vel_x >=0 && vmag - eps > limits_->max_vel_x) {
+  // make sure we do not exceed max diagonal (x+y+z) translational velocity (if set)
+  if (limits_->max_vel_trans >=0 && vmag - eps > limits_->max_vel_trans) {
     return false;
   }
 
@@ -366,7 +410,7 @@ bool DDSimpleTrajectoryGeneratorTheory::generateTrajectory(
 
   //compute the number of steps we must take along this trajectory to be "safe"
   double sim_time_distance = vmag * params_->sim_time; // the distance the robot would travel in sim_time if it did not change velocity
-  double sim_time_angle = fabs(sample_target_vel[2]) * params_->sim_time; // the angle the robot would rotate in sim_time
+  double sim_time_angle = fabs(sample_target_vel[5]) * params_->sim_time; // the angle the robot would rotate in sim_time
   num_steps =
       ceil(std::max(sim_time_distance / params_->sim_granularity,
           sim_time_angle / params_->angular_sim_granularity));
@@ -386,17 +430,17 @@ bool DDSimpleTrajectoryGeneratorTheory::generateTrajectory(
   //traj.time_delta_ = dt;
 
   
-  Eigen::Vector3f loop_vel;
+  Eigen::VectorXf loop_vel;
 
   // assuming sample_vel is our target velocity within acc limits for one timestep
   loop_vel = sample_target_vel;
   traj.xv_     = sample_target_vel[0];
-  traj.yv_     = 0.0;
-  traj.zv_     = 0.0;
-  traj.thetav_ = sample_target_vel[2];
+  traj.yv_     = sample_target_vel[1];
+  traj.zv_     = sample_target_vel[2];
+  traj.thetav_ = sample_target_vel[5];
 
   /*We first create trajectory based on robot_frame, then we use affine to transform it to global frame*/
-  Eigen::Vector3f pos = Eigen::Vector3f::Zero();
+  Eigen::VectorXf pos = Eigen::VectorXf::Zero(6);
   //simulate the trajectory and check for collisions, updating costs along the way
   for (int i = 0; i < num_steps; ++i) {
 
@@ -407,9 +451,10 @@ bool DDSimpleTrajectoryGeneratorTheory::generateTrajectory(
     Eigen::Affine3d trans_gbl2traj_af3;
 
     
-    Eigen::Affine3d trans_b2traj_af3(Eigen::AngleAxisd(pos[2], Eigen::Vector3d::UnitZ()));
+    Eigen::Affine3d trans_b2traj_af3(Eigen::AngleAxisd(pos[5], Eigen::Vector3d::UnitZ()));
     trans_b2traj_af3.translation().x() = pos[0];
     trans_b2traj_af3.translation().y() = pos[1];
+    trans_b2traj_af3.translation().z() = pos[2];
     
     /*
     tf2::Quaternion tf2_rotation;
@@ -448,16 +493,17 @@ bool DDSimpleTrajectoryGeneratorTheory::generateTrajectory(
   return true; // trajectory has at least one point
 }
 
-Eigen::Vector3f DDSimpleTrajectoryGeneratorTheory::computeNewPositions(const Eigen::Vector3f& pos,
-    const Eigen::Vector3f& vel, double dt) {
-  Eigen::Vector3f new_pos = Eigen::Vector3f::Zero();
-  new_pos[0] = pos[0] + (vel[0] * cos(pos[2])) * dt;
-  new_pos[1] = pos[1] + (vel[0] * sin(pos[2])) * dt;
-  new_pos[2] = pos[2] + vel[2] * dt;
+Eigen::VectorXf UUVSimpleTrajectoryGeneratorTheory::computeNewPositions(const Eigen::VectorXf& pos,
+    const Eigen::VectorXf& vel6d, double dt) {
+  Eigen::VectorXf new_pos = pos;
+  new_pos[0] += (vel6d[0] * cos(pos[5]) + vel6d[1] * cos(M_PI_2 + pos[5])) * dt;
+  new_pos[1] += (vel6d[0] * sin(pos[5]) + vel6d[1] * sin(M_PI_2 + pos[5])) * dt;
+  new_pos[2] += vel6d[2] * dt;
+  new_pos[5] += vel6d[5] * dt;
   return new_pos;
 }
 
-void DDSimpleTrajectoryGeneratorTheory::expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
+void UUVSimpleTrajectoryGeneratorTheory::expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
                                             std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
                                               base_trajectory::Trajectory& best_traj){
   //use default scoring

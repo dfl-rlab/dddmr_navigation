@@ -28,60 +28,57 @@
 * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include <base_trajectory/trajectory.h>
 
-namespace base_trajectory {
-  Trajectory::Trajectory()
-    : xv_(0.0), yv_(0.0), thetav_(0.0), cost_(-1.0)
-  {
-  }
+#ifndef _UUV_SIMPLE_TRAJECTORY_GENERATOR_PARAMS_H__
+#define _UUV_SIMPLE_TRAJECTORY_GENERATOR_PARAMS_H__
 
-  geometry_msgs::msg::PoseStamped Trajectory::getPose(unsigned int index) const {
-    return trajectory_path_.poses[index];
-  }
+#include <Eigen/Core>
+//@ pcl for cuboid
+#include <pcl/point_cloud.h>
 
-  pcl::PointXYZI Trajectory::getPCLPoint(unsigned int index) const{
-    return pcl_trajectory_path_.points[index];
-  }
+namespace trajectory_generators
+{
+class UUVTrajectoryGeneratorParams
+{
+public:
 
-  pcl::PointCloud<pcl::PointXYZ> Trajectory::getCuboid(unsigned int index) const {
-    return cuboids_[index];
-  }
+  double controller_frequency;
+  double sim_time;
+  double linear_x_sample;
+  double linear_y_sample;
+  double linear_z_sample;
+  double angular_z_sample;
+  double sim_granularity;
+  double angular_sim_granularity;
+  pcl::PointCloud<pcl::PointXYZ> cuboid;
 
-  cuboid_min_max_t Trajectory::getCuboidMinMax(unsigned int index) const {
-    return cuboids_min_max_[index];
-  }
 
-  bool Trajectory::addPoseCuboid(const geometry_msgs::msg::PoseStamped& pos, 
-                            const pcl::PointCloud<pcl::PointXYZ>& cuboid,
-                            const cuboid_min_max_t& cuboid_min_max){
-    trajectory_path_.poses.push_back(pos);
-    cuboids_.push_back(cuboid);
-    cuboids_min_max_.push_back(cuboid_min_max);
-    //@ for pcl
-    pcl::PointXYZI ipt;
-    ipt.x = pos.pose.position.x;
-    ipt.y = pos.pose.position.y;
-    ipt.z = pos.pose.position.z;
-    ipt.intensity = 0.;
-    pcl_trajectory_path_.push_back(ipt);
+  UUVTrajectoryGeneratorParams() {}
 
-    return true;
+  UUVTrajectoryGeneratorParams(
+      double ncontroller_frequency,
+      double nsim_time,
+      double nlinear_x_sample,
+      double nlinear_y_sample,
+      double nlinear_z_sample,
+      double nangular_z_sample,
+      double nsim_granularity,
+      double nangular_sim_granularity):
+        controller_frequency(ncontroller_frequency),
+        sim_time(nsim_time),
+        linear_x_sample(nlinear_x_sample),
+        linear_y_sample(nlinear_y_sample),
+        linear_z_sample(nlinear_z_sample),
+        angular_z_sample(nangular_z_sample),
+        sim_granularity(nsim_granularity),
+        angular_sim_granularity(nangular_sim_granularity)
 
-  }
+{}
 
-  void Trajectory::resetPoses(){
-    trajectory_path_.poses.clear();
-    cuboids_.clear();
-    cuboids_min_max_.clear();
-    pcl_trajectory_path_.points.clear();
-  }
+  ~UUVTrajectoryGeneratorParams() {}
 
-  void Trajectory::getEndpoint(double& x, double& y, double& th) const {
 
-  }
-
-  unsigned int Trajectory::getPosesSize() const {
-    return trajectory_path_.poses.size();
-  }
 };
+
+}
+#endif // _UUV_SIMPLE_TRAJECTORY_GENERATOR_PARAMS_H__

@@ -159,6 +159,7 @@ void P2PMoveBase::publishZeroVelocity(){
   geometry_msgs::msg::Twist cmd_vel;
   cmd_vel.linear.x = 0.0;
   cmd_vel.linear.y = 0.0;
+  cmd_vel.linear.z = 0.0;
   cmd_vel.angular.z = 0.0;
   if(STATE_->use_twist_stamped_){
     geometry_msgs::msg::TwistStamped stamped_cmd_vel;
@@ -186,6 +187,7 @@ void P2PMoveBase::publishVelocity(const base_trajectory::Trajectory& cmd_traj){
     geometry_msgs::msg::Twist cmd_vel;
     cmd_vel.linear.x = cmd_traj.xv_;
     cmd_vel.linear.y = cmd_traj.yv_;
+    cmd_vel.linear.z = cmd_traj.zv_;
     cmd_vel.angular.z = cmd_traj.thetav_;
     if(STATE_->use_twist_stamped_){
       geometry_msgs::msg::TwistStamped stamped_cmd_vel;

@@ -105,6 +105,7 @@ add_library(theories SHARED
   theories/dd_simple_trajectory_generator_theory.cpp
   theories/omni_simple_trajectory_generator_theory.cpp
   theories/one_state_trajectory_generator_theory.cpp
+  theories/uuv_simple_trajectory_generator_theory.cpp
 )
 target_link_libraries(theories
   trajectory_generator_ros
