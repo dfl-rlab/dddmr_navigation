@@ -98,19 +98,18 @@ double PurePursuitModel::scoreTrajectory(base_trajectory::Trajectory &traj){
   tf2::convert(tf_pose_difference.transform.rotation , q);
   tf2::Matrix3x3(q).getEulerYPR(y,p,r);
 
-  y = std::fmod((y+3.1416),3.1416);
   //RCLCPP_DEBUG(node_->get_logger().get_child(name_), "yaw: %f",y);
   double distance = sqrt(tf_pose_difference.transform.translation.x*tf_pose_difference.transform.translation.x+
                         tf_pose_difference.transform.translation.y*tf_pose_difference.transform.translation.y+
                         tf_pose_difference.transform.translation.z*tf_pose_difference.transform.translation.z);
-  /*
-  RCLCPP_DEBUG(node_->get_logger().get_child(name_), "Roll: %f, Pitch: %f, Yaw: %f",r,p,y);
-  RCLCPP_DEBUG(node_->get_logger().get_child(name_), "trans: %f,%f,%f", pose_difference.translation().x(), pose_difference.translation().y(), pose_difference.translation().z());
-  RCLCPP_STREAM(node_->get_logger().get_child(name_), "Affine: " << pose_difference.rotation());
-  */
+  
+  //RCLCPP_INFO(node_->get_logger().get_child(name_), "Roll: %f, Pitch: %f, Yaw: %f",r,p,y);
+  //RCLCPP_DEBUG(node_->get_logger().get_child(name_), "trans: %f,%f,%f", pose_difference.translation().x(), pose_difference.translation().y(), pose_difference.translation().z());
+  //RCLCPP_STREAM(node_->get_logger().get_child(name_), "Affine: " << pose_difference.rotation());
+  
   //RCLCPP_INFO(node_->get_logger().get_child(name_), "trans: %f,%f,%f", tf_pose_difference.transform.translation.x, tf_pose_difference.transform.translation.y, tf_pose_difference.transform.translation.z);
   //@ normalized translation vs rotation
-  return (translation_weight_*distance + orientation_weight_*y);
+  return (translation_weight_*distance + orientation_weight_*fabs(y));
 }
 
 }//end of name space

@@ -33,6 +33,10 @@
       <description>TBW</description>
     </class>
 
+    <class type="mpc_critics::DensityPreferenceModel"  base_class_type="mpc_critics::ScoringModel">
+      <description>TBW</description>
+    </class>
+
   </library>
 </class_libraries>
 

@@ -39,11 +39,11 @@
 namespace trajectory_generators
 {
 
-class UUVSimpleTrajectoryGeneratorTheory: public TrajectoryGeneratorTheory{
+class UUVSwayPredictiveTrajectoryGeneratorTheory: public TrajectoryGeneratorTheory{
 
   public:
     
-    UUVSimpleTrajectoryGeneratorTheory();
+    UUVSwayPredictiveTrajectoryGeneratorTheory();
     virtual size_t getSamplingSize();
     virtual void getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj);
     void expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
@@ -60,7 +60,9 @@ class UUVSimpleTrajectoryGeneratorTheory: public TrajectoryGeneratorTheory{
 
     Eigen::VectorXf computeNewPositions(const Eigen::VectorXf& pos,
                                         const Eigen::VectorXf& vel6d, double dt);
-
+    
+    double lateral_velocity_incurred_weight_;
+    
   protected:
 
     virtual void onInitialize();

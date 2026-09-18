@@ -28,27 +28,27 @@
 * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include <trajectory_generators/uuv_simple_trajectory_generator_theory.h>
+#include <trajectory_generators/uuv_sway_predictive_trajectory_generator.h>
 
-PLUGINLIB_EXPORT_CLASS(trajectory_generators::UUVSimpleTrajectoryGeneratorTheory, trajectory_generators::TrajectoryGeneratorTheory)
+PLUGINLIB_EXPORT_CLASS(trajectory_generators::UUVSwayPredictiveTrajectoryGeneratorTheory, trajectory_generators::TrajectoryGeneratorTheory)
 
 namespace trajectory_generators
 {
 
-UUVSimpleTrajectoryGeneratorTheory::UUVSimpleTrajectoryGeneratorTheory(){
+UUVSwayPredictiveTrajectoryGeneratorTheory::UUVSwayPredictiveTrajectoryGeneratorTheory(){
   return;
 }
 
-void UUVSimpleTrajectoryGeneratorTheory::configurateActuatorType(){
+void UUVSwayPredictiveTrajectoryGeneratorTheory::configurateActuatorType(){
   actuator_type_ = dddmr_sys_core::ActuatorType::MOTOR;
 }
 
 
-void UUVSimpleTrajectoryGeneratorTheory::onInitialize(){
-
+void UUVSwayPredictiveTrajectoryGeneratorTheory::onInitialize(){
+  
   //@initialize trajectory generator
   limits_ = std::make_shared<trajectory_generators::UUVTrajectoryGeneratorLimits>();
-  
+
   node_->declare_parameter(name_ + ".min_vel_x", rclcpp::ParameterValue(0.01));
   node_->get_parameter(name_ + ".min_vel_x", limits_->min_vel_x);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "min_vel_x: %.2f", limits_->min_vel_x);
@@ -134,6 +134,10 @@ void UUVSimpleTrajectoryGeneratorTheory::onInitialize(){
 
   //@initial params
   params_ = std::make_shared<trajectory_generators::UUVTrajectoryGeneratorParams>();
+  
+  node_->declare_parameter(name_ + ".lateral_velocity_incurred_weight", rclcpp::ParameterValue(0.1));
+  node_->get_parameter(name_ + ".lateral_velocity_incurred_weight", lateral_velocity_incurred_weight_);
+  RCLCPP_INFO(node_->get_logger().get_child(name_), "lateral_velocity_incurred_weight: %.2f", lateral_velocity_incurred_weight_);
 
   node_->declare_parameter(name_ + ".controller_frequency", rclcpp::ParameterValue(10.0));
   node_->get_parameter(name_ + ".controller_frequency", params_->controller_frequency);
@@ -267,7 +271,7 @@ void UUVSimpleTrajectoryGeneratorTheory::onInitialize(){
 
 }
 
-void UUVSimpleTrajectoryGeneratorTheory::initialise(){
+void UUVSwayPredictiveTrajectoryGeneratorTheory::initialise(){
   /*
    * We actually generate all velocity sample vectors here, from which to generate trajectories later on
    */
@@ -359,7 +363,7 @@ void UUVSimpleTrajectoryGeneratorTheory::initialise(){
   }    
 }
 
-bool UUVSimpleTrajectoryGeneratorTheory::isPowerConstraintSatisfied(Eigen::VectorXf& vel6d){
+bool UUVSwayPredictiveTrajectoryGeneratorTheory::isPowerConstraintSatisfied(Eigen::VectorXf& vel6d){
   
   //@ if we dont want motor constraint, return constraint is atisfied
   if(!limits_->use_power_constraint)
@@ -368,11 +372,11 @@ bool UUVSimpleTrajectoryGeneratorTheory::isPowerConstraintSatisfied(Eigen::Vecto
   //@ compute thrust command that will not cause over current
 }
 
-size_t UUVSimpleTrajectoryGeneratorTheory::getSamplingSize(){
+size_t UUVSwayPredictiveTrajectoryGeneratorTheory::getSamplingSize(){
   return sample_params_.size();
 }
 
-void UUVSimpleTrajectoryGeneratorTheory::getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj){
+void UUVSwayPredictiveTrajectoryGeneratorTheory::getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj){
   generateTrajectory(sample_params_[index], _traj);
 }
 
@@ -380,7 +384,7 @@ void UUVSimpleTrajectoryGeneratorTheory::getSamplingTrajectoryByIndex(size_t ind
  * @param pos current position of robot
  * @param vel desired velocity for sampling
  */
-bool UUVSimpleTrajectoryGeneratorTheory::generateTrajectory(
+bool UUVSwayPredictiveTrajectoryGeneratorTheory::generateTrajectory(
       Eigen::VectorXf& sample_target_vel,
       base_trajectory::Trajectory& traj) {
 
@@ -444,6 +448,10 @@ bool UUVSimpleTrajectoryGeneratorTheory::generateTrajectory(
   //simulate the trajectory and check for collisions, updating costs along the way
   for (int i = 0; i < num_steps; ++i) {
 
+    //y incurred by x speed and rotation
+    lateral_velocity_incurred_weight_ = std::min(lateral_velocity_incurred_weight_, 1.0);
+    loop_vel[1] += loop_vel[0] * cos(1.5707963 + pos[5]) * lateral_velocity_incurred_weight_;
+
     //update the position of the robot using the velocities passed in
     pos = computeNewPositions(pos, loop_vel, dt);
 
@@ -493,7 +501,7 @@ bool UUVSimpleTrajectoryGeneratorTheory::generateTrajectory(
   return true; // trajectory has at least one point
 }
 
-Eigen::VectorXf UUVSimpleTrajectoryGeneratorTheory::computeNewPositions(const Eigen::VectorXf& pos,
+Eigen::VectorXf UUVSwayPredictiveTrajectoryGeneratorTheory::computeNewPositions(const Eigen::VectorXf& pos,
     const Eigen::VectorXf& vel6d, double dt) {
   Eigen::VectorXf new_pos = pos;
   new_pos[0] += (vel6d[0] * cos(pos[5]) + vel6d[1] * cos(M_PI_2 + pos[5])) * dt;
@@ -503,7 +511,7 @@ Eigen::VectorXf UUVSimpleTrajectoryGeneratorTheory::computeNewPositions(const Ei
   return new_pos;
 }
 
-void UUVSimpleTrajectoryGeneratorTheory::expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
+void UUVSwayPredictiveTrajectoryGeneratorTheory::expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
                                             std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
                                               base_trajectory::Trajectory& best_traj){
   //use default scoring

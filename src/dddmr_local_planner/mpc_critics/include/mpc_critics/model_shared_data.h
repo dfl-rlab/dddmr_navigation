@@ -62,6 +62,8 @@
 #include <tf2_eigen/tf2_eigen.hpp>
 #include <Eigen/Core>
 
+#include <mutex>
+
 namespace mpc_critics
 {
 
@@ -108,7 +110,9 @@ class ModelSharedData{
     ackermann_msgs::msg::AckermannDriveStamped ackermann_drive_state_;
 
     double heading_deviation_;
-
+    
+    std::mutex scoring_mutex_;
+    
   private:
 
     std::shared_ptr<tf2_ros::Buffer> tf2Buffer_; 

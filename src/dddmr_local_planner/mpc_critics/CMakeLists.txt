@@ -106,6 +106,7 @@ add_library(critics SHARED
   models/target_ranging_model.cpp
   models/toward_global_plan_model.cpp
   models/twirling_model.cpp
+  models/density_preference_model.cpp
 )
 target_link_libraries(critics
   mpc_critics_ros

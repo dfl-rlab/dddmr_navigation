@@ -59,6 +59,9 @@ void TargetRangingModel::onInitialize(){
 }
 
 void TargetRangingModel::targetPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg){
+
+  std::lock_guard<std::mutex> lock(shared_data_->scoring_mutex_);
+
   target_pose_ = *msg;
   if(!got_tf_){
     try
@@ -89,7 +92,8 @@ void TargetRangingModel::targetPoseCallback(const geometry_msgs::msg::PoseStampe
 }
 
 double TargetRangingModel::scoreTrajectory(base_trajectory::Trajectory &traj){
-
+  
+  std::lock_guard<std::mutex> lock(shared_data_->scoring_mutex_);
   if(shared_data_->prune_plan_.poses.empty() || traj.getPosesSize()<2){
     return -5.0;  
   }

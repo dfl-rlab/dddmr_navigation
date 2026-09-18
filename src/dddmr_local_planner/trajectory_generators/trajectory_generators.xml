@@ -21,7 +21,7 @@
       <description>TBW</description>
     </class>
 
-    <class type="trajectory_generators::UUVSimpleTrajectoryGeneratorTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
+    <class type="trajectory_generators::UUVSwayPredictiveTrajectoryGeneratorTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
       <description>TBW</description>
     </class>
 
