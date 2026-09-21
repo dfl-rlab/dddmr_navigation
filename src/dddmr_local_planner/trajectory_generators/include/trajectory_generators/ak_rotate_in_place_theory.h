@@ -29,40 +29,52 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include <trajectory_generators/trajectory_generator_theory.h>
+#include <trajectory_generators/ak_simple_trajectory_generator_limits.h>
+#include <trajectory_generators/ak_simple_trajectory_generator_params.h>
+
+/*getMinMax3D*/
+#include <pcl/common/common.h>
 
 namespace trajectory_generators
 {
 
-TrajectoryGeneratorTheory::TrajectoryGeneratorTheory(){
+class AKRotateInPlaceTheory: public TrajectoryGeneratorTheory{
 
-}
+  public:
+    
+    AKRotateInPlaceTheory();
 
-void TrajectoryGeneratorTheory::initialize(const std::string name, const rclcpp::Node::WeakPtr& weak_node){
-  name_ = name;
-  node_ = weak_node.lock();
-  configurateActuatorType();
-  onInitialize();
-}
+    virtual size_t getSamplingSize();
+    virtual void getSamplingTrajectoryByIndex(size_t index, base_trajectory::Trajectory& _traj);
+    void expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
+                        std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories,
+                          base_trajectory::Trajectory& best_traj) override;
 
-void TrajectoryGeneratorTheory::setSharedData(std::shared_ptr<trajectory_generators::TrajectoryGeneratorSharedData> shared_data){
-  shared_data_ = shared_data;
-}
+  private:
+    void initialise();
 
-void TrajectoryGeneratorTheory::expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
-                                                std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
-                                                  base_trajectory::Trajectory& best_traj){
+    bool generateTrajectory(
+        Eigen::Vector3f command,
+        base_trajectory::Trajectory& traj);
 
-    best_traj.cost_ = -1;
-    best_traj.xv_ = 0.0;
-    best_traj.yv_ = 0.0;
-    double minimum_cost = 9999999;
+    Eigen::Vector3f computeNewPositions(const Eigen::Vector3f& pos,
+        const Eigen::Vector3f& command, double dt);
 
-    for(auto& a_traj:accepted_trajectories){
-      if(a_traj.getPosesSize()>0 && a_traj.cost_>=0 && a_traj.cost_<=minimum_cost){
-        best_traj = a_traj;
-        minimum_cost = a_traj.cost_;
-      }
-    }
-}
+    // Fixed low speed for this heading maneuver.  The steering target is
+    // always the largest physically admissible left or right steering angle.
+    double rotate_linear_speed_;
+    
+  protected:
+
+    virtual void onInitialize();
+    virtual void configurateActuatorType();
+    
+    std::shared_ptr<trajectory_generators::AckermannTrajectoryGeneratorLimits> limits_;
+    std::shared_ptr<trajectory_generators::AckermannTrajectoryGeneratorParams> params_;
+
+    unsigned int next_sample_index_;
+    // to store sample params of each sample between init and generation
+    std::vector<Eigen::Vector3f> sample_params_;
+};
 
 }//end of name space

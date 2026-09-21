@@ -12,7 +12,7 @@ In dddmr navigation, we extensively use the simulation to develop/debug our stac
 
 [Omni Direction](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_p2p_move_base/kinematics_md/OMNIDIRECTION.md)
 
-[Ackermann Steering]
+[Ackermann Steering](kinematics_md/ACKERMANN.md)
 
 [Tricycle]
 

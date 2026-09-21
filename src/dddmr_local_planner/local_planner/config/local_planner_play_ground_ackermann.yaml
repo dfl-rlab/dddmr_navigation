@@ -44,7 +44,7 @@ trajectory_generators:
   ros__parameters:
     plugins: ["ackermann_simple"]
     ackermann_simple:
-      plugin: "trajectory_generators::AckermannSimpleTrajectoryGeneratorTheory"
+      plugin: "trajectory_generators::AKSimpleTrajectoryGeneratorTheory"
       # --- speed limits ---
       max_vel_x: 1.0          # m/s  (low speed test)
       min_vel_x: 0.1

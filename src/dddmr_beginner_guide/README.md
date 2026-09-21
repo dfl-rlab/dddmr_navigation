@@ -39,17 +39,11 @@ cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./download_files.bash
 > [!IMPORTANT] 
 > The following command will start two interactive Docker containers using the image we built.  Please open **two separate terminals** to prepare the demo environment
 
-#### 🖥️ Terminal 1  (create the container for gazebo system)
+#### 🖥️ Terminal 1: Start the Go2 Gazebo Simulation
 
-- ##### Step 1 (on host): create the container for Gazebo system
-```
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./run_x64_gazebo.bash
-```
-- ##### Step 2 (inside the gazebo container): build and launch
-```
-source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash && ros2 launch go2_config gz_lidar_odom.launch.py
-```
+In the first terminal, follow the [Gazebo Guide — Go2](GAZEBO_GUIDE.md#go2--quadruped) to build the simulation image and start Gazebo.
+
+Once the Go2 simulation is running, keep this terminal open and return here to continue with **Terminal 2** below.
 
 #### 🖥️ Terminal 2   (create the container for navigation system)
 

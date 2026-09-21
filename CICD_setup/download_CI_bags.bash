@@ -158,3 +158,16 @@ if [ "$d_bag12" != "${d_bag12#[Yy]}" ] ;then
   rm -f confirm.txt cookies.txt
   unzip perception_3d_depth_camera_rs457.zip
 fi
+
+echo -n "Do you want to download nav_ackermann_p2p (Y/N):"
+read d_bag13
+if [ "$d_bag13" != "${d_bag13#[Yy]}" ] ;then 
+  echo "Download bag"
+  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='14CN4Z5-GSCMPXG9MkSmX6fPS6LZPHxTM \
+      | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
+  curl -L -b cookies.txt -o nav_ackermann_p2p.zip \
+      'https://drive.usercontent.google.com/download?id='14CN4Z5-GSCMPXG9MkSmX6fPS6LZPHxTM'&confirm='$(<confirm.txt)
+  rm -f confirm.txt cookies.txt
+  unzip nav_ackermann_p2p.zip
+fi
+

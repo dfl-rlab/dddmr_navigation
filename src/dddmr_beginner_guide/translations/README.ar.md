@@ -45,18 +45,11 @@ cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./download_files.bash
 > [!IMPORTANT] 
 > سيقوم الأمر التالي بتشغيل حاويتي Docker تفاعليتين باستخدام الصورة التي قمنا ببنائها. يرجى فتح **نافذتي طرفية منفصلتين** لتحضير بيئة العرض.
 
-#### 🖥️ الطرفية 1 (إنشاء حاوية لنظام Gazebo)
+#### 🖥️ الطرفية 1: تشغيل محاكاة Go2 في Gazebo
 
-- ##### الخطوة 1 (على المضيف): إنشاء حاوية لنظام Gazebo
-```bash
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./run_x64_gazebo.bash
-```
+في الطرفية الأولى، اتبع الخطوتين في [دليل Gazebo — Go2](../GAZEBO_GUIDE.md#go2--quadruped) لبناء صورة المحاكاة وتشغيل حاوية Gazebo.
 
-- ##### الخطوة 2 (داخل حاوية Gazebo): البناء والتشغيل
-```bash
-source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash && ros2 launch go2_config gz_lidar_odom.launch.py
-```
+بعد تشغيل محاكاة Go2، اترك هذه الطرفية مفتوحة وعد إلى هنا لمتابعة خطوات **الطرفية 2** أدناه.
 
 #### 🖥️ الطرفية 2 (إنشاء حاوية لنظام الملاحة)
 

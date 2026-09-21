@@ -93,6 +93,7 @@ class State{
     
     bool use_position_control_at_goal_;
     std::string main_trajectory_generator_;
+    std::string heading_trajectory_generator_;
 
   private:
 

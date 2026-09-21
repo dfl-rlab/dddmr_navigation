@@ -45,18 +45,11 @@ cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./download_files.bash
 > [!IMPORTANT] 
 > Lệnh sau sẽ khởi động hai Docker container tương tác sử dụng image đã xây dựng. Vui lòng mở **hai terminal riêng biệt** để chuẩn bị môi trường demo.
 
-#### 🖥️ Terminal 1 (tạo container cho hệ thống Gazebo)
+#### 🖥️ Terminal 1: Khởi chạy mô phỏng Go2 trong Gazebo
 
-- ##### Bước 1 (trên host): tạo container cho hệ thống Gazebo
-```bash
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./run_x64_gazebo.bash
-```
+Trong terminal đầu tiên, làm theo cả hai bước trong [Hướng dẫn Gazebo — Go2](../GAZEBO_GUIDE.md#go2--quadruped) để xây dựng image mô phỏng và khởi động container Gazebo.
 
-- ##### Bước 2 (trong container Gazebo): build và khởi chạy
-```bash
-source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash && ros2 launch go2_config gz_lidar_odom.launch.py
-```
+Khi mô phỏng Go2 đã chạy, hãy giữ terminal này mở và quay lại đây để tiếp tục với **Terminal 2** bên dưới.
 
 #### 🖥️ Terminal 2 (tạo container cho hệ thống navigation)
 

@@ -357,7 +357,7 @@ bool P2PMoveBase::executeCycle(const std::shared_ptr<rclcpp_action::ServerGoalHa
         }
         
         base_trajectory::Trajectory best_traj;
-        dddmr_sys_core::PlannerState PS = LP_->computeVelocityCommand("differential_drive_rotate_shortest_angle", best_traj);
+        dddmr_sys_core::PlannerState PS = LP_->computeVelocityCommand(STATE_->heading_trajectory_generator_, best_traj);
 
         if(PS == dddmr_sys_core::PlannerState::TRAJECTORY_FOUND){
           STATE_->last_valid_control_ = clock_->now();
@@ -439,7 +439,7 @@ bool P2PMoveBase::executeCycle(const std::shared_ptr<rclcpp_action::ServerGoalHa
         }
         
         base_trajectory::Trajectory best_traj;
-        dddmr_sys_core::PlannerState PS = LP_->computeVelocityCommand("differential_drive_rotate_shortest_angle", best_traj);
+        dddmr_sys_core::PlannerState PS = LP_->computeVelocityCommand(STATE_->heading_trajectory_generator_, best_traj);
 
         if(PS == dddmr_sys_core::PlannerState::TRAJECTORY_FOUND){
           STATE_->last_valid_control_ = clock_->now();
@@ -570,7 +570,7 @@ bool P2PMoveBase::executeCycle(const std::shared_ptr<rclcpp_action::ServerGoalHa
           STATE_->last_valid_plan_ = clock_->now();
           STATE_->setDecision("d_planning");  
         }
-        publishZeroVelocity();
+
         return false;
       }
 
@@ -715,7 +715,6 @@ bool P2PMoveBase::executeCycle(const std::shared_ptr<rclcpp_action::ServerGoalHa
           STATE_->last_valid_plan_ = clock_->now();
           STATE_->setDecision("d_planning");  
         }
-        publishZeroVelocity();
       }
 
       else if(PS == dddmr_sys_core::PlannerState::PATH_BLOCKED_WAIT || PS == dddmr_sys_core::PlannerState::PATH_BLOCKED_REPLANNING){

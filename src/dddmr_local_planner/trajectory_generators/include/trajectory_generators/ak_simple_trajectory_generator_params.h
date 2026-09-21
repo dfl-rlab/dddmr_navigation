@@ -28,41 +28,50 @@
 * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include <trajectory_generators/trajectory_generator_theory.h>
+
+#ifndef _ACKERMANN_SIMPLE_TRAJECTORY_GENERATOR_PARAMS_H__
+#define _ACKERMANN_SIMPLE_TRAJECTORY_GENERATOR_PARAMS_H__
+
+#include <Eigen/Core>
+//@ pcl for cuboid
+#include <pcl/point_cloud.h>
 
 namespace trajectory_generators
 {
+class AckermannTrajectoryGeneratorParams
+{
+public:
 
-TrajectoryGeneratorTheory::TrajectoryGeneratorTheory(){
+  double controller_frequency;
+  double sim_time;
+  double linear_x_sample;
+  double angular_z_sample;
+  double sim_granularity;
+  double angular_sim_granularity;
+  pcl::PointCloud<pcl::PointXYZ> cuboid;
+
+  AckermannTrajectoryGeneratorParams() {}
+
+  AckermannTrajectoryGeneratorParams(
+      double ncontroller_frequency,
+      double nsim_time,
+      double nlinear_x_sample,
+      double nangular_z_sample,
+      double nsim_granularity,
+      double nangular_sim_granularity):
+        controller_frequency(ncontroller_frequency),
+        sim_time(nsim_time),
+        linear_x_sample(nlinear_x_sample),
+        angular_z_sample(nangular_z_sample),
+        sim_granularity(nsim_granularity),
+        angular_sim_granularity(nangular_sim_granularity)
+
+{}
+
+  ~AckermannTrajectoryGeneratorParams() {}
+
+
+};
 
 }
-
-void TrajectoryGeneratorTheory::initialize(const std::string name, const rclcpp::Node::WeakPtr& weak_node){
-  name_ = name;
-  node_ = weak_node.lock();
-  configurateActuatorType();
-  onInitialize();
-}
-
-void TrajectoryGeneratorTheory::setSharedData(std::shared_ptr<trajectory_generators::TrajectoryGeneratorSharedData> shared_data){
-  shared_data_ = shared_data;
-}
-
-void TrajectoryGeneratorTheory::expertScoring(std::vector<base_trajectory::Trajectory>& accepted_trajectories,
-                                                std::map<std::string, std::vector<base_trajectory::Trajectory>>& rejected_trajectories, 
-                                                  base_trajectory::Trajectory& best_traj){
-
-    best_traj.cost_ = -1;
-    best_traj.xv_ = 0.0;
-    best_traj.yv_ = 0.0;
-    double minimum_cost = 9999999;
-
-    for(auto& a_traj:accepted_trajectories){
-      if(a_traj.getPosesSize()>0 && a_traj.cost_>=0 && a_traj.cost_<=minimum_cost){
-        best_traj = a_traj;
-        minimum_cost = a_traj.cost_;
-      }
-    }
-}
-
-}//end of name space
+#endif // _ACKERMANN_SIMPLE_TRAJECTORY_GENERATOR_PARAMS_H__

@@ -136,6 +136,9 @@ install(PROGRAMS
 )
 
 
+# Python integration tests run directly from source; install for share-directory use too.
+install(DIRECTORY test DESTINATION share/${PROJECT_NAME}/)
+
 ament_export_include_directories(include)
 ament_export_libraries(p2p_state p2p_mov2_base p2p_global_plan_manager)
 ament_export_dependencies(${dependencies})

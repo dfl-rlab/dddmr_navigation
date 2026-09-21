@@ -45,18 +45,11 @@ cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./download_files.bash
 > [!IMPORTANT] 
 > 以下指令將使用我們建構的映像檔啟動兩個互動式 Docker 容器。請開啟**兩個獨立的終端機**來準備展示環境。
 
-#### 🖥️ 終端機 1（建立 Gazebo 系統容器）
+#### 🖥️ 終端機 1：啟動 Go2 Gazebo 模擬
 
-- ##### 步驟 1（在主機上）：建立 Gazebo 系統容器
-```bash
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./run_x64_gazebo.bash
-```
+在第一個終端機中，依照 [Gazebo 指南 — Go2](../GAZEBO_GUIDE.md#go2--quadruped) 的兩個步驟，建立模擬映像檔並啟動 Gazebo 容器。
 
-- ##### 步驟 2（在 Gazebo 容器內）：建構並啟動
-```bash
-source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash && ros2 launch go2_config gz_lidar_odom.launch.py
-```
+Go2 模擬啟動後，請保持此終端機開啟，並回到這裡繼續下方的**終端機 2** 步驟。
 
 #### 🖥️ 終端機 2（建立導航系統容器）
 

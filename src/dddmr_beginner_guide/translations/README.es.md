@@ -45,18 +45,11 @@ cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./download_files.bash
 > [!IMPORTANT] 
 > El siguiente comando iniciará dos contenedores Docker interactivos usando la imagen construida. Por favor abre **dos terminales separadas** para preparar el entorno de demostración.
 
-#### 🖥️ Terminal 1 (crear contenedor para sistema Gazebo)
+#### 🖥️ Terminal 1: Iniciar la simulación de Go2 en Gazebo
 
-- ##### Paso 1 (en el host): crear contenedor para sistema Gazebo
-```bash
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./run_x64_gazebo.bash
-```
+En el primer terminal, sigue los dos pasos de la [Guía de Gazebo — Go2](../GAZEBO_GUIDE.md#go2--quadruped) para crear la imagen de simulación e iniciar el contenedor de Gazebo.
 
-- ##### Paso 2 (dentro del contenedor Gazebo): construir y lanzar
-```bash
-source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash && ros2 launch go2_config gz_lidar_odom.launch.py
-```
+Una vez que la simulación de Go2 esté en ejecución, mantén este terminal abierto y vuelve aquí para continuar con el **Terminal 2** a continuación.
 
 #### 🖥️ Terminal 2 (crear contenedor para sistema de navegación)
 

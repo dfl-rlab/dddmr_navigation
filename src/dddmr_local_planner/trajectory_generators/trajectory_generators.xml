@@ -9,11 +9,19 @@
       <description>TBW</description>
     </class>
 
+    <class type="trajectory_generators::AKRotateInPlaceTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
+      <description>Ackermann-compatible rotate behavior: forward turning arc with configurable linear velocity.</description>
+    </class>
+
+    <class type="trajectory_generators::AKRotateReedsSheppTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
+      <description>Scores all Reeds-Shepp candidates before retaining one timed command FIFO; collision-checks its remainder each cycle and replans after rejection.</description>
+    </class>
+
     <class type="trajectory_generators::OmniSimpleTrajectoryGeneratorTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
       <description>TBW</description>
     </class>
 
-    <class type="trajectory_generators::AckermannSimpleTrajectoryGeneratorTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
+    <class type="trajectory_generators::AKSimpleTrajectoryGeneratorTheory"  base_class_type="trajectory_generators::TrajectoryGeneratorTheory">
       <description>Ackermann bicycle-model trajectory generator with three-layer steering bounds</description>
     </class>
 
@@ -23,4 +31,3 @@
 
   </library>
 </class_libraries>
-

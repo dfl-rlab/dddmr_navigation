@@ -45,18 +45,11 @@ cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./download_files.bash
 > [!IMPORTANT] 
 > Aşağıdaki komut, oluşturduğumuz imajı kullanarak iki etkileşimli Docker konteyneri başlatacaktır. Demo ortamını hazırlamak için lütfen **iki ayrı terminal** açın.
 
-#### 🖥️ Terminal 1 (Gazebo sistemi için konteyner oluşturma)
+#### 🖥️ Terminal 1: Go2 Gazebo Simülasyonunu Başlatma
 
-- ##### Adım 1 (ana bilgisayarda): Gazebo sistemi için konteyner oluşturma
-```bash
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./run_x64_gazebo.bash
-```
+İlk terminalde, simülasyon imajını oluşturmak ve Gazebo konteynerini başlatmak için [Gazebo Kılavuzu — Go2](../GAZEBO_GUIDE.md#go2--quadruped) içindeki iki adımı da uygulayın.
 
-- ##### Adım 2 (Gazebo konteyneri içinde): derleme ve başlatma
-```bash
-source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash && ros2 launch go2_config gz_lidar_odom.launch.py
-```
+Go2 simülasyonu çalışmaya başladığında bu terminali açık bırakın ve aşağıdaki **Terminal 2** adımlarına devam etmek için buraya dönün.
 
 #### 🖥️ Terminal 2 (navigasyon sistemi için konteyner oluşturma)
 
