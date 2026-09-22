@@ -29,7 +29,7 @@ elif [[ $image_type == "x64_gz" ]]; then
     echo "----> Creating x64 image with cuda, the x64 image will be created first"
     build_x64
     echo "----> Starting second layer with gz"
-    docker build --network host -t dddmr_gz:humble -f Dockerfile_humble_gazebo . --no-cache
+    docker build --network host -t dddmr_gz:humble -f Dockerfile_x64_gazebo . --no-cache
 
 else
     echo "Invalid image type. Please choose x64/l4t/gz"

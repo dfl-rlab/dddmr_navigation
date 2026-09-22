@@ -44,13 +44,16 @@ cd ~/dddmr_navigation/dddmr_docker/docker_file/
 ./run_x64.bash
 ```
 
-You should now be inside the `dddmr_humble` container. Make sure the navigation test map is available at:
+You should now be inside the `dddmr_humble` container. Make sure the navigation test map is available at :
 
 ```text
-/root/dddmr_bags/cicdtest/nav_ackermann_p2p/pg
+ls /root/dddmr_bags/cicdtest/nav_ackermann_p2p/pg
 ```
 
-This directory must contain the complete pose-graph map, including the per-keyframe `pcd` directory. The simulation world and this map should match. Use the same `ROS_DOMAIN_ID` for the simulation and navigation environments so their ROS nodes can communicate.
+ Use the same `ROS_DOMAIN_ID` for the simulation and navigation environments so their ROS nodes can communicate (ackermann gazebo use 14).
+```text
+export ROS_DOMAIN_ID=14
+```
 
 Compile the navigation stack and run the test:
 
