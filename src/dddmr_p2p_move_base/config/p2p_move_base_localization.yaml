@@ -59,7 +59,7 @@ dddmr_pg_map_server_manager:
 
 map1:
   ros__parameters:
-    pose_graph_dir: "/root/dddmr_bags/benanli_detention_basin_pg"
+    pose_graph_dir: "/root/dddmr_bags/cicdtest/mcl_3dl_c16/pg"
     complete_map_voxel_size: 0.3
 
 sub_maps:
@@ -217,8 +217,8 @@ trajectory_generators:
       
       controller_frequency: 10.0
       sim_time: 2.0
-      linear_x_sample: 5.0
-      angular_z_sample: 10.0
+      linear_x_sample: 20.0
+      angular_z_sample: 20.0
       sim_granularity: 0.05
       angular_sim_granularity: 0.025
 

@@ -51,6 +51,7 @@ class DepthCameraLayer: public Sensor{
     void selfMark();
     void updateLethalPointCloud();
     pcl::PointCloud<pcl::PointXYZI>::Ptr getObservation();
+    pcl::PointCloud<pcl::PointXYZI>::Ptr getObservationRobotFrame();
     pcl::PointCloud<pcl::PointXYZI>::Ptr getLethal();
     void resetdGraph();
     double get_dGraphValue(const unsigned int index);
@@ -81,7 +82,8 @@ class DepthCameraLayer: public Sensor{
     void cbSensor(const sensor_msgs::msg::PointCloud2::SharedPtr msg,
                                     const std::shared_ptr<perception_3d::DepthCameraObservationBuffer>& buffer);
     void aggregatePointCloudFromObservations(const pcl::PointCloud<pcl::PointXYZI>::Ptr& resulting_pcl)  ;
-        
+    void aggregatePointCloudFromObservationsRobotFrame(const pcl::PointCloud<pcl::PointXYZI>::Ptr& resulting_pcl)  ;
+         
     //@ For casting visualization
     void addCastingMarker(const pcl::PointXYZI& pt, size_t id, visualization_msgs::msg::MarkerArray& markerArray);
     

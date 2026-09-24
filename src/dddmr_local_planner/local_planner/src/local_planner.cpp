@@ -45,6 +45,16 @@ void Local_Planner::initial(
       const std::shared_ptr<mpc_critics::MPC_Critics_ROS>& mpc_critics,
       const std::shared_ptr<trajectory_generators::Trajectory_Generators_ROS>& trajectory_generators){
 
+  
+  auto env_p = std::getenv("DDDMR_MAPPING_DIR");
+  if ( env_p == NULL ) {
+    labelled_tensor_storage_dir_ = std::string("/tmp/") + currentDateTime();
+    std::filesystem::create_directory(labelled_tensor_storage_dir_);
+  } else {
+    labelled_tensor_storage_dir_ = std::string( env_p ) + currentDateTime();
+    std::filesystem::create_directory(labelled_tensor_storage_dir_);
+  }
+
   declare_parameter("odom_topic", rclcpp::ParameterValue("odom"));
   this->get_parameter("odom_topic", odom_topic_);
   RCLCPP_INFO(this->get_logger(), "odom_topic: %s", odom_topic_.c_str());
@@ -115,6 +125,7 @@ void Local_Planner::initial(
   pub_accepted_trajectory_pose_array_ = this->create_publisher<geometry_msgs::msg::PoseArray>("accepted_trajectory", 1);
   pub_best_trajectory_pose_ = this->create_publisher<geometry_msgs::msg::PoseArray>("best_trajectory", 2);
   pub_trajectory_pose_array_ = this->create_publisher<geometry_msgs::msg::PoseArray>("trajectory", 2);
+  pub_informative_tensor_ = this->create_publisher<sensor_msgs::msg::Image>("informative_tensor", 1);
   //pub_pc_normal_ = pnh_.advertise<visualization_msgs::MarkerArray>("normal_marker", 2, true);
   //pub_trajectory_cuboids_ = pnh_.advertise<sensor_msgs::PointCloud2>("trajectory_cuboids", 2, true);
 
@@ -133,6 +144,10 @@ void Local_Planner::initial(
       std::bind(&Local_Planner::cbOdom, this, std::placeholders::_1), sub_options);
   }
   
+  cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
+      "training_cmd_vel", rclcpp::QoS(rclcpp::KeepLast(1)).durability_volatile().best_effort(),
+      std::bind(&Local_Planner::cbCmdVel, this, std::placeholders::_1), sub_options);
+
   steering_state_ros_sub_ = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>(
       steering_state_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).durability_volatile().best_effort(),
       std::bind(&Local_Planner::cbSteeringState, this, std::placeholders::_1), sub_options);
@@ -201,6 +216,11 @@ void Local_Planner::cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg)
   robot_state_ = *msg;
   updateGlobalPose();
   got_odom_ = true;
+}
+
+void Local_Planner::cbCmdVel(const geometry_msgs::msg::TwistStamped::SharedPtr msg)
+{
+  training_cmd_vel_ = *msg;
 }
 
 void Local_Planner::cbSteeringState(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg){
@@ -452,12 +472,171 @@ void Local_Planner::prunePlan(double forward_distance, double backward_distance)
     if(forward_distance<0)
       break;
   }
-  
+
+  pcl_prune_plan_.width = pcl_prune_plan_.points.size();
+  pcl_prune_plan_.height = 1;
+  pcl_prune_plan_.is_dense = true; // or false if NaNs may exist
+
   prune_plan_.header.frame_id = perception_3d_ros_->getGlobalUtils()->getGblFrame();
   prune_plan_.header.stamp = clock_->now();
   pub_prune_plan_->publish(prune_plan_);
   last_valid_prune_plan_ = clock_->now();
   //RCLCPP_DEBUG(this->get_logger().get_child(name_), "%lu",prune_plan_.poses.size());
+}
+
+bool Local_Planner::setBitByValue(uint8_t &byte, float value, float res) {
+    if (value < 0.0f) {
+        return false;
+    }
+
+    // Determine the 0-indexed bit position (0 to 7)
+    int bit_index = static_cast<int>(std::round(value / res));
+
+    // uint8_t only has 8 bits (indices 0 to 7)
+    if (bit_index < 0 || bit_index > 7) {
+        return false; // Out of range (> 0.35)
+    }
+
+    // Set the bit to 1
+    byte |= static_cast<uint8_t>(1U << bit_index);
+    return true;
+}
+
+cv::Mat Local_Planner::stackImages(const std::deque<std::pair<cv::Mat, tensor_labelling>>& queue, int rows, int cols) {
+  if (queue.empty() || rows <= 0 || cols <= 0) {
+    return cv::Mat();
+  }
+
+  int tile_w = queue[0].first.cols;
+  int tile_h = queue[0].first.rows;
+  cv::Mat stacked = cv::Mat::zeros(rows * tile_h, cols * tile_w, queue[0].first.type());
+  for (int r = 0; r < rows; ++r) {
+    for (int c = 0; c < cols; ++c) {
+      int idx = r * cols + c;
+      if (idx >= static_cast<int>(queue.size())) {
+        continue;
+      }
+      if (queue[idx].first.empty()) {
+        continue;
+      }
+      cv::Rect roi(c * tile_w, r * tile_h, tile_w, tile_h);
+      queue[idx].first.copyTo(stacked(roi));
+    }
+  }
+
+  std::string file_name;
+  std::stringstream ss;
+  ss << queue.back().second.header.stamp.sec << "_" << std::setw(9) << std::setfill('0') << queue.back().second.header.stamp.nanosec;
+  file_name = ss.str();
+
+  writeStackedImage(stacked, file_name);
+  generateLabelJson(queue, rows, cols, stacked.cols, stacked.rows, file_name);
+
+  return stacked;
+}
+
+bool Local_Planner::writeStackedImage(const cv::Mat& image, const std::string& file_name) {
+  if (image.empty()) {
+    RCLCPP_WARN(this->get_logger(), "Cannot write stacked image: image is empty.");
+    return false;
+  }
+
+  std::string png_full_path = labelled_tensor_storage_dir_ + "/" + file_name + ".png";
+  bool success = cv::imwrite(png_full_path, image);
+  if (success) {
+    RCLCPP_INFO(this->get_logger(), "Successfully wrote stacked image to %s", png_full_path.c_str());
+  } else {
+    RCLCPP_WARN(this->get_logger(), "Failed to write stacked image to %s", png_full_path.c_str());
+  }
+
+  return success;
+}
+
+bool Local_Planner::generateLabelJson(const std::deque<std::pair<cv::Mat, tensor_labelling>>& queue, 
+                                      int rows, int cols, 
+                                      int image_width, int image_height, 
+                                      const std::string& file_name) {
+  if (queue.empty() || rows <= 0 || cols <= 0) {
+    return false;
+  }
+
+  std::string timestamp;
+  std::stringstream ss;
+  ss << queue.back().second.header.stamp.sec << "_" << std::setw(9) << std::setfill('0') << queue.back().second.header.stamp.nanosec;
+  timestamp = ss.str();
+
+  std::string json_filename = labelled_tensor_storage_dir_ + "/" + file_name + ".json";
+  std::string img_filename = labelled_tensor_storage_dir_ + "/" + file_name + ".png";
+  int tile_w = image_width / cols;
+  int tile_h = image_height / rows;
+
+  std::vector<std::string> shapes_ss;
+
+  for (int r = 0; r < rows; ++r) {
+    for (int c = 0; c < cols; ++c) {
+      int idx = r * cols + c;
+      if (idx >= static_cast<int>(queue.size())) {
+        continue;
+      }
+
+      double x1 = c * tile_w + queue[idx].second.x1;
+      double y1 = r * tile_h + queue[idx].second.y1;
+      double x2 = c * tile_w + queue[idx].second.x2;
+      double y2 = r * tile_h + queue[idx].second.y2;
+
+      std::stringstream ss_shape;
+      ss_shape << "    {\n";
+      ss_shape << "      \"label\": \"cmd_vel\",\n";
+      ss_shape << "      \"text\": \"\",\n";
+      ss_shape << "      \"points\": [\n";
+      ss_shape << "        [\n";
+      ss_shape << std::fixed << std::setprecision(1);
+      ss_shape << "          " << y1 << ",\n"; //@ remember to flip x,y; because our y is left and right which is anylabeling's x
+      ss_shape << "          " << x1 << "\n";
+      ss_shape << "        ],\n";
+      ss_shape << "        [\n";
+      ss_shape << "          " << y2 << ",\n"; //@ remember to flip x,y; because our y is left and right which is anylabeling's x
+      ss_shape << "          " << x2 << "\n";
+      ss_shape << "        ]\n";
+      ss_shape << "      ],\n";
+      ss_shape << "      \"group_id\": null,\n";
+      ss_shape << "      \"shape_type\": \"rectangle\",\n";
+      ss_shape << "      \"flags\": {}\n";
+      ss_shape << "    }";
+
+      shapes_ss.push_back(ss_shape.str());
+    }
+  }
+
+  std::ofstream ofs(json_filename);
+  if (!ofs.is_open()) {
+    RCLCPP_WARN(this->get_logger(), "Failed to open label json file for writing: %s", json_filename.c_str());
+    return false;
+  }
+
+  ofs << "{\n";
+  ofs << "  \"version\": \"0.4.30\",\n";
+  ofs << "  \"flags\": {},\n";
+  ofs << "  \"shapes\": [\n";
+  for (size_t k = 0; k < shapes_ss.size(); ++k) {
+    ofs << shapes_ss[k];
+    if (k + 1 < shapes_ss.size()) {
+      ofs << ",\n";
+    } else {
+      ofs << "\n";
+    }
+  }
+  ofs << "  ],\n";
+  ofs << "  \"imagePath\": \"" << file_name + ".png" << "\",\n";
+  ofs << "  \"imageData\": null,\n";
+  ofs << "  \"imageHeight\": " << image_height << ",\n";
+  ofs << "  \"imageWidth\": " << image_width << ",\n";
+  ofs << "  \"text\": \"\"\n";
+  ofs << "}\n";
+
+  ofs.close();
+  RCLCPP_INFO(this->get_logger(), "Successfully generated label JSON: %s", json_filename.c_str());
+  return true;
 }
 
 void Local_Planner::getBestTrajectory(std::string traj_gen_name, base_trajectory::Trajectory& best_traj){
@@ -483,12 +662,13 @@ void Local_Planner::getBestTrajectory(std::string traj_gen_name, base_trajectory
       trajectory2posearray_cuboids((*traj_it), accepted_pose_arr, cuboids_pcl);
       accepted_trajectories_.push_back(*traj_it);
     }
-
-    rejected_trajectories_[(*traj_it).rejected_by_].push_back(*traj_it);
+    else{
+      rejected_trajectories_[(*traj_it).rejected_by_].push_back(*traj_it);
+    }
     
   }
 
-  #ifdef HAVE_SYS_TIME_H
+#ifdef HAVE_SYS_TIME_H
   gettimeofday(&end, NULL);
   start_t = start.tv_sec + double(start.tv_usec) / 1e6;
   end_t = end.tv_sec + double(end.tv_usec) / 1e6;
@@ -496,6 +676,144 @@ void Local_Planner::getBestTrajectory(std::string traj_gen_name, base_trajectory
   RCLCPP_WARN(this->get_logger(), "Scoring time: %.9f", diff_t);
   #endif
 
+#ifdef TRT_ENABLED
+  //@ generate informative_tensor
+  double ctpy_radius = 5.0;
+  std::vector<pcl::index_t> pointIdx;
+  std::vector<float> pointSquaredDistance;
+  pcl::PointXYZI robot_pose;
+  robot_pose.x = trans_gbl2b_.transform.translation.x;
+  robot_pose.y = trans_gbl2b_.transform.translation.y;
+  robot_pose.z = trans_gbl2b_.transform.translation.z;
+  
+  mpc_critics_ros_->getSharedDataPtr()->radiusSearchPerceptionRobotFrameWiCheck(robot_pose, ctpy_radius, pointIdx, pointSquaredDistance);
+  double res = 0.05;
+  int dimension = ctpy_radius/res; //@resolution 5 cm
+  cv::Mat informative_tensor(dimension, dimension, CV_8UC3, cv::Scalar(0,0,0));
+  //@ upper left is 0,0, define Forward, Left, Up
+  // informative_tensor.at<cv::Vec3b>(0, 0)[0~2]
+  for(const auto& index: pointIdx){
+    auto a_pt = mpc_critics_ros_->getSharedDataPtr()->pcl_perception_robot_frame_->points[index];
+    if(a_pt.x < -ctpy_radius/2.)
+      continue;
+    if(a_pt.x > ctpy_radius/2.)
+      continue;
+    if(a_pt.y < -ctpy_radius/2.)
+      continue;
+    if(a_pt.y > ctpy_radius/2.)
+      continue;
+
+    int xloc = static_cast<int>((ctpy_radius/2. - a_pt.x)/res); //0 is the first row
+    int yloc = static_cast<int>((ctpy_radius/2. - a_pt.y)/res); //0 is the leftest, because FLU
+    
+    //@ set z value to loc
+    setBitByValue(informative_tensor.at<cv::Vec3b>(xloc, yloc)[0], a_pt.z, res);
+  }
+  //@value for control tensor
+  double v_max = 2.5;
+  double w_max = 1.0;
+  double v_res = v_max*2/dimension;
+  double w_res = w_max*2/dimension;
+  //RCLCPP_INFO(this->get_logger().get_child(name_), "Accepted traj size: %lu", accepted_trajectories_.size());
+  for(size_t index=0; index<accepted_trajectories_.size(); index++){
+    uint8_t value_for_control_tensor = 0;
+    double xv = accepted_trajectories_[index].xv_;
+    double thetav = accepted_trajectories_[index].thetav_;
+    if(xv < -v_max)
+      continue;
+    if(xv > v_max)
+      continue;
+    if(thetav < -w_max)
+      continue;
+    if(thetav > w_max)
+      continue;
+    int xloc = static_cast<int>((v_max - xv)/v_res);
+    int yloc = static_cast<int>((w_max - thetav)/w_res);
+    double traj_cost = accepted_trajectories_[index].cost_*100;
+    if(traj_cost>254)
+      value_for_control_tensor = 255;
+    else
+      value_for_control_tensor = static_cast<uint8_t>(traj_cost);
+    
+    informative_tensor.at<cv::Vec3b>(xloc, yloc)[1] = value_for_control_tensor;
+    //RCLCPP_INFO(this->get_logger().get_child(name_), "Put control tensor: %.2f, %.2f, %d, %d, %u", xv, thetav, xloc, yloc, value_for_control_tensor);
+  }
+  for (const auto& [rejector, trajectories] : rejected_trajectories_) {
+    for(size_t index=0; index<trajectories.size(); index++){
+      double xv = trajectories[index].xv_;
+      double thetav = trajectories[index].thetav_;
+      if(xv < -v_max)
+        continue;
+      if(xv > v_max)
+        continue;
+      if(thetav < -w_max)
+        continue;
+      if(thetav > w_max)
+        continue;
+      int xloc = static_cast<int>((v_max - xv)/v_res);
+      int yloc = static_cast<int>((w_max - thetav)/w_res);
+      informative_tensor.at<cv::Vec3b>(xloc, yloc)[1] = 0;
+      //RCLCPP_INFO(this->get_logger().get_child(name_), "Put control tensor: %.2f, %.2f, %d, %d, %u", xv, thetav, xloc, yloc, 0);
+    }  
+  }
+  //value of prune plan
+  //prune plan is global frame, need to transform it to robot frame
+  pcl::PointCloud<pcl::PointXYZI> pcl_prune_plan_robot_frame;
+  Eigen::Affine3d trans_gbl2b_af3 = tf2::transformToEigen(trans_gbl2b_);
+  Eigen::Affine3f trans_robot_from_map = trans_gbl2b_af3.inverse().cast<float>();
+  if(!pcl_prune_plan_.empty())
+    pcl::transformPointCloud(pcl_prune_plan_, pcl_prune_plan_robot_frame, trans_robot_from_map);
+
+  for(size_t index=0; index<pcl_prune_plan_robot_frame.size(); index++){
+    auto a_pt = pcl_prune_plan_robot_frame.points[index];
+    if(a_pt.x < -ctpy_radius/2.)
+      continue;
+    if(a_pt.x > ctpy_radius/2.)
+      continue;
+    if(a_pt.y < -ctpy_radius/2.)
+      continue;
+    if(a_pt.y > ctpy_radius/2.)
+      continue;
+
+    int xloc = static_cast<int>((ctpy_radius/2. - a_pt.x)/res); //0 is the first row
+    int yloc = static_cast<int>((ctpy_radius/2. - a_pt.y)/res); //0 is the leftest, because FLU
+    
+    setBitByValue(informative_tensor.at<cv::Vec3b>(xloc, yloc)[2], a_pt.z, res);
+    //RCLCPP_INFO(this->get_logger().get_child(name_), "Local prune: %.2f, %.2f", a_pt.x, a_pt.y);
+  }
+  
+  /*
+  label phase: we need to implement training intension detection to correctly label the best value
+  */
+  int xloc = static_cast<int>((v_max - robot_state_.twist.twist.linear.x)/v_res);
+  int yloc = static_cast<int>((w_max - robot_state_.twist.twist.angular.z)/w_res);
+  //RCLCPP_INFO(this->get_logger().get_child(name_), "Label: %d, %d, xv: %.2f, wv: %.2f", xloc, yloc, robot_state_.twist.twist.linear.x, robot_state_.twist.twist.angular.z);
+  std_msgs::msg::Header tensor_header;
+  tensor_header.stamp = clock_->now();
+  tensor_labelling tl(xloc-2, yloc-2, xloc+2, yloc+2, tensor_header);
+
+  //@ queue tensor
+  auto label_tensor = std::make_pair(informative_tensor, tl);
+  if(informative_tensor_queue_.size()<9){
+    informative_tensor_queue_.push_back(label_tensor);
+  }
+  else{
+    informative_tensor_queue_.push_back(label_tensor);
+    informative_tensor_queue_.pop_front();
+  }
+  
+  if(informative_tensor_queue_.size()==9){
+    cv::Mat informative_stacked_tensor = stackImages(informative_tensor_queue_, 3, 3);
+    cv_bridge::CvImage informative_stacked_tensor_img;
+    informative_stacked_tensor_img.image = informative_stacked_tensor;
+    informative_stacked_tensor_img.encoding = sensor_msgs::image_encodings::TYPE_8UC3;
+    sensor_msgs::msg::Image::SharedPtr ros2_informative_stacked_tensor_img = informative_stacked_tensor_img.toImageMsg();
+    ros2_informative_stacked_tensor_img->header.stamp = clock_->now();
+    pub_informative_tensor_->publish(*ros2_informative_stacked_tensor_img);
+  }
+
+
+#endif
   //for(auto report_it=rejected_trajectories_.begin(); report_it!=rejected_trajectories_.end(); report_it++){
   //  RCLCPP_INFO(this->get_logger().get_child(name_), "Report: %s with rate: %.2f", (*report_it).first.c_str(), (float)(*report_it).second.size()/(float)trajectories_->size());
   //}
@@ -620,6 +938,7 @@ dddmr_sys_core::PlannerState Local_Planner::computeVelocityCommand(std::string t
   mpc_critics_ros_->getSharedDataPtr()->robot_state_ = robot_state_;
   mpc_critics_ros_->getSharedDataPtr()->ackermann_drive_state_ = ackermann_drive_state_;
   mpc_critics_ros_->getSharedDataPtr()->pcl_perception_ = perception_3d_ros_->getSharedDataPtr()->aggregate_observation_;
+  mpc_critics_ros_->getSharedDataPtr()->pcl_perception_robot_frame_ = perception_3d_ros_->getSharedDataPtr()->aggregate_observation_robot_frame_;
   mpc_critics_ros_->getSharedDataPtr()->prune_plan_ = prune_plan_;
   //@ Below function transform prune_plane from nav::msg to pcl type
   //@ Below function generate kd-tree using aggregate observation
@@ -658,6 +977,8 @@ dddmr_sys_core::PlannerState Local_Planner::computeVelocityCommand(std::string t
   //@ Reset kd tree/observations because it is shared_ptr and copied from perception_ros
   mpc_critics_ros_->getSharedDataPtr()->pcl_perception_.reset(new pcl::PointCloud<pcl::PointXYZI>());
   mpc_critics_ros_->getSharedDataPtr()->pcl_perception_kdtree_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
+  mpc_critics_ros_->getSharedDataPtr()->pcl_perception_robot_frame_.reset(new pcl::PointCloud<pcl::PointXYZI>());
+  mpc_critics_ros_->getSharedDataPtr()->pcl_perception_kdtree_robot_frame_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
 }
 
 void Local_Planner::trajectory2posearray_cuboids(const base_trajectory::Trajectory& a_traj, 

@@ -50,6 +50,7 @@ void Sensor::initialize(std::string name,
   gbl_utils_ = gbl_utils;
   shared_data_->dgraph_update_request_[name_] = true;
   sensor_current_observation_.reset(new pcl::PointCloud<pcl::PointXYZI>);
+  sensor_current_observation_robot_frame_.reset(new pcl::PointCloud<pcl::PointXYZI>);
   expected_sensor_time_ = 0.1;
   current_ = false;
   onInitialize();

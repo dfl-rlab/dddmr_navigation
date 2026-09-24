@@ -67,8 +67,9 @@ public:
   geometry_msgs::msg::Point origin_;
   //@ cloud_ is in global frame after min/max height check and distance check
   pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_;
-  //@ raw_cloud_ is in sensor frame
+  //@ raw_cloud_ is in robot frame
   pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud_;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr raw_cloud_i_;
   //@ everything related to frustum is in global frame
   pcl::PointCloud<pcl::PointXYZ>::Ptr frustum_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr frustum_normal_;

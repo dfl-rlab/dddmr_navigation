@@ -49,12 +49,6 @@ void CollisionModel::onInitialize(){
 }
 
 double CollisionModel::scoreTrajectory(base_trajectory::Trajectory &traj){
-  
-  if(shared_data_->pcl_perception_->points.size()<5){
-    return 0.0;
-  }
-  
-
 
   for(unsigned int i=0;i<traj.getPosesSize();i++){
 
@@ -119,7 +113,7 @@ double CollisionModel::scoreTrajectory(base_trajectory::Trajectory &traj){
     dz.x/=(2.*half_z);dz.y/=(2.*half_z);dz.z/=(2.*half_z);
 
     //@The robot is not possible to be larger than 2 meters?
-    shared_data_->pcl_perception_kdtree_->radiusSearch(pcl_traj_pose, 1.0, id, sqdist);
+    shared_data_->radiusSearchPerceptionWiCheck(pcl_traj_pose, 1.0, id, sqdist);
   
     for(auto pit=id.begin();pit!=id.end();pit++){
       auto pct_point = shared_data_->pcl_perception_->points[(*pit)];

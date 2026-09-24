@@ -119,6 +119,9 @@ bool PathBlockedStrategy::isCurrent(){
 pcl::PointCloud<pcl::PointXYZI>::Ptr PathBlockedStrategy::getObservation(){
   return sensor_current_observation_;
 }
+pcl::PointCloud<pcl::PointXYZI>::Ptr PathBlockedStrategy::getObservationRobotFrame(){
+  return sensor_current_observation_;
+}
 pcl::PointCloud<pcl::PointXYZI>::Ptr PathBlockedStrategy::getLethal(){
   return current_lethal_;
 }

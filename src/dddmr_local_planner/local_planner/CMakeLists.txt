@@ -27,7 +27,12 @@ find_package(mpc_critics REQUIRED)
 find_package(trajectory_generators REQUIRED)
 find_package(dddmr_sys_core REQUIRED)
 
-find_package(PCL REQUIRED)
+find_package(PCL 1.15 REQUIRED)
+find_package(OpenCV REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(image_geometry REQUIRED)
+find_package(dddmr_trt REQUIRED)
+find_package(OpenMP REQUIRED)
 
 set(dependencies
   rclcpp
@@ -54,25 +59,72 @@ set(dependencies
   mpc_critics
   trajectory_generators
   dddmr_sys_core
+  image_geometry
+  cv_bridge
 )
 
-include_directories(
-  include
-  ${PCL_INCLUDE_DIRS}
-  ${dddmr_sys_core_INCLUDE_DIRS}
-)
+#Check yolo build flag
+if(NOT TRT_ENABLED)
+    set(TRT_ENABLED OFF CACHE BOOL "Enable or disable TensorRT")
+endif()
 
 
-# local_planner
-add_library(local_planner SHARED
-  src/local_planner.cpp
-)
-target_link_libraries(local_planner
-  ${PCL_LIBRARIES}
-)
-ament_target_dependencies(local_planner
-  ${dependencies}
-)
+if(TRT_ENABLED)
+  add_definitions(-DTRT_ENABLED) 
+  find_package(CUDAToolkit REQUIRED)
+
+  message(STATUS "TensorRT is enabled. Compiling TRT and YOLO features")
+  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "cmake")
+
+  include_directories(
+    include
+    ${PCL_INCLUDE_DIRS}
+    ${dddmr_sys_core_INCLUDE_DIRS}
+    ${OpenMP_CXX_INCLUDE_DIRS}
+    ${dddmr_trt_INCLUDE_DIRS}
+    ${OpenCV_INCLUDE_DIRS}
+  )
+
+else()
+    message(STATUS "TensorRT is disabled.")
+    include_directories(
+      include
+      ${PCL_INCLUDE_DIRS}
+      ${dddmr_sys_core_INCLUDE_DIRS}
+      ${OpenMP_CXX_INCLUDE_DIRS}
+    )
+endif()
+
+if(TRT_ENABLED)
+  add_definitions(-DTRT_ENABLED) 
+  add_library(local_planner SHARED
+    src/local_planner.cpp
+  )
+  target_link_libraries(local_planner
+    ${PCL_LIBRARIES}
+    ${OpenCV_LIBRARIES}
+    ${dddmr_trt_LIBRARIES}
+    CUDA::cudart
+    OpenMP::OpenMP_CXX
+  )
+  target_include_directories(local_planner 
+    PRIVATE ${CUDAToolkit_INCLUDE_DIRS}
+  )
+  ament_target_dependencies(local_planner
+    ${dependencies}
+  )
+else()
+  # local_planner
+  add_library(local_planner SHARED
+    src/local_planner.cpp
+  )
+  target_link_libraries(local_planner
+    ${PCL_LIBRARIES}
+  )
+  ament_target_dependencies(local_planner
+    ${dependencies}
+  )
+endif()
 
 #local_planner_node
 add_executable(local_planner_node

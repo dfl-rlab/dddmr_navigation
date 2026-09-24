@@ -80,7 +80,12 @@ class ModelSharedData{
         pcl_perception_kdtree_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
         pcl_perception_kdtree_->setInputCloud(pcl_perception_);        
       }
-      
+
+      if(pcl_perception_robot_frame_->points.size()>=5){
+        pcl_perception_kdtree_robot_frame_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
+        pcl_perception_kdtree_robot_frame_->setInputCloud(pcl_perception_robot_frame_);        
+      }
+
       pcl_prune_plan_.reset(new pcl::PointCloud<pcl::PointXYZI>);
       for(auto i=prune_plan_.poses.begin();i!=prune_plan_.poses.end();i++){
         pcl::PointXYZI ipt;
@@ -91,9 +96,54 @@ class ModelSharedData{
         pcl_prune_plan_->push_back(ipt);
       }
     }
+
+    void radiusSearchPerceptionWiCheck(pcl::PointXYZI ref_pt, double radius, std::vector<pcl::index_t>& idx, std::vector<float>& sqdist){
+      //@handling points.size()<5 makeing kdtree search fail
+      idx.clear();
+      sqdist.clear();
+      if(pcl_perception_->points.size()>5){
+        pcl_perception_kdtree_->radiusSearch(ref_pt, radius, idx, sqdist);
+      }
+      else{
+        for(size_t index=0; index<pcl_perception_->points.size(); index++){
+          float dx = ref_pt.x - pcl_perception_->points[index].x;
+          float dy = ref_pt.y - pcl_perception_->points[index].y;
+          float dz = ref_pt.z - pcl_perception_->points[index].z;
+          float sq_dis = dx*dx+dy*dy+dz*dz;
+          if(sqrt(sq_dis)<radius){
+            idx.push_back(index);
+            sqdist.push_back(sq_dis);
+          }
+        }
+      }
+    }
+
+    void radiusSearchPerceptionRobotFrameWiCheck(pcl::PointXYZI ref_pt, double radius, std::vector<pcl::index_t>& idx, std::vector<float>& sqdist){
+      //@handling points.size()<5 makeing kdtree search fail
+      idx.clear();
+      sqdist.clear();
+      if(pcl_perception_robot_frame_->points.size()>5){
+        pcl_perception_kdtree_robot_frame_->radiusSearch(ref_pt, radius, idx, sqdist);
+      }
+      else{
+        for(size_t index=0; index<pcl_perception_robot_frame_->points.size(); index++){
+          float dx = ref_pt.x - pcl_perception_robot_frame_->points[index].x;
+          float dy = ref_pt.y - pcl_perception_robot_frame_->points[index].y;
+          float dz = ref_pt.z - pcl_perception_robot_frame_->points[index].z;
+          float sq_dis = dx*dx+dy*dy+dz*dz;
+          if(sqrt(sq_dis)<radius){
+            idx.push_back(index);
+            sqdist.push_back(sq_dis);
+          }
+        }
+      }
+    }
+
     pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr pcl_perception_kdtree_;
+    pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr pcl_perception_kdtree_robot_frame_;
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_perception_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_perception_robot_frame_;
     
     //@ this will be easy use for kdtree from pct
     pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_prune_plan_;

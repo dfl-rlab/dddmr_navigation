@@ -440,6 +440,9 @@ bool StaticLayer::isCurrent(){
 pcl::PointCloud<pcl::PointXYZI>::Ptr StaticLayer::getObservation(){
   return sensor_current_observation_;
 }
+pcl::PointCloud<pcl::PointXYZI>::Ptr StaticLayer::getObservationRobotFrame(){
+  return sensor_current_observation_;
+}
 pcl::PointCloud<pcl::PointXYZI>::Ptr StaticLayer::getLethal(){
   return current_lethal_;
 }

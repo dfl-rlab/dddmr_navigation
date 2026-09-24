@@ -38,6 +38,7 @@ SharedData::SharedData(){
   static_map_size_ = 0;
   static_ground_size_ = 0;
   aggregate_observation_.reset(new pcl::PointCloud<pcl::PointXYZI>);
+  aggregate_observation_robot_frame_.reset(new pcl::PointCloud<pcl::PointXYZI>);
   current_allowed_max_linear_speed_ = -1.0;
 }
 

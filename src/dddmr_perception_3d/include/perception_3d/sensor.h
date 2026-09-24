@@ -68,6 +68,7 @@ class Sensor{
     virtual void selfMark(){}
 
     virtual pcl::PointCloud<pcl::PointXYZI>::Ptr getObservation() = 0;
+    virtual pcl::PointCloud<pcl::PointXYZI>::Ptr getObservationRobotFrame() = 0;
     virtual pcl::PointCloud<pcl::PointXYZI>::Ptr getLethal() = 0;
 
     virtual void resetdGraph(){}
@@ -106,6 +107,7 @@ class Sensor{
 
     //@ current observation for local planner
     pcl::PointCloud<pcl::PointXYZI>::Ptr sensor_current_observation_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr sensor_current_observation_robot_frame_;
 
     //@ opinion of plugin, default is pass
     PerceptionOpinion opinion_;

@@ -128,6 +128,7 @@ double StackedPerception::get_min_dGraphValue(const unsigned int index){
 void StackedPerception::aggregateObservations(){
 
   shared_data_->aggregate_observation_.reset(new pcl::PointCloud<pcl::PointXYZI>);
+  shared_data_->aggregate_observation_robot_frame_.reset(new pcl::PointCloud<pcl::PointXYZI>);
 
   for (std::vector<std::shared_ptr<Sensor> >::iterator plugin = plugins_.begin(); plugin != plugins_.end();
        ++plugin)
@@ -135,6 +136,10 @@ void StackedPerception::aggregateObservations(){
     //@aggregate observation for perception
     (*shared_data_->aggregate_observation_) += (*(*plugin)->getObservation());
     shared_data_->aggregate_observation_->header.frame_id = (*plugin)->getGlobalUtils()->getGblFrame();
+    
+    //@robot frame
+    (*shared_data_->aggregate_observation_robot_frame_) += (*(*plugin)->getObservationRobotFrame());
+    shared_data_->aggregate_observation_robot_frame_->header.frame_id = (*plugin)->getGlobalUtils()->getRobotFrame();
   }
 
 }

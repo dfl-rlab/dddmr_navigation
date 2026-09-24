@@ -68,7 +68,7 @@ public:
       rclcpp::Logger logger,
       const rclcpp::Clock::SharedPtr& clock,
       std::string global_frame,
-      std::string base_link_frame,
+      std::string robot_frame,
       std::string sensor_frame,
       double min_detect_distance,
       double max_detect_distance,
@@ -103,7 +103,7 @@ private:
   double observation_persistence_;
   double expected_update_rate_;
   rclcpp::Time last_updated_;
-  std::string base_link_frame_;
+  std::string robot_frame_;
   std::string global_frame_;
   std::string sensor_frame_;
   std::string topic_name_;

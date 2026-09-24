@@ -71,6 +71,9 @@ bool NothingLayer::isCurrent(){
 pcl::PointCloud<pcl::PointXYZI>::Ptr NothingLayer::getObservation(){
   return sensor_current_observation_;
 }
+pcl::PointCloud<pcl::PointXYZI>::Ptr NothingLayer::getObservationRobotFrame(){
+  return sensor_current_observation_;
+}
 pcl::PointCloud<pcl::PointXYZI>::Ptr NothingLayer::getLethal(){
   return current_lethal_;
 }

@@ -718,6 +718,18 @@ void DepthCameraLayer::aggregatePointCloudFromObservations(const pcl::PointCloud
   }
 }
 
+void DepthCameraLayer::aggregatePointCloudFromObservationsRobotFrame(const pcl::PointCloud<pcl::PointXYZI>::Ptr& resulting_pcl)
+{
+  std::vector<perception_3d::DepthCameraObservation> observations;
+  for(auto it=observation_buffers_.begin(); it!=observation_buffers_.end();it++)
+  {
+    (*it).second->getObservations(observations);
+  }
+  for(auto it=observations.begin(); it!=observations.end();it++){
+    *resulting_pcl += (*(*it).raw_cloud_i_);
+  }
+}
+
 void DepthCameraLayer::addCastingMarker(const pcl::PointXYZI& pt, size_t id, visualization_msgs::msg::MarkerArray& markerArray){
 
     //@ Creater marker
@@ -751,6 +763,12 @@ pcl::PointCloud<pcl::PointXYZI>::Ptr DepthCameraLayer::getObservation(){
   sensor_current_observation_.reset(new pcl::PointCloud<pcl::PointXYZI>());
   aggregatePointCloudFromObservations(sensor_current_observation_);
   return sensor_current_observation_;
+}
+
+pcl::PointCloud<pcl::PointXYZI>::Ptr DepthCameraLayer::getObservationRobotFrame(){
+  sensor_current_observation_robot_frame_.reset(new pcl::PointCloud<pcl::PointXYZI>());
+  aggregatePointCloudFromObservationsRobotFrame(sensor_current_observation_robot_frame_);
+  return sensor_current_observation_robot_frame_;
 }
 
 pcl::PointCloud<pcl::PointXYZI>::Ptr DepthCameraLayer::getLethal(){

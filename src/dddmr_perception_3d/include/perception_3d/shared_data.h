@@ -77,6 +77,7 @@ class SharedData{
     //@ Add kd tree as shared make system unstable, because multi process are calling the tree
     //@ I am not able to make a more stable structure
     pcl::PointCloud<pcl::PointXYZI>::Ptr aggregate_observation_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr aggregate_observation_robot_frame_;
     pcl::PointCloud<pcl::PointXYZI>::Ptr aggregate_lethal_;
 
     //@ limit the current speed of trajectories

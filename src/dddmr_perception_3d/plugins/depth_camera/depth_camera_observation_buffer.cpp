@@ -41,7 +41,7 @@ DepthCameraObservationBuffer::DepthCameraObservationBuffer(
       rclcpp::Logger logger,
       const rclcpp::Clock::SharedPtr& clock,
       std::string global_frame,
-      std::string base_link_frame,
+      std::string robot_frame,
       std::string sensor_frame,
       double min_detect_distance,
       double max_detect_distance,
@@ -55,7 +55,7 @@ DepthCameraObservationBuffer::DepthCameraObservationBuffer(
   tf2Buffer_(tf2Buffer),
   clock_(clock),
   global_frame_(global_frame),
-  base_link_frame_(base_link_frame),
+  robot_frame_(robot_frame),
   sensor_frame_(sensor_frame),
   min_detect_distance_(min_detect_distance),
   max_detect_distance_(max_detect_distance),
@@ -92,20 +92,20 @@ void DepthCameraObservationBuffer::bufferCloud(const sensor_msgs::msg::PointClou
   try
   {
     if(!got_b2s_){
-      b2s_ = tf2Buffer_->lookupTransform(base_link_frame_, cloud.header.frame_id , tf2::TimePointZero, tf2::durationFromSec(0.5));
+      b2s_ = tf2Buffer_->lookupTransform(robot_frame_, cloud.header.frame_id , tf2::TimePointZero, tf2::durationFromSec(0.5));
       got_b2s_ = true;
     }
   }
   catch (tf2::TransformException& e)
   {
-    RCLCPP_INFO(logger_, "Failed to transform pointcloud to %s frame: %s", base_link_frame_.c_str(), e.what());
+    RCLCPP_INFO(logger_, "Failed to transform pointcloud to %s frame: %s", robot_frame_.c_str(), e.what());
   }
 
   //@ get af3 to convert observation to baselink frame
   Eigen::Affine3d trans_b2s_af3 = tf2::transformToEigen(b2s_);
   //@ raw_cloud is XYZ, convert it to XYZI so in the future we can extend features leverage intensity
   pcl::transformPointCloud(*observation_vector_.back().raw_cloud_, *observation_vector_.back().raw_cloud_, trans_b2s_af3);
-
+  
   for (auto it=observation_vector_.back().raw_cloud_->points.begin();it!=observation_vector_.back().raw_cloud_->points.end();it++)
   {
     //@ super near filter, basically, filter out 0,0.0 point
@@ -117,6 +117,7 @@ void DepthCameraObservationBuffer::bufferCloud(const sensor_msgs::msg::PointClou
       tmp_pt.z = (*it).z;
       tmp_pt.intensity = 0;
       observation_vector_.back().cloud_->push_back(tmp_pt);
+      observation_vector_.back().raw_cloud_i_->push_back(tmp_pt);
     }
   }
 
@@ -138,7 +139,7 @@ void DepthCameraObservationBuffer::bufferCloud(const sensor_msgs::msg::PointClou
   try
   {
     m2s = tf2Buffer_->lookupTransform(global_frame_, origin_frame, tf2::TimePointZero, tf2::durationFromSec(0.2));
-    m2b = tf2Buffer_->lookupTransform(global_frame_, base_link_frame_, tf2::TimePointZero, tf2::durationFromSec(0.2));
+    m2b = tf2Buffer_->lookupTransform(global_frame_, robot_frame_, tf2::TimePointZero, tf2::durationFromSec(0.2));
   }
   catch (tf2::TransformException& e)
   {
@@ -173,7 +174,7 @@ void DepthCameraObservationBuffer::bufferCloud(const sensor_msgs::msg::PointClou
   observation_vector_.back().findFrustumNormal();
   observation_vector_.back().findFrustumPlane();
 
-  //@ Convert cloud_ from base_link_frame_ to global frame
+  //@ Convert cloud_ from robot_frame_ to global frame
   Eigen::Affine3d trans_m2b_af3 = tf2::transformToEigen(m2b);
   pcl::transformPointCloud(*observation_vector_.back().cloud_, *observation_vector_.back().cloud_, trans_m2b_af3);
   pcl_conversions::toPCL(clock_->now(), observation_vector_.back().cloud_->header.stamp);

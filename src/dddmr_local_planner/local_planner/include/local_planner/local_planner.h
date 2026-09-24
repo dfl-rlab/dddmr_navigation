@@ -36,6 +36,9 @@
 #include <unordered_map>
 #include <set>
 #include <queue> 
+#include <fstream>
+#include <iomanip>
+#include <filesystem>
 #include <angles/angles.h>
 /*For perception plugin*/
 #include <perception_3d/perception_3d_ros.h>
@@ -55,7 +58,52 @@
 //@planner state
 #include <dddmr_sys_core/dddmr_enum_states.h>
 
+// Auto-detect cv_bridge version based on file existence
+#if __has_include(<cv_bridge/cv_bridge.hpp>)
+    // ROS 2 Iron, Jazzy, and newer
+    #include <cv_bridge/cv_bridge.hpp>
+#elif __has_include(<cv_bridge/cv_bridge.h>)
+    // ROS 2 Humble and older
+    #include <cv_bridge/cv_bridge.h>
+#else
+    #error "Could not find cv_bridge headers!"
+#endif
+
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/opencv.hpp>
+
+#ifdef TRT_ENABLED
+#include "dddmr_trt/yolov8.h"
+#include <opencv2/cudaimgproc.hpp>
+#endif
+
 namespace local_planner {
+
+inline std::string currentDateTime() {
+  std::time_t t = std::time(nullptr);
+  std::tm* now = std::localtime(&t);
+
+  char buffer[128];
+  strftime(buffer, sizeof(buffer), "%Y_%m_%d_%H_%M_%S", now);
+  return buffer;
+}
+
+class tensor_labelling{
+  public:
+    int x1;
+    int y1;
+    int x2;
+    int y2;
+    std_msgs::msg::Header header;
+    tensor_labelling(int m_x1, int m_y1, int m_x2, int m_y2, std_msgs::msg::Header m_header){
+      x1 = m_x1;
+      y1 = m_y1;
+      x2 = m_x2;
+      y2 = m_y2;
+      header = m_header;
+    }
+};
 
 class Local_Planner : public rclcpp::Node {
 
@@ -71,7 +119,13 @@ class Local_Planner : public rclcpp::Node {
 
       void setPlan(const std::vector<geometry_msgs::msg::PoseStamped>& orig_global_plan);
       dddmr_sys_core::PlannerState computeVelocityCommand(std::string traj_gen_name, base_trajectory::Trajectory& best_traj);
+      
       void getBestTrajectory(std::string traj_gen_name, base_trajectory::Trajectory& best_traj);
+      bool setBitByValue(uint8_t &byte, float value, float res);
+
+      cv::Mat stackImages(const std::deque<std::pair<cv::Mat, tensor_labelling>>& queue, int rows = 3, int cols = 3);
+      bool writeStackedImage(const cv::Mat& image, const std::string& file_name);
+      bool generateLabelJson(const std::deque<std::pair<cv::Mat, tensor_labelling>>& queue, int rows, int cols, int image_width, int image_height, const std::string& file_name);
 
       //@ shared data for trajectory generator, we manage the variables by this way for future changed to ROS2
       std::shared_ptr<trajectory_generators::TrajectoryGeneratorSharedData> traj_shared_data_;
@@ -132,6 +186,7 @@ class Local_Planner : public rclcpp::Node {
       rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr pub_accepted_trajectory_pose_array_;
       rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr pub_best_trajectory_pose_;
       rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr pub_trajectory_pose_array_;
+      rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_informative_tensor_;
       //ros::Publisher pub_pc_normal_;
       //ros::Publisher pub_trajectory_cuboids_;
       
@@ -139,10 +194,12 @@ class Local_Planner : public rclcpp::Node {
       /*Sub*/
       rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_ros_sub_;
       rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr steering_state_ros_sub_;
-      
+      rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_vel_sub_;
+
       /*cb*/
       void cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg);
       void cbSteeringState(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg);
+      void cbCmdVel(const geometry_msgs::msg::TwistStamped::SharedPtr msg);
 
       void trajectory2posearray_cuboids(const base_trajectory::Trajectory& a_traj, 
                                       geometry_msgs::msg::PoseArray& pose_arr,
@@ -171,12 +228,16 @@ class Local_Planner : public rclcpp::Node {
       
       std::vector<base_trajectory::Trajectory> accepted_trajectories_;
       std::map<std::string, std::vector<base_trajectory::Trajectory>> rejected_trajectories_;
-
+      
+      std::deque<std::pair<cv::Mat, tensor_labelling>> informative_tensor_queue_;
+      std::string labelled_tensor_storage_dir_;
+      
     protected:
 
       std::shared_ptr<tf2_ros::TransformListener> tfl_;
       std::shared_ptr<tf2_ros::Buffer> tf2Buffer_;  ///< @brief Used for transforming point clouds
       nav_msgs::msg::Odometry robot_state_;
+      geometry_msgs::msg::TwistStamped training_cmd_vel_;
       ackermann_msgs::msg::AckermannDriveStamped ackermann_drive_state_;
       std::shared_ptr<std::vector<base_trajectory::Trajectory>> trajectories_;
       nav_msgs::msg::Path prune_plan_;

@@ -123,17 +123,6 @@ ament_target_dependencies(perception_3d_ros_node
   ${dependencies}
 )
 
-# perception_cluster_marking
-add_library(cluster_marking SHARED
-  plugins/cluster_marking.cpp
-)
-target_link_libraries(cluster_marking
-  perception_sensor
-)
-ament_target_dependencies(cluster_marking
-  ${dependencies}
-)
-
 # perception_cluster_kdtree_marking
 add_library(cluster_kdtree_marking SHARED
   plugins/cluster_kdtree_marking.cpp
@@ -170,8 +159,7 @@ add_library(layers SHARED
   plugins/multilayer_spinning_lidar.cpp
   plugins/depth_camera/depth_camera_layer.cpp
 )
-target_link_libraries(layers
-  cluster_marking 
+target_link_libraries(layers 
   cluster_kdtree_marking
   depth_camera_buffer 
   stacked_perception_ros
@@ -216,7 +204,6 @@ install(TARGETS
   stacked_perception
   stacked_perception_ros
   depth_camera_buffer
-  cluster_marking
   cluster_kdtree_marking
   layers
   ARCHIVE DESTINATION lib
@@ -287,7 +274,7 @@ endif()
 # --- Everything CI/CD test finish here ---
 
 ament_export_include_directories(include)
-ament_export_libraries(shared_data_sensor perception_sensor stacked_perception stacked_perception_ros cluster_marking cluster_kdtree_marking depth_camera_buffer layers)
+ament_export_libraries(shared_data_sensor perception_sensor stacked_perception stacked_perception_ros cluster_kdtree_marking depth_camera_buffer layers)
 ament_export_dependencies(${dependencies})
 pluginlib_export_plugin_description_file(perception_3d perception_3d_plugins.xml)
 ament_package()

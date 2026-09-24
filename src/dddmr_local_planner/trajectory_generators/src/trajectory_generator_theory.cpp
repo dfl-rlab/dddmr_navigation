@@ -61,6 +61,7 @@ void TrajectoryGeneratorTheory::expertScoring(std::vector<base_trajectory::Traje
       if(a_traj.getPosesSize()>0 && a_traj.cost_>=0 && a_traj.cost_<=minimum_cost){
         best_traj = a_traj;
         minimum_cost = a_traj.cost_;
+        //RCLCPP_INFO(rclcpp::get_logger("TrajectoryGeneratorTheory"),"Toal cost of a traj %.2f v, %.2f w, cost: %.2f", a_traj.xv_, a_traj.thetav_, a_traj.cost_);
       }
     }
 }

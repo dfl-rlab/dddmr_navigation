@@ -8,15 +8,15 @@
 #include "sensor_msgs/msg/camera_info.hpp"
 
 
-//auto detect cv bridge version to prepare for jazzy
-#ifdef ROS_JAZZY
-    // ROS 2 Iron, Jazzy, and newer use the .hpp extension
+// Auto-detect cv_bridge version based on file existence
+#if __has_include(<cv_bridge/cv_bridge.hpp>)
+    // ROS 2 Iron, Jazzy, and newer
     #include <cv_bridge/cv_bridge.hpp>
-    #include <image_geometry/pinhole_camera_model.hpp>
-#else
-    // ROS 2 Humble and older use the .h extension
+#elif __has_include(<cv_bridge/cv_bridge.h>)
+    // ROS 2 Humble and older
     #include <cv_bridge/cv_bridge.h>
-    #include <image_geometry/pinhole_camera_model.h>
+#else
+    #error "Could not find cv_bridge headers!"
 #endif
 
 #include <opencv2/core/core.hpp>

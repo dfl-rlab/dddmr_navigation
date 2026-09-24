@@ -313,6 +313,9 @@ bool NoEntryLayer::isCurrent(){
 pcl::PointCloud<pcl::PointXYZI>::Ptr NoEntryLayer::getObservation(){
   return sensor_current_observation_;
 }
+pcl::PointCloud<pcl::PointXYZI>::Ptr NoEntryLayer::getObservationRobotFrame(){
+  return sensor_current_observation_;
+}
 pcl::PointCloud<pcl::PointXYZI>::Ptr NoEntryLayer::getLethal(){
   return current_lethal_;
 }

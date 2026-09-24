@@ -15,13 +15,15 @@
 
 #include "tf2_ros/static_transform_broadcaster.h"
 
-//auto detect cv bridge version to prepare for jazzy
-#ifdef ROS_JAZZY
-    // ROS 2 Iron, Jazzy, and newer use the .hpp extension
+// Auto-detect cv_bridge version based on file existence
+#if __has_include(<cv_bridge/cv_bridge.hpp>)
+    // ROS 2 Iron, Jazzy, and newer
     #include <cv_bridge/cv_bridge.hpp>
-#else
-    // ROS 2 Humble and older use the .h extension
+#elif __has_include(<cv_bridge/cv_bridge.h>)
+    // ROS 2 Humble and older
     #include <cv_bridge/cv_bridge.h>
+#else
+    #error "Could not find cv_bridge headers!"
 #endif
 
 #include <opencv2/core/core.hpp>

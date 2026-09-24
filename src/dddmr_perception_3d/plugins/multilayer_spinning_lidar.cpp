@@ -319,6 +319,7 @@ void MultiLayerSpinningLidar::cbSensor(const sensor_msgs::msg::PointCloud2::Shar
 
   if(is_local_planner_){
     //@ put to current observation, different for global/local
+    pcl::copyPointCloud(*pcl_msg_, *sensor_current_observation_robot_frame_);
     Eigen::Affine3d trans_gbl2b_af3 = tf2::transformToEigen(trans_gbl2b_);
     pcl::transformPointCloud(*pcl_msg_, *pcl_msg_, trans_gbl2b_af3);
     pcl_msg_->header.frame_id = gbl_utils_->getGblFrame();
@@ -632,8 +633,6 @@ void MultiLayerSpinningLidar::selfClear(){
   }
   visualization_msgs::msg::MarkerArray markerArray;
   pc_current_window_.reset(new pcl::PointCloud<pcl::PointXYZI>);
-  sensor_current_observation_.reset(new pcl::PointCloud<pcl::PointXYZI>);
-
 
   size_t cleared_cnt = 0;
   
@@ -1044,6 +1043,10 @@ bool MultiLayerSpinningLidar::isCurrent(){
 
 pcl::PointCloud<pcl::PointXYZI>::Ptr MultiLayerSpinningLidar::getObservation(){
   return sensor_current_observation_;
+}
+
+pcl::PointCloud<pcl::PointXYZI>::Ptr MultiLayerSpinningLidar::getObservationRobotFrame(){
+  return sensor_current_observation_robot_frame_;
 }
 
 pcl::PointCloud<pcl::PointXYZI>::Ptr MultiLayerSpinningLidar::getLethal(){

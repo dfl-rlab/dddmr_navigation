@@ -315,6 +315,9 @@ bool SpeedLimitLayer::isCurrent(){
 pcl::PointCloud<pcl::PointXYZI>::Ptr SpeedLimitLayer::getObservation(){
   return sensor_current_observation_;
 }
+pcl::PointCloud<pcl::PointXYZI>::Ptr SpeedLimitLayer::getObservationRobotFrame(){
+  return sensor_current_observation_;
+}
 pcl::PointCloud<pcl::PointXYZI>::Ptr SpeedLimitLayer::getLethal(){
   return current_lethal_;
 }

@@ -35,6 +35,7 @@ namespace perception_3d
 {
   DepthCameraObservation::DepthCameraObservation(const sensor_msgs::msg::PointCloud2& cloud) 
   : raw_cloud_(new pcl::PointCloud<pcl::PointXYZ>())
+  , raw_cloud_i_(new pcl::PointCloud<pcl::PointXYZI>())
   , cloud_(new pcl::PointCloud<pcl::PointXYZI>())
   , frustum_(new pcl::PointCloud<pcl::PointXYZ>())
   , frustum_normal_(new pcl::PointCloud<pcl::PointXYZ>())
@@ -69,6 +70,7 @@ namespace perception_3d
   {
     raw_cloud_.reset();
     cloud_.reset();
+    raw_cloud_i_.reset();
     frustum_.reset();
     frustum_normal_.reset();
   }
