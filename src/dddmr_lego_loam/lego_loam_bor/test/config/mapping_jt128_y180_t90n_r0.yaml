@@ -1,8 +1,8 @@
 bag_reader:
   ros__parameters:
     use_sim_time: true
-    bag_file_dir: "/root/dddmr_bags/cicdtest/mapping_jt128_t45"
-    bag_format: "mcap"
+    bag_file_dir: "/root/dddmr_bags/cicdtest/mapping_jt128_y180_t90n_r0"
+    bag_format: "sqlite3"
     point_cloud_topic: "/lidar_points"
     odometry_topic: "/odom"
     skip_frame: 1
@@ -12,10 +12,10 @@ lego_loam_ip:
     use_sim_time: true
     laser:
         odom_type: "wheel_odometry"         #wheel_odometry/laser_odometry 
-        baselink_frame: "base_footprint"
+        baselink_frame: "base_link"
         num_vertical_scans: 100
         num_horizontal_scans: 400
-        vertical_angle_bottom: 0.0          # degrees
+        vertical_angle_bottom: 5.0          # degrees
         vertical_angle_top: 90.0            # degrees
         scan_period: 0.0                   # seconds
 
@@ -33,11 +33,11 @@ lego_loam_ip:
         ground_slope_tolerance: 0.3
         
         ground_fov_bottom: 0.0
-        ground_fov_top: 0.61086
-        ground_positive_start: 0.0
-        ground_positive_stop: 1.5707
-        ground_negative_start: 0.0
-        ground_negative_stop: -1.5707
+        ground_fov_top: 1.57
+        ground_positive_start: 2.0
+        ground_positive_stop: 3.14159
+        ground_negative_start: -2.0
+        ground_negative_stop: -3.14159
 
 
 lego_loam_fa:
@@ -56,7 +56,7 @@ lego_loam_mo:
     use_sim_time: true
     mapping:
 
-        distance_between_key_frame: 0.5
+        distance_between_key_frame: 1.0
         angle_between_key_frame: 0.5
 
         enable_loop_closure: true

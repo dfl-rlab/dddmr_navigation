@@ -106,7 +106,7 @@ def generate_test_description():
           package="rviz2",
           executable="rviz2",
           output="screen",
-          arguments=['-d', os.path.join(get_package_share_directory('lego_loam_bor'), 'rviz', 'lego_loam.rviz')], # <-- FIXED CLOSING BRACKET HERE
+          arguments=['-d', os.path.join(get_package_share_directory('lego_loam_bor'), 'rviz', 'test.rviz')], # <-- FIXED CLOSING BRACKET HERE
           condition=IfCondition(enable_rviz_config)
   )  
   

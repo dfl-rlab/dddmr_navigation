@@ -106,17 +106,17 @@ def generate_test_description():
           package="rviz2",
           executable="rviz2",
           output="screen",
-          arguments=['-d', os.path.join(get_package_share_directory('lego_loam_bor'), 'rviz', 'lego_loam.rviz')], # <-- FIXED CLOSING BRACKET HERE
+          arguments=['-d', os.path.join(get_package_share_directory('lego_loam_bor'), 'rviz', 'test.rviz')], # <-- FIXED CLOSING BRACKET HERE
           condition=IfCondition(enable_rviz_config)
   )  
   
   ### Change test name and TF only
-  test_name = 'mapping_jt128_t45'
+  test_name = 'mapping_jt128_y0_t90_r0'
   s2b = Node(
     package="tf2_ros",
     executable="static_transform_publisher",
     output="screen" ,
-    arguments=["0.235", "0.0", "0.16", "1.5707963", "0.0", "0.785398", "base_link", "hesai_lidar"]
+    arguments=["0.33", "0.0", "1.12", "0.0", "1.5707963", "0.0", "base_link", "hesai_lidar"]
   )
 
   b2ft = Node(

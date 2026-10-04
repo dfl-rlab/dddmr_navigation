@@ -122,19 +122,6 @@ if [ "$d_bag9" != "${d_bag9#[Yy]}" ] ;then
   unzip perception_3d_multilayer_spinning_lidar_gpulidar.zip
 fi
 
-
-echo -n "Do you want to download mapping_jt128_t45 (Y/N):"
-read d_bag10
-if [ "$d_bag10" != "${d_bag10#[Yy]}" ] ;then 
-  echo "Download bag"
-  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='1VE6zUmlT21IA9MIoN36JZYuBUB6w6He2 \
-      | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
-  curl -L -b cookies.txt -o mapping_jt128_t45.zip \
-      'https://drive.usercontent.google.com/download?id='1VE6zUmlT21IA9MIoN36JZYuBUB6w6He2'&confirm='$(<confirm.txt)
-  rm -f confirm.txt cookies.txt
-  unzip mapping_jt128_t45.zip
-fi
-
 echo -n "Do you want to download perception_3d_multilayer_spinning_lidar_gpulidar_static (Y/N):"
 read d_bag11
 if [ "$d_bag11" != "${d_bag11#[Yy]}" ] ;then 
@@ -171,3 +158,38 @@ if [ "$d_bag13" != "${d_bag13#[Yy]}" ] ;then
   unzip nav_ackermann_p2p.zip
 fi
 
+echo -n "Do you want to download mapping_jt128_y0_t90_r0 (Y/N):"
+read d_bag14
+if [ "$d_bag14" != "${d_bag14#[Yy]}" ] ;then 
+  echo "Download bag"
+  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='14_L-gX461OmRAUn021N_599RduCQoiOL \
+      | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
+  curl -L -b cookies.txt -o mapping_jt128_y0_t90_r0.zip \
+      'https://drive.usercontent.google.com/download?id='14_L-gX461OmRAUn021N_599RduCQoiOL'&confirm='$(<confirm.txt)
+  rm -f confirm.txt cookies.txt
+  unzip mapping_jt128_y0_t90_r0.zip
+fi
+
+echo -n "Do you want to download mapping_jt128_y90_t0_r45 (Y/N):"
+read d_bag15
+if [ "$d_bag15" != "${d_bag15#[Yy]}" ] ;then 
+  echo "Download bag"
+  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='1ZKLFt2Q-MdUn0J6MR_vQVCnkMNshPxxO \
+      | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
+  curl -L -b cookies.txt -o mapping_jt128_y90_t0_r45.zip \
+      'https://drive.usercontent.google.com/download?id='1ZKLFt2Q-MdUn0J6MR_vQVCnkMNshPxxO'&confirm='$(<confirm.txt)
+  rm -f confirm.txt cookies.txt
+  unzip mapping_jt128_y90_t0_r45.zip
+fi
+
+echo -n "Do you want to download mapping_jt128_y180_t90n_r0 (Y/N):"
+read d_bag16
+if [ "$d_bag16" != "${d_bag16#[Yy]}" ] ;then 
+  echo "Download bag"
+  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='14jyuLI9iDIwMee0q2jImX2PhNwg4dER_ \
+      | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
+  curl -L -b cookies.txt -o mapping_jt128_y180_t90n_r0.zip \
+      'https://drive.usercontent.google.com/download?id='14jyuLI9iDIwMee0q2jImX2PhNwg4dER_'&confirm='$(<confirm.txt)
+  rm -f confirm.txt cookies.txt
+  unzip mapping_jt128_y180_t90n_r0.zip
+fi

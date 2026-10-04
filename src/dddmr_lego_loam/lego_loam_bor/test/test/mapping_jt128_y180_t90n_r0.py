@@ -91,7 +91,7 @@ def correct_yaml_format_by_ros2_version(metadata_path, ros_version=None):
 
 @pytest.mark.launch_test
 def generate_test_description():
-
+  
   ### Argument for rviz
   enable_rviz_arg = DeclareLaunchArgument(
     'enable_rviz',
@@ -109,14 +109,21 @@ def generate_test_description():
           arguments=['-d', os.path.join(get_package_share_directory('lego_loam_bor'), 'rviz', 'test.rviz')], # <-- FIXED CLOSING BRACKET HERE
           condition=IfCondition(enable_rviz_config)
   )  
-
+  
   ### Change test name and TF only
-  test_name = 'mapping_airy_t45_trt'
+  test_name = 'mapping_jt128_y180_t90n_r0'
   s2b = Node(
     package="tf2_ros",
     executable="static_transform_publisher",
     output="screen" ,
-    arguments=["0.3", "0.0", "0.5", "0.0", "0.78539815", "0.0", "base_link", "airy"]
+    arguments=["0.33", "0.0", "1.12", "3.1415926", "-1.5707963", "0.0", "base_link", "hesai_lidar"]
+  )
+
+  b2ft = Node(
+    package="tf2_ros",
+    executable="static_transform_publisher",
+    output="screen" ,
+    arguments=["0.0", "0.0", "-0.32", "0.0", "0.0", "0.0", "base_link", "base_footprint"]
   )
 
   the_yaml = os.path.join(
@@ -145,13 +152,14 @@ def generate_test_description():
   #for test node
   test_node = Node(
     package="lego_loam_bor",
-    executable="mapping_trt_test_node",
+    executable="mapping_test_node",
     name=test_name,
     output="screen"
   )  
 
   return LaunchDescription([
       s2b,
+      b2ft,
       lego_loam_bag_node,
       shutdown_on_crash,
       rviz,

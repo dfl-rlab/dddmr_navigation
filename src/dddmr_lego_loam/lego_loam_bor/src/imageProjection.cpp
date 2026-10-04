@@ -56,8 +56,11 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
   _pub_ground_cloud = this->create_publisher<sensor_msgs::msg::PointCloud2>
       ("ground_cloud", 1);  
 
-  _pub_segmented_cloud = this->create_publisher<sensor_msgs::msg::PointCloud2>
-      ("segmented_cloud", 1); 
+  //_pub_segmented_cloud = this->create_publisher<sensor_msgs::msg::PointCloud2>
+  //    ("segmented_cloud", 1); 
+
+  _pub_zrollpitchfeature_cloud = this->create_publisher<sensor_msgs::msg::PointCloud2>
+      ("zrollpitchfeature_cloud", 1); 
 
   _pub_segmented_cloud_pure = this->create_publisher<sensor_msgs::msg::PointCloud2>
       ("segmented_cloud_pure", 1);
@@ -716,24 +719,43 @@ void ImageProjection::zPitchRollFeatureRemoval() {
       }
 
       float dX =
-          _full_cloud->points[upperInd].x - _full_cloud->points[lowerInd].x;
+          _full_cloud_no_pitch.points[upperInd].x - _full_cloud_no_pitch.points[lowerInd].x;
       float dY =
-          _full_cloud->points[upperInd].y - _full_cloud->points[lowerInd].y;
+          _full_cloud_no_pitch.points[upperInd].y - _full_cloud_no_pitch.points[lowerInd].y;
       float dZ =
-          _full_cloud->points[upperInd].z - _full_cloud->points[lowerInd].z;
+          _full_cloud_no_pitch.points[upperInd].z - _full_cloud_no_pitch.points[lowerInd].z;
 
       float vertical_angle = std::atan2(dZ , sqrt(dX * dX + dY * dY));
 
       // zPitchRoll feature
-      if ( vertical_angle <= 5 * DEG_TO_RAD) {
-        _ground_mat(i, j) = 1;
-        _ground_mat(i + 1, j) = 1;
-        _z_pitch_roll_decisive_feature_cloud->push_back(_full_cloud->points[upperInd]);
-        _z_pitch_roll_decisive_feature_cloud->push_back(_full_cloud->points[lowerInd]);
-      
-        //We have found zPitchRoll features, label something we dont need for xYYawfeatures
-        _label_mat(i, j) = -1;
-        _label_mat(i+1, j) = -1;
+      if ( fabs(vertical_angle) <= 5 * DEG_TO_RAD) {
+        //@ test left and right, otherwise vertical wall will be treated as floor/ceiling
+        if(j>5 && j<_horizontal_scans-5){
+          size_t lowerInd_left = lowerInd - 5;
+          size_t lowerInd_right = lowerInd + 5;
+          float dZh = _full_cloud_no_pitch.points[lowerInd_left].z - _full_cloud_no_pitch.points[lowerInd_right].z;  
+          if(fabs(dZh)<0.1){
+            _ground_mat(i, j) = 1;
+            _ground_mat(i + 1, j) = 1;
+            _z_pitch_roll_decisive_feature_cloud->push_back(_full_cloud->points[upperInd]);
+            _z_pitch_roll_decisive_feature_cloud->push_back(_full_cloud->points[lowerInd]);
+          
+            //We have found zPitchRoll features, label something we dont need for xYYawfeatures
+            _label_mat(i, j) = -1;
+            _label_mat(i+1, j) = -1;
+          }
+        }
+        else{
+          _ground_mat(i, j) = 1;
+          _ground_mat(i + 1, j) = 1;
+          _z_pitch_roll_decisive_feature_cloud->push_back(_full_cloud->points[upperInd]);
+          _z_pitch_roll_decisive_feature_cloud->push_back(_full_cloud->points[lowerInd]);
+        
+          //We have found zPitchRoll features, label something we dont need for xYYawfeatures
+          _label_mat(i, j) = -1;
+          _label_mat(i+1, j) = -1;  
+        }
+
       }
 
       //@ 1. check upper and lower are in ground FOV
@@ -1126,6 +1148,7 @@ void ImageProjection::publishClouds() {
   };
 
   //PublishCloud(_pub_outlier_cloud, _outlier_cloud);
+  PublishCloud(_pub_zrollpitchfeature_cloud, _z_pitch_roll_decisive_feature_cloud);
   //PublishCloud(_pub_segmented_cloud, _segmented_cloud);
   PublishCloud(_pub_ground_cloud, ds_patched_ground_);
   PublishCloud(_pub_segmented_cloud_pure, _segmented_cloud_pure);

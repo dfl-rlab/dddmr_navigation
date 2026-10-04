@@ -57,10 +57,10 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 98.03990173339844
+      Max Intensity: 98.03070068359375
       Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: Raw
+      Min Intensity: 9.999999747378752e-05
+      Name: ZRollPitchFeature
       Position Transformer: XYZ
       Selectable: true
       Size (Pixels): 3
@@ -71,7 +71,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Best Effort
-        Value: /segmented_cloud
+        Value: /zrollpitchfeature_cloud
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
