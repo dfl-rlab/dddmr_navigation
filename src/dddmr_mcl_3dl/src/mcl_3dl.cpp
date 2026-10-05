@@ -313,9 +313,16 @@ void MCL3dlNode::cbLeGoFeatureCloud(const sensor_msgs::msg::PointCloud2::SharedP
 
 
   //Ground will skew the result when close to obstacle, because velodyne has blind spot of 50 cm
+  pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_flat_ds(new pcl::PointCloud<mcl_3dl::pcl_t>); 
+  pc_flat_ds = small_gicp::voxelgrid_sampling_omp(*pc_flat_in, 1.0, 4);
+  //@ remove large Z value from the ground
   pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_flat(new pcl::PointCloud<mcl_3dl::pcl_t>); 
-  pc_flat = small_gicp::voxelgrid_sampling_omp(*pc_flat_in, 1.0, 4);
-  
+  for(auto a_pt=pc_flat_ds->points.begin(); a_pt!=pc_flat_ds->points.end(); a_pt++){
+    if(fabs((*a_pt).z)<=0.2){
+      pc_flat->push_back(*a_pt);
+    }
+  }
+
   //@ decide voxel size by total pc size
   double voxel_size = pc_less_sharp_in->points.size()/3000.0;
   pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_less_sharp(new pcl::PointCloud<mcl_3dl::pcl_t>);
