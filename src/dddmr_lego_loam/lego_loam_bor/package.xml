@@ -37,6 +37,7 @@
   <depend>cv_bridge</depend>
   <depend>dddmr_trt</depend>
   <depend>dddmr_sys_core</depend>
+  <depend>hesai_ros_driver</depend>
   
   <test_depend>ament_lint_common</test_depend>
   <test_depend>ament_lint_auto</test_depend>

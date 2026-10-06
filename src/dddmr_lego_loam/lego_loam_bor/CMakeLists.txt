@@ -263,6 +263,38 @@ ament_target_dependencies(lego_loam_bag
   ${dependencies}
 )
 
+#Check Hesai build flag
+if(NOT HESAI_ENABLED)
+    set(HESAI_ENABLED OFF CACHE BOOL "Enable or disable Hesai packet node")
+endif()
+
+if(HESAI_ENABLED)
+  add_definitions(-DHESAI_ENABLED)
+  find_package(hesai_ros_driver REQUIRED)
+
+  #lego loam hesai packet node
+  add_executable(lego_loam_hesai_packet_node
+    src/lego_loam_hesai_packet_node.cpp
+  )
+  target_link_libraries(lego_loam_hesai_packet_node 
+    interactive_pose_graph_editor
+    image_projection
+    feature_association
+    map_optimization
+    lego_loam_map_visualization
+    gtsam
+  )
+  ament_target_dependencies(lego_loam_hesai_packet_node
+    ${dependencies}
+    hesai_ros_driver
+  )
+
+  install(TARGETS
+    lego_loam_hesai_packet_node
+    RUNTIME DESTINATION lib/${PROJECT_NAME}
+  )
+endif()
+
 #lego loam node
 add_executable(lego_loam
   src/lego_loam_node.cpp

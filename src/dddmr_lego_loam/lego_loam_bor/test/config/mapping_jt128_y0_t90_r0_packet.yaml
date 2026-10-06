@@ -1,0 +1,138 @@
+bag_reader:
+  ros__parameters:
+    use_sim_time: true
+    bag_file_dir: "/root/dddmr_bags/cicdtest/mapping_jt128_y0_t90_r0_packet"
+    bag_format: "mcap"
+    hesai_packet_topic: "/lidar_packets"
+    odometry_topic: "/odom"
+    skip_frame: 1
+
+lego_loam_ip:
+  ros__parameters:
+    use_sim_time: true
+    laser:
+        odom_type: "wheel_odometry"         #wheel_odometry/laser_odometry 
+        baselink_frame: "base_link"
+        num_vertical_scans: 100
+        num_horizontal_scans: 400
+        vertical_angle_bottom: 5.0          # degrees
+        vertical_angle_top: 90.0            # degrees
+        scan_period: 0.0                   # seconds
+
+    imageProjection:
+        segment_valid_point_num: 5
+        segment_valid_line_num: 2
+        segment_theta: 60.0                      # decrese this value may improve accuracy
+        minimum_detection_range: 0.05
+        maximum_detection_range: 60.0            # point cloud within this range will be used to project image
+        distance_for_patch_between_rings: 1.0    # patch ground between rings within this range, i.e. ring0 and ring1 is smaller than 1 meter, patch them
+        stitcher_num: 0                          # for non-repetitive scan lidar use 2~4 (i.e. mid360)
+        trt_model_path: ""                       # provide trt engine for yolo
+        projected_image_stack_size: 1            # Stack this number of image for yolo11n to inference as time elapsed yolo (only work when TRT is loaded)
+        patch_first_ring_to_baselink: false      
+        ground_slope_tolerance: 0.3
+        
+        ground_fov_bottom: 0.0
+        ground_fov_top: 1.57
+        ground_positive_start: 0.0
+        ground_positive_stop: 1.57
+        ground_negative_start: -0.0
+        ground_negative_stop: -1.57
+
+
+lego_loam_fa:
+  ros__parameters:
+    use_sim_time: true
+    featureAssociation:                              
+        edge_threshold: 0.1
+        surf_threshold: 0.1
+        nearest_feature_search_distance: 3.0
+
+    mapping:
+        to_map_optimization: true
+
+lego_loam_mo:
+  ros__parameters:
+    use_sim_time: true
+    mapping:
+
+        distance_between_key_frame: 1.0
+        angle_between_key_frame: 0.5
+
+        enable_loop_closure: true
+
+        surrounding_keyframe_search_num: 20
+        history_keyframe_search_radius: 12.0
+        history_keyframe_search_num: 5
+        history_keyframe_fitness_score: 0.2
+        
+        ground_voxel_size: 0.3
+        ground_edge_threshold_num: 8
+        generate_testing_pg: true
+
+lego_loam_map_visualization:
+  ros__parameters:
+    use_sim_time: true
+    visualization_detail_level: 0 #0~2, larger number means the map will be denser and detailed. Thist is just for visualization purpose
+    ground_voxel_size: 0.3 #Ground voxel size for path planning when using mapping and navigation together. This does not affect the mapping result when using bag files.
+    map_voxel_size: 0.2 #Only for visualization experience
+
+lidar:
+  ros__parameters:
+    driver:
+      use_gpu: false
+      source_type: 3                                  # The type of data source, 1: real-time lidar connection, 2: pcap, 3: packet rosbag, 4: serial    
+      # Depending on the type of source_type, fill in the corresponding configuration block (lidar_udp_type, pcap_type, serial_type)
+      rosbag_type:
+        correction_file_path: "/root/dddmr_bags/cicdtest/mapping_jt128_y0_t90_r0_packet/jt128_angle_correction"   # The path of correction file
+        firetimes_path: "/root/dddmr_bags/cicdtest/mapping_jt128_y0_t90_r0_packet/jt128_firetime_correction"           # The path of firetimes file
+
+      serial_type:
+        rs485_com: "Your serial port name for receiving point cloud"  # if using JT16, Port to receive the point cloud
+        rs232_com: "Your serial port name for sending cmd"            # if using JT16, Port to send cmd
+        point_cloud_baudrate: 3125000
+        correction_save_path: ""                                      # turn on when you need to store angle calibration files(from lidar)
+        correction_file_path: "Your correction file path"             # The path of correction file
+      
+      # public module
+      use_timestamp_type: 0                 # 0 use point cloud timestamp; 1 use receive timestamp
+      frame_start_azimuth: 0                # Frame azimuth for Pandar128, range from 1 to 359, set it less than 0 if you do not want to use it      
+      # parser thread num
+      thread_num: 4
+      # transform param
+      transform_flag: false
+      x: 0
+      y: 0
+      z: 0
+      roll: 0
+      pitch: 0
+      yaw: 2.967059728
+      # fov config, [fov_start, fov_end] range [1, 359], [-1, -1]means use default
+      fov_start: -1
+      fov_end:  -1
+      channel_fov_filter_path: "Your channel fov filter file path"  # The path of channel_fov_filter file, like channel 0 filter [10, 20] and [30,40]
+      multi_fov_filter_ranges: "" # compare to channel_fov_filter_path, multi_fov_filter_ranges for all channels. example config "[20,30];[40,200]"
+      # other config
+      enable_packet_loss_tool: false         # enable the udp packet loss detection tool
+      distance_correction_flag: false       # set to true when optical centre correction needs to be turned on
+      xt_spot_correction: false             # Set to TRUE when XT S point cloud layering correction is required
+      device_udp_src_port: 0                # Filter point clouds for specified source ports in case of multiple lidar, setting >=1024
+      device_fault_port: 0                  # Filter fault message for specified source ports in case of multiple lidar, setting >=1024
+      frame_frequency: 0                    # The frequency that point cloud sends.
+      default_frame_frequency: 10.0         # The default frequency that point cloud sends.
+      echo_mode_filter: 0                   # return mode filter
+
+    ros:
+      ros_frame_id: hesai_lidar                           # Frame id of packet message and point cloud message
+      ros_recv_packet_topic: /null               # Topic used to receive lidar packets from rosbag
+      ros_send_packet_topic: /null               # Topic used to send lidar raw packets through ROS
+      ros_send_point_cloud_topic: /null_points           # Topic used to send point cloud through ROS
+      ros_send_imu_topic: /null_imu                      # Topic used to send lidar imu message
+      ros_send_packet_loss_topic: /null_loss     # Topic used to monitor packets loss condition through ROS
+      # ros_recv_correction_topic: /lidar_corrections     # Topic used to receive corrections file from rosbag
+      # ros_send_correction_topic: /lidar_corrections     # Topic used to send correction through ROS
+      # ros_send_ptp_topic: /lidar_ptp                    # Topic used to send PTP lock status, offset through ROS
+      # ros_send_every_packet_topic: /lidar_every_packet  # Topic used to send every packet through ROS
+      send_packet_ros: false                              # true: Send packets through ROS 
+      send_point_cloud_ros: false                          # true: Send point cloud through ROS    
+      send_imu_ros: false                                  # true: Send imu through ROS    
