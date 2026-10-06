@@ -193,3 +193,15 @@ if [ "$d_bag16" != "${d_bag16#[Yy]}" ] ;then
   rm -f confirm.txt cookies.txt
   unzip mapping_jt128_y180_t90n_r0.zip
 fi
+
+echo -n "Do you want to download mapping_jt128_y0_t90_r0_packet (Y/N):"
+read d_bag17
+if [ "$d_bag17" != "${d_bag17#[Yy]}" ] ;then 
+  echo "Download bag"
+  cd ~/dddmr_bags/cicdtest && curl -L -c cookies.txt 'https://drive.usercontent.google.com/uc?export=download&id='1mu-tfbpXwYhXNPr_1sa4nmY4vHFWQVzw \
+      | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > confirm.txt
+  curl -L -b cookies.txt -o mapping_jt128_y0_t90_r0_packet.zip \
+      'https://drive.usercontent.google.com/download?id='1mu-tfbpXwYhXNPr_1sa4nmY4vHFWQVzw'&confirm='$(<confirm.txt)
+  rm -f confirm.txt cookies.txt
+  unzip mapping_jt128_y0_t90_r0_packet.zip
+fi

@@ -1008,7 +1008,7 @@ void ImageProjection::cloudSegmentation() {
         }
         // majority of ground points are skipped
         if (_ground_mat(i, j) == 1) {
-          if (j % 5 != 0 && j > 5 && j < _horizontal_scans - 5) continue;
+          if (j % 2 ==0 ) continue;
         }
         // remove nan
 
