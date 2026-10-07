@@ -1,51 +1,56 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-
-<!--
-Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
-
-NVIDIA CORPORATION and its licensors retain all intellectual property
-and proprietary rights in and to this software, related documentation
-and any modifications thereto.  Any use, reproduction, disclosure or
-distribution of this software and related documentation without an express
-license agreement from NVIDIA CORPORATION is strictly prohibited.
--->
-
-<license>NVIDIA Isaac ROS Software License</license>
-<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles" >
-
-    <publisher profile_name="default_publisher" is_default_profile="true">
-        <historyMemoryPolicy>DYNAMIC</historyMemoryPolicy>
-        <qos>
-        <data_sharing>
-            <kind>AUTOMATIC</kind>
-        </data_sharing>
-        </qos>
-    </publisher>
-    <!-- subscriber profile for topic sync_topic -->
-    <subscriber profile_name="default_subscriber" is_default_profile="true">
-        <historyMemoryPolicy>DYNAMIC</historyMemoryPolicy>
-        <qos>
-        <data_sharing>
-            <kind>AUTOMATIC</kind>
-        </data_sharing>
-        </qos>
-    </subscriber>
+<profiles xmlns="http://eprosima.com" version="2.0">
 
     <transport_descriptors>
         <transport_descriptor>
             <transport_id>UdpTransport</transport_id>
             <type>UDPv4</type>
             <interfaceWhiteList>
-                <address>192.168.10.151</address>
+                <address>192.168.0.2</address>
             </interfaceWhiteList>
+            <!-- Increased send and receive buffers to 16MB -->
+            <sendBufferSize>16777216</sendBufferSize>
+            <receiveBufferSize>16777216</receiveBufferSize>
+            <maxMessageSize>65500</maxMessageSize>
         </transport_descriptor>
     </transport_descriptors>
-    <participant profile_name="udp_transport_profile" is_default_profile="true">
+
+    <participant profile_name="custom_participant" is_default_profile="true">
         <rtps>
             <userTransports>
                 <transport_id>UdpTransport</transport_id>
             </userTransports>
-            <useBuiltinTransports>false</useBuiltinTransports>
         </rtps>
     </participant>
+
+    <publisher profile_name="default_publisher" is_default_profile="true">
+        <historyMemoryPolicy>DYNAMIC</historyMemoryPolicy>
+        <qos>
+            <reliability>
+                <kind>RELIABLE</kind>
+            </reliability>
+            <durability>
+                <kind>VOLATILE</kind>
+            </durability>
+            <data_sharing>
+                <kind>AUTOMATIC</kind>
+            </data_sharing>
+        </qos>
+    </publisher>
+
+    <subscriber profile_name="default_subscriber" is_default_profile="true">
+        <historyMemoryPolicy>DYNAMIC</historyMemoryPolicy>
+        <qos>
+            <reliability>
+                <kind>BEST_EFFORT</kind>
+            </reliability>
+            <durability>
+                <kind>VOLATILE</kind>
+            </durability>
+            <data_sharing>
+                <kind>AUTOMATIC</kind>
+            </data_sharing>
+        </qos>
+    </subscriber>
+
 </profiles>
