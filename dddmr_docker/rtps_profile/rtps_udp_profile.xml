@@ -8,10 +8,9 @@
             <interfaceWhiteList>
                 <address>192.168.0.2</address>
             </interfaceWhiteList>
-            <!-- Increased send and receive buffers to 16MB -->
-            <sendBufferSize>16777216</sendBufferSize>
-            <receiveBufferSize>16777216</receiveBufferSize>
-            <maxMessageSize>65500</maxMessageSize>
+            <sendBufferSize>33554432</sendBufferSize>    <!-- 32 MB -->
+            <receiveBufferSize>33554432</receiveBufferSize> <!-- 32 MB -->
+            <maxMessageSize>65500</maxMessageSize>       <!-- Max Packet -->
         </transport_descriptor>
     </transport_descriptors>
 

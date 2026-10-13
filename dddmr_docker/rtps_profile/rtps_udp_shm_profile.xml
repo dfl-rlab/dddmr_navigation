@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<dds xmlns="http://eprosima.com" schemaLocation="http://eprosima.com fastdds_profiles.xsd">
+    <profiles>
+        <transport_descriptors>
+            <!-- 1️⃣ Shared Memory Transport -->
+            <transport_descriptor>
+                <transport_id>CUSTOM_SHM_TRANSPORT</transport_id>
+                <type>SHM</type>
+            </transport_descriptor>
+
+            <!-- 2️⃣ UDP Ethernet Interface Transport -->
+            <transport_descriptor>
+                <transport_id>ETHERNET_UDP</transport_id>
+                <type>UDPv4</type>
+                <sendBufferSize>33554432</sendBufferSize>
+                <receiveBufferSize>33554432</receiveBufferSize>
+                <maxMessageSize>65000</maxMessageSize>
+                <interfaceWhiteList>
+                    <address>192.168.0.2</address>
+                </interfaceWhiteList>
+            </transport_descriptor>
+        </transport_descriptors>
+
+        <!-- 🎯 FIX: Force ROS2 memory matching policy -->
+        <participant profile_name="default_shm_interface_profile" is_default_profile="true">
+            <rtps>
+                <userTransports>
+                    <transport_id>CUSTOM_SHM_TRANSPORT</transport_id>
+                    <transport_id>ETHERNET_UDP</transport_id>
+                </userTransports>
+                <useBuiltinTransports>false</useBuiltinTransports>
+                
+                <!-- This forces the participant to accept re-allocations -->
+                <allocation>
+                    <send_buffers>
+                        <preallocated_number>10</preallocated_number>
+                        <dynamic>true</dynamic>
+                    </send_buffers>
+                </allocation>
+            </rtps>
+        </participant>
+
+        <!-- Apply dynamic re-allocation policy directly to your topic readers/writers -->
+        <data_reader profile_name="default_reader_profile" is_default_profile="true">
+            <historyMemoryPolicy>PREALLOCATED_WITH_REALLOC</historyMemoryPolicy>
+        </data_reader>
+
+        <data_writer profile_name="default_writer_profile" is_default_profile="true">
+            <historyMemoryPolicy>PREALLOCATED_WITH_REALLOC</historyMemoryPolicy>
+        </data_writer>
+    </profiles>
+</dds>

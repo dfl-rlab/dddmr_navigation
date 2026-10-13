@@ -302,9 +302,9 @@ void MCL3dlNode::cbLeGoFeatureCloud(const sensor_msgs::msg::PointCloud2::SharedP
   //pcl::transformPointCloud(*pc_sharp, *pc_sharp, trans_b2s_af3);
   pcl::transformPointCloud(*pc_less_sharp_in, *pc_less_sharp_in, trans_b2s_af3);
   pcl::transformPointCloud(*pc_flat_in, *pc_flat_in, trans_b2s_af3);
-  pcl::transformPointCloud(*pc_less_flat, *pc_less_flat, trans_b2s_af3);
+  //pcl::transformPointCloud(*pc_less_flat, *pc_less_flat, trans_b2s_af3);
   
-  //*pc_less_sharp+=*pc_less_flat;
+  // *pc_less_sharp_in+=*pc_less_flat;
 
   pc_less_sharp_in->header.frame_id = params_->frame_ids_["base_link"];
 
@@ -720,7 +720,7 @@ void MCL3dlNode::publishTFThread()
       laser_header_.stamp = odom_header_.stamp;
       RCLCPP_WARN_THROTTLE(this->get_logger(), *clock_, 3000, "Laser msg.header.timestamp = 0, use odom stamp as the timestamp");
     }
-    map2odom_trans_.header.stamp = laser_header_.stamp;
+    map2odom_trans_.header.stamp = clock_->now();
     tfb_->sendTransform(map2odom_trans_);
     first_tf_ = true;
   }

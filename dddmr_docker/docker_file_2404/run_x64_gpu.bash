@@ -32,6 +32,7 @@ elif [ "$is_l4t_r39" != "" ] ;then
         --privileged \
         --network=host \
         --runtime=nvidia\
+        --ulimit memlock=-1:-1 \
         --env="DISPLAY" \
         --env="QT_X11_NO_MITSHM=1" \
         --env="NVIDIA_VISIBLE_DEVICES=all"\

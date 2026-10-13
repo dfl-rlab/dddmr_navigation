@@ -50,8 +50,8 @@ State::State(const rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr& m_l
   //Controlling related
   parameter_->declare_parameter("oscillation_distance", rclcpp::ParameterValue(10.0));
   rclcpp::Parameter oscillation_distance = parameter_->get_parameter("oscillation_distance");
-  oscillation_angle_ = oscillation_distance.as_double();
-  RCLCPP_INFO(logger_->get_logger(), "oscillation_distance: %.2f", oscillation_angle_);  
+  oscillation_distance_ = oscillation_distance.as_double();
+  RCLCPP_INFO(logger_->get_logger(), "oscillation_distance: %.2f", oscillation_distance_);  
 
   parameter_->declare_parameter("oscillation_angle", rclcpp::ParameterValue(0.5));
   rclcpp::Parameter oscillation_angle = parameter_->get_parameter("oscillation_angle");

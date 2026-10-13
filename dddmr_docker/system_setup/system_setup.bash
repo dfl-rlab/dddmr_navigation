@@ -122,10 +122,11 @@ done
 echo -e "Got IP: \$(/sbin/ifconfig $target_iface | grep 'inet ' | tr -s ' ' | cut -d" " -f3)"
 
 sudo jetson_clocks
-sudo sysctl -w net.core.rmem_max=2147483647
-sudo sysctl -w net.core.wmem_max=2147483647
+sudo sysctl -w net.core.rmem_max=33554432
+sudo sysctl -w net.core.wmem_max=33554432
 sudo sysctl -w net.ipv4.ipfrag_high_thresh=134217728
-sudo sysctl -w net.ipv4.ipfrag_time=3
+sudo sysctl -w net.ipv4.ipfrag_low_thresh=100663296
+sudo sysctl -w net.ipv4.ipfrag_time=10
 EOF
         sudo chmod +x "$SYSTEM_SETUP_SCRIPT_PATH"
         echo "Generated $SYSTEM_SETUP_SCRIPT_PATH successfully."

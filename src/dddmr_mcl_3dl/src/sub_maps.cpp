@@ -206,11 +206,12 @@ void SubMaps::warmUpThread(){
     pcl::PointCloud<pcl_t>::Ptr ground_current_stacked (new pcl::PointCloud<pcl_t>);
     for(auto it=pointIdxRadiusSearch.begin(); it!=pointIdxRadiusSearch.end(); it++){
       *map_current_stacked += (*cornerCloudKeyFrames_[*it]);
-      //*map_current_ += (*surfCloudKeyFrames_[*it]);
+      *map_current_stacked += (*surfCloudKeyFrames_[*it]);
       *ground_current_stacked += (*groundCloudKeyFrames_[*it]);
     }
     
-    map_current_ = small_gicp::voxelgrid_sampling_omp(*map_current_stacked, 0.2, 6);
+    //*map_current_  = *map_current_stacked;
+    map_current_ = small_gicp::voxelgrid_sampling_omp(*map_current_stacked, 0.05, 6);
     ground_current_ = small_gicp::voxelgrid_sampling_omp(*ground_current_stacked, 0.2, 6);
 
     kdtree_ground_current_.setInputCloud(ground_current_);
@@ -258,11 +259,12 @@ void SubMaps::warmUpThread(){
     pcl::PointCloud<pcl_t>::Ptr ground_warmup_current_stacked (new pcl::PointCloud<pcl_t>);
     for(auto it=pointIdxRadiusSearch.begin(); it!=pointIdxRadiusSearch.end(); it++){
       *map_warmup_current_stacked += (*cornerCloudKeyFrames_[*it]);
-      //*map_warmup_ += (*surfCloudKeyFrames_[*it]);
+      *map_warmup_current_stacked += (*surfCloudKeyFrames_[*it]);
       *ground_warmup_current_stacked += (*groundCloudKeyFrames_[*it]);
     }
     
-    map_warmup_ = small_gicp::voxelgrid_sampling_omp(*map_warmup_current_stacked, 0.2, 6);
+    //*map_warmup_ = *map_warmup_current_stacked;
+    map_warmup_ = small_gicp::voxelgrid_sampling_omp(*map_warmup_current_stacked, 0.05, 6);
     ground_warmup_ = small_gicp::voxelgrid_sampling_omp(*ground_warmup_current_stacked, 0.2, 6);
 
     kdtree_ground_warmup_.setInputCloud(ground_warmup_);
