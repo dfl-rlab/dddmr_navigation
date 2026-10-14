@@ -20,16 +20,6 @@ cd ~/
 rm -rf ./librealsense_build
 mkdir librealsense_build && cd librealsense_build
 
-if [ $(swapon --show | wc -l) -eq 0 ];
-then
-	echo "No swapon - setting up 1Gb swap file"
-	fallocate -l 2G /swapfile
-	chmod 600 /swapfile
-	mkswap /swapfile
-	swapon /swapfile
-	swapon --show
-fi
-
 echo Installing Librealsense-required dev packages
 apt-get install git cmake libssl-dev freeglut3-dev libusb-1.0-0-dev pkg-config libgtk-3-dev unzip -y
 rm -f ./master.zip
