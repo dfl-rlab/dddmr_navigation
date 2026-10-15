@@ -23,6 +23,7 @@ if [[ $image_type == "x64" ]]; then
 
 elif [[ $image_type == "l4t" ]]; then
     echo "----> Creating l4t image"
+    docker build --network host -t dddmr:l4t_r39 -f Dockerfile_x64_l4t_r39 .
     
 else
     echo "Invalid image type. Please choose x64/l4t/gz"
