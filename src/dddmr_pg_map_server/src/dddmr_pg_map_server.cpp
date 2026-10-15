@@ -57,7 +57,10 @@ DDDMRPGMapServer::DDDMRPGMapServer(std::string name) : Node(name){
 
   pub_ground_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("~/mapground",
                 rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());  
-  
+
+  pub_filtered_ground_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("~/surfaced_mapground",
+                rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());  
+
   srv_get_key_frame_ = this->create_service<dddmr_sys_core::srv::GetKeyFrameCloud>("~/get_key_frame_cloud", std::bind(&DDDMRPGMapServer::getKeyFrameCloud, this, std::placeholders::_1, std::placeholders::_2), rmw_qos_profile_services_default);
 
   readPoseGraph();
@@ -229,6 +232,9 @@ void DDDMRPGMapServer::readPoseGraph(){
   ds_map_ground = small_gicp::voxelgrid_sampling_omp(*map_ground, complete_map_voxel_size_, 6);
   RCLCPP_INFO(this->get_logger(), "Ground pointcloud size: %lu", map_ground->points.size());
   RCLCPP_INFO(this->get_logger(), "Ground pointcloud size after down size: %lu", ds_map_ground->points.size());
+
+  findSurface(ds_map_ground);
+
   sensor_msgs::msg::PointCloud2 ground_pc;
   pcl::toROSMsg(*ds_map_ground, ground_pc);
   ground_pc.header.frame_id = "map";
@@ -280,5 +286,69 @@ void DDDMRPGMapServer::getKeyFrameCloud(const std::shared_ptr<dddmr_sys_core::sr
 
 }
 
+void DDDMRPGMapServer::findSurface(const pcl::PointCloud<dddmr_pg_map_server::pcl_t>::Ptr map_ground){
+
+  pcl::search::KdTree<dddmr_pg_map_server::pcl_t>::Ptr ground_kdtree (new pcl::search::KdTree<dddmr_pg_map_server::pcl_t>);
+  ground_kdtree->setInputCloud (map_ground);
+  std::vector<bool> valid_points(map_ground->points.size(), true);
+  
+  pcl::PointCloud<dddmr_pg_map_server::pcl_t>::Ptr surface_map_ground (new pcl::PointCloud<dddmr_pg_map_server::pcl_t>);
+  surface_map_ground->points.resize(map_ground->points.size());
+  
+  #pragma omp parallel for schedule(static)
+  for(size_t a_pt_idx=0; a_pt_idx<map_ground->points.size(); a_pt_idx++){
+    dddmr_pg_map_server::pcl_t a_pt = map_ground->points[a_pt_idx];
+    //@ if we search a point at higher position and we found other point, we mark this point invalid. 
+    std::vector<pcl::index_t> idx_ground;
+    std::vector<float> sqdist_ground;
+    ground_kdtree->radiusSearch(a_pt, 0.5, idx_ground, sqdist_ground);
+    //@ loop the point and check z value
+    double avg_z = 0.0;
+    double cnt = 0.0;
+    for(auto b_pt_idx=0; b_pt_idx<idx_ground.size(); b_pt_idx++){
+      dddmr_pg_map_server::pcl_t b_pt = map_ground->points[idx_ground[b_pt_idx]];
+      double dx = a_pt.x - b_pt.x;
+      double dy = a_pt.y - b_pt.y;
+      double dz = a_pt.z - b_pt.z;
+      if(sqrt(dx*dx + dy*dy)<0.15){
+        avg_z+=b_pt.z;
+        cnt++;
+        /*
+        if(b_pt.z > a_pt.z){
+          //@a_pt is invalid
+          valid_points[a_pt_idx] = false;
+          break;
+        }
+        */
+      }
+    }
+    avg_z = avg_z/cnt;
+    dddmr_pg_map_server::pcl_t new_pt;
+    new_pt.x = a_pt.x;
+    new_pt.y = a_pt.y;
+    new_pt.z = avg_z;
+    surface_map_ground->points[a_pt_idx] = new_pt;
+    if(a_pt_idx%1000==0)
+      RCLCPP_INFO(this->get_logger(), "Done %lu/%lu", a_pt_idx, map_ground->points.size());
+  
+  }
+
+  pcl::PointCloud<dddmr_pg_map_server::pcl_t>::Ptr ds_surface_map_ground (new pcl::PointCloud<dddmr_pg_map_server::pcl_t>);
+  ds_surface_map_ground = small_gicp::voxelgrid_sampling_omp(*surface_map_ground, 0.1, 6);
+  
+  //for(size_t a_pt_idx=0; a_pt_idx<map_ground->points.size(); a_pt_idx++){
+  //  if(valid_points[a_pt_idx]){
+  //    surface_map_ground->points.push_back(map_ground->points[a_pt_idx]);
+  //  }
+  //}
+  RCLCPP_INFO(this->get_logger(), "Surface detection done.");
+
+  sensor_msgs::msg::PointCloud2 surface_ground_pc;
+  pcl::toROSMsg(*ds_surface_map_ground, surface_ground_pc);
+  surface_ground_pc.header.frame_id = "map";
+  pub_filtered_ground_->publish(surface_ground_pc);
+  
+
+}
 
 }

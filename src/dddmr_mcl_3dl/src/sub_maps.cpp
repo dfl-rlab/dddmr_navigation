@@ -210,9 +210,12 @@ void SubMaps::warmUpThread(){
       *ground_current_stacked += (*groundCloudKeyFrames_[*it]);
     }
     
-    //*map_current_  = *map_current_stacked;
+    //@*map_current_  = *map_current_stacked;
     map_current_ = small_gicp::voxelgrid_sampling_omp(*map_current_stacked, 0.05, 6);
-    ground_current_ = small_gicp::voxelgrid_sampling_omp(*ground_current_stacked, 0.2, 6);
+    pcl::PointCloud<pcl_t>::Ptr ds_ground_current_stacked (new pcl::PointCloud<pcl_t>);
+    ds_ground_current_stacked = small_gicp::voxelgrid_sampling_omp(*ground_current_stacked, 0.1, 6);
+    
+    findSurface(ds_ground_current_stacked, ground_current_);
 
     kdtree_ground_current_.setInputCloud(ground_current_);
     kdtree_map_current_.setInputCloud(map_current_);   
@@ -263,9 +266,12 @@ void SubMaps::warmUpThread(){
       *ground_warmup_current_stacked += (*groundCloudKeyFrames_[*it]);
     }
     
-    //*map_warmup_ = *map_warmup_current_stacked;
+    //@*map_warmup_ = *map_warmup_current_stacked;
     map_warmup_ = small_gicp::voxelgrid_sampling_omp(*map_warmup_current_stacked, 0.05, 6);
-    ground_warmup_ = small_gicp::voxelgrid_sampling_omp(*ground_warmup_current_stacked, 0.2, 6);
+    pcl::PointCloud<pcl_t>::Ptr ds_ground_warmup_current_stacked (new pcl::PointCloud<pcl_t>);
+    ds_ground_warmup_current_stacked = small_gicp::voxelgrid_sampling_omp(*ground_warmup_current_stacked, 0.1, 6);
+
+    findSurface(ds_ground_warmup_current_stacked, ground_warmup_);
 
     kdtree_ground_warmup_.setInputCloud(ground_warmup_);
     kdtree_map_warmup_.setInputCloud(map_warmup_);   
@@ -338,6 +344,58 @@ void SubMaps::setPose(const geometry_msgs::msg::PoseWithCovarianceStamped pose){
     warm_up_pose_ = pose;
     RCLCPP_INFO_THROTTLE(this->get_logger(), *clock_, 1000, "Warming up sub maps");
   }
+}
+
+void SubMaps::findSurface(const pcl::PointCloud<pcl_t>::Ptr map_ground, const pcl::PointCloud<pcl_t>::Ptr ds_surface_map_ground){
+
+  pcl::search::KdTree<pcl_t>::Ptr ground_kdtree (new pcl::search::KdTree<pcl_t>);
+  ground_kdtree->setInputCloud (map_ground);
+  std::vector<bool> valid_points(map_ground->points.size(), true);
+  
+  pcl::PointCloud<pcl_t>::Ptr surface_map_ground (new pcl::PointCloud<pcl_t>);
+  surface_map_ground->points.resize(map_ground->points.size());
+  
+  #pragma omp parallel for schedule(static)
+  for(size_t a_pt_idx=0; a_pt_idx<map_ground->points.size(); a_pt_idx++){
+    pcl_t a_pt = map_ground->points[a_pt_idx];
+    //@ if we search a point at higher position and we found other point, we mark this point invalid. 
+    std::vector<pcl::index_t> idx_ground;
+    std::vector<float> sqdist_ground;
+    ground_kdtree->radiusSearch(a_pt, 0.5, idx_ground, sqdist_ground);
+    //@ loop the point and check z value
+    double avg_z = 0.0;
+    double cnt = 0.0;
+    for(auto b_pt_idx=0; b_pt_idx<idx_ground.size(); b_pt_idx++){
+      pcl_t b_pt = map_ground->points[idx_ground[b_pt_idx]];
+      double dx = a_pt.x - b_pt.x;
+      double dy = a_pt.y - b_pt.y;
+      double dz = a_pt.z - b_pt.z;
+      if(sqrt(dx*dx + dy*dy)<0.15){
+        avg_z+=b_pt.z;
+        cnt++;
+        /*
+        if(b_pt.z > a_pt.z){
+          //@a_pt is invalid
+          valid_points[a_pt_idx] = false;
+          break;
+        }
+        */
+      }
+    }
+    avg_z = avg_z/cnt;
+    pcl_t new_pt;
+    new_pt.x = a_pt.x;
+    new_pt.y = a_pt.y;
+    new_pt.z = avg_z;
+    surface_map_ground->points[a_pt_idx] = new_pt;
+    if(a_pt_idx%10000==0)
+      RCLCPP_INFO(this->get_logger(), "Done %lu/%lu", a_pt_idx, map_ground->points.size());
+  
+  }
+  
+  pcl::PointCloud<pcl_t>::Ptr ds_surface_map_ground_copy (new pcl::PointCloud<pcl_t>);
+  ds_surface_map_ground_copy = small_gicp::voxelgrid_sampling_omp(*surface_map_ground, 0.1, 6);
+  *ds_surface_map_ground = *ds_surface_map_ground_copy;
 }
 
 }

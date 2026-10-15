@@ -74,7 +74,8 @@ private:
   
   void keyPosesCb(const geometry_msgs::msg::PoseArray::SharedPtr msg);
   void syncMapThread();
-
+  void findSurface(const pcl::PointCloud<pcl_t>::Ptr map_ground, const pcl::PointCloud<pcl_t>::Ptr surface_map_ground);
+  
   std::string pg_map_server_name_;
   rclcpp::Clock::SharedPtr clock_;
 

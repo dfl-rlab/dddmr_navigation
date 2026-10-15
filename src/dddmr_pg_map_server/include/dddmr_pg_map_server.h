@@ -82,6 +82,7 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_map_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_surf_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_ground_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_filtered_ground_;
   rclcpp::Service<dddmr_sys_core::srv::GetKeyFrameCloud>::SharedPtr srv_get_key_frame_;
   rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr pub_key_pose_arr_;
 
@@ -93,7 +94,8 @@ private:
   std::vector<pcl::PointCloud<dddmr_pg_map_server::pcl_t>::Ptr> surfCloudKeyFrames_baselink_; //original frame from files are base_link
   std::vector<pcl::PointCloud<dddmr_pg_map_server::pcl_t>::Ptr> groundCloudKeyFrames_; //this frame is converted to global using poses_
   std::vector<pcl::PointCloud<dddmr_pg_map_server::pcl_t>::Ptr> groundCloudKeyFrames_baselink_; //original frame from files are base_link
-
+  
+  void findSurface(const pcl::PointCloud<dddmr_pg_map_server::pcl_t>::Ptr map_ground);
 
   void readPoseGraph();
 

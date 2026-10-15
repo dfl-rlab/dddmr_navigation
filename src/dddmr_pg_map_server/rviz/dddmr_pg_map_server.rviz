@@ -7,7 +7,8 @@ Panels:
         - /map1/Topic1
         - /surface1/Topic1
         - /ground1/Topic1
-        - /PoseGraph1/Status1
+        - /SurfaceGround1/Status1
+        - /SurfaceGround1/Topic1
         - /PoseGraph1/Topic1
       Splitter Ratio: 0.5
     Tree Height: 555
@@ -28,7 +29,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: map
+    SyncSource: ground
 Visualization Manager:
   Class: ""
   Displays:
@@ -44,10 +45,10 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 27.599998474121094
+      Max Intensity: 0
       Min Color: 0; 0; 0
       Min Intensity: 0
       Name: map
@@ -59,13 +60,12 @@ Visualization Manager:
       Topic:
         Depth: 2
         Durability Policy: Transient Local
-        Filter size: 2
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /map1/mapcloud
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -78,7 +78,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: FlatColor
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 30
@@ -93,13 +93,12 @@ Visualization Manager:
       Topic:
         Depth: 2
         Durability Policy: Transient Local
-        Filter size: 2
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /map1/mapsurface
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -122,15 +121,47 @@ Visualization Manager:
       Position Transformer: XYZ
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.20000000298023224
+      Size (m): 0.07999999821186066
       Style: Tiles
       Topic:
         Depth: 2
         Durability Policy: Transient Local
-        Filter size: 2
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /map1/mapground
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: false
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
+      Color: 255; 255; 0
+      Color Transformer: FlatColor
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 0
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: SurfaceGround
+      Position Transformer: XYZ
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.10000000149011612
+      Style: Tiles
+      Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /map1/surfaced_mapground
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -140,7 +171,7 @@ Visualization Manager:
       Axes Radius: 0.10000000149011612
       Class: rviz_default_plugins/PoseArray
       Color: 255; 25; 0
-      Enabled: true
+      Enabled: false
       Head Length: 0.07000000029802322
       Head Radius: 0.029999999329447746
       Name: PoseGraph
@@ -154,7 +185,7 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /map1/key_poses
-      Value: true
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -201,25 +232,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 16.257047653198242
+      Distance: 11.654478073120117
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 2.3532204627990723
-        Y: -2.4112696647644043
-        Z: -1.4338809251785278
+        X: -10.88724422454834
+        Y: 3.5344767570495605
+        Z: -5.618356704711914
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.9253978729248047
+      Pitch: 0.5153987407684326
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.22039954364299774
+      Yaw: 1.5503984689712524
     Saved: ~
 Window Geometry:
   Displays:
