@@ -63,10 +63,11 @@ bool MCL3dlNode::configure(const std::shared_ptr<mcl_3dl::SubMaps>& sub_maps)
   lidar_measurements_ = std::make_shared<LidarMeasurementModelLikelihood>();
   lidar_measurements_->loadConfig(this->get_node_logging_interface(), this->get_node_parameters_interface());
 
+  const int init_particle_num = params_->enable_amcl_ ? params_->max_particles_ : params_->num_particles_;
   pf_.reset(new pf::ParticleFilter<State6DOF,
                                     float,
                                     ParticleWeightedMeanQuat,
-                                    std::default_random_engine>(params_->num_particles_));
+                                    std::default_random_engine>(init_particle_num));
   pf_->init(params_->initial_pose_, params_->initial_pose_std_);
 
   f_pos_.reset(new FilterVec3(
@@ -216,13 +217,66 @@ void MCL3dlNode::cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg){
     std::unique_lock<std::mutex> lock(protect_measure_in_odomcb_);
     measure(pcl_segmentations_);
 
-    pf_->resample(State6DOF(
-    Vec3(params_->resample_var_x_,
-          params_->resample_var_y_,
-          params_->resample_var_z_),
-    Vec3(params_->resample_var_roll_,
-          params_->resample_var_pitch_,
-          params_->resample_var_yaw_)));
+    if (params_->enable_amcl_)
+    {
+      auto bin_func = [this](const State6DOF& s) -> size_t
+      {
+        const Vec3 rpy = s.rot_.getRPY();
+        const int bx = static_cast<int>(std::floor(s.pos_.x_ / params_->kld_bin_size_x_));
+        const int by = static_cast<int>(std::floor(s.pos_.y_ / params_->kld_bin_size_y_));
+        const int byaw = static_cast<int>(std::floor(rpy.z_ / params_->kld_bin_size_yaw_));
+
+        size_t seed = 0;
+        auto hash_combine = [](size_t& seed, int val)
+        {
+          seed ^= std::hash<int>()(val) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        };
+        hash_combine(seed, bx);
+        hash_combine(seed, by);
+        if (params_->kld_bin_size_z_ > 0.0)
+        {
+          const int bz = static_cast<int>(std::floor(s.pos_.z_ / params_->kld_bin_size_z_));
+          hash_combine(seed, bz);
+        }
+        hash_combine(seed, byaw);
+        return seed;
+      };
+
+      RCLCPP_INFO_ONCE(this->get_logger(),
+                       "KLD PARAMS: min=%d, max=%d, err=%.3f, z=%.3f, bin_x=%.2f, bin_y=%.2f, bin_z=%.2f, bin_yaw=%.2f",
+                       params_->min_particles_, params_->max_particles_,
+                       params_->kld_err_, params_->kld_z_,
+                       params_->kld_bin_size_x_, params_->kld_bin_size_y_,
+                       params_->kld_bin_size_z_, params_->kld_bin_size_yaw_);
+
+      pf_->resampleKLD(
+          State6DOF(
+              Vec3(params_->resample_var_x_,
+                   params_->resample_var_y_,
+                   params_->resample_var_z_),
+              Vec3(params_->resample_var_roll_,
+                   params_->resample_var_pitch_,
+                   params_->resample_var_yaw_)),
+          params_->min_particles_,
+          params_->max_particles_,
+          params_->kld_err_,
+          params_->kld_z_,
+          bin_func);
+
+      RCLCPP_DEBUG(this->get_logger(),
+                  "AMCL Resample particle size: %zu (min: %d, max: %d)",
+                  pf_->getParticleSize(), params_->min_particles_, params_->max_particles_);
+    }
+    else
+    {
+      pf_->resample(State6DOF(
+      Vec3(params_->resample_var_x_,
+            params_->resample_var_y_,
+            params_->resample_var_z_),
+      Vec3(params_->resample_var_roll_,
+            params_->resample_var_pitch_,
+            params_->resample_var_yaw_)));
+    }
 
     std::normal_distribution<float> noise(0.0, 1.0);
     auto update_noise_func = [this, &noise](State6DOF& s)
@@ -516,7 +570,7 @@ void MCL3dlNode::measure(std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::
   //@ This block first calculate the weight (p.probability_bias_) based on the particle state
   //@ It means that the particle away from last pose has less weight
   //@ This weight is different from the weight of likelihood
-  if (static_cast<int>(pf_->getParticleSize()) > params_->num_particles_)
+  if (!params_->enable_amcl_ && static_cast<int>(pf_->getParticleSize()) > params_->num_particles_)
   {
     auto bias_func = [](const State6DOF& s, float& p_bias) -> void
     {
@@ -561,7 +615,7 @@ void MCL3dlNode::measure(std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::
   map_rot = e.rot_ * odom_.rot_.inv();
 
   bool jump = false;
-  if (static_cast<int>(pf_->getParticleSize()) > params_->num_particles_)
+  if (!params_->enable_amcl_ && static_cast<int>(pf_->getParticleSize()) > params_->num_particles_)
   {
     jump = true;
     state_prev_ = e;
@@ -606,10 +660,11 @@ void MCL3dlNode::measure(std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::
 
   // Calculate covariance from sampled particles to reduce calculation cost on global localization.
   // Use the number of original particles or at least 10% of full particles.
+  const int ref_particles = params_->enable_amcl_ ? params_->min_particles_ : params_->num_particles_;
   auto cov = pf_->covariance(
       1.0,
       std::max(
-          0.1f, static_cast<float>(params_->num_particles_) / pf_->getParticleSize()));
+          0.1f, static_cast<float>(ref_particles) / pf_->getParticleSize()));
 
   geometry_msgs::msg::PoseWithCovarianceStamped pose;
   pose.header.stamp = odom_last_;
@@ -670,7 +725,7 @@ void MCL3dlNode::measure(std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::
               params_->expansion_var_yaw_)));
   }
 
-  if (static_cast<int>(pf_->getParticleSize()) > params_->num_particles_)
+  if (!params_->enable_amcl_ && static_cast<int>(pf_->getParticleSize()) > params_->num_particles_)
   {
     const int reduced = pf_->getParticleSize() * 0.75;
     if (reduced > params_->num_particles_)
@@ -716,11 +771,7 @@ void MCL3dlNode::publishParticles()
 void MCL3dlNode::publishTFThread()
 {
   if (tf_ready_ && params_->publish_tf_){
-    if(laser_header_.stamp.sec==0 && laser_header_.stamp.nanosec == 0){
-      laser_header_.stamp = odom_header_.stamp;
-      RCLCPP_WARN_THROTTLE(this->get_logger(), *clock_, 3000, "Laser msg.header.timestamp = 0, use odom stamp as the timestamp");
-    }
-    map2odom_trans_.header.stamp = clock_->now();
+    map2odom_trans_.header.stamp = odom_header_.stamp;
     tfb_->sendTransform(map2odom_trans_);
     first_tf_ = true;
   }
@@ -786,6 +837,14 @@ void MCL3dlNode::cbPosition(const geometry_msgs::msg::PoseWithCovarianceStamped:
                             pose.pose.orientation.z,
                             pose.pose.orientation.w),
                         time_seconds);
+  if (params_->enable_amcl_)
+  {
+    if (static_cast<int>(pf_->getParticleSize()) < params_->max_particles_)
+    {
+      pf_->resizeParticle(params_->max_particles_);
+    }
+  }
+
   const MultivariateNoiseGenerator<float> noise_gen(mean, msg->pose.covariance);
   pf_->initUsingNoiseGenerator(noise_gen);
 

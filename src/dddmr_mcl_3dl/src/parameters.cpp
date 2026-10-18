@@ -58,34 +58,55 @@ Parameters::Parameters(const rclcpp::node_interfaces::NodeLoggingInterface::Shar
   frame_ids_["odom"] = odom_frame.as_string();
   RCLCPP_INFO(logger_->get_logger(), "odom_frame: %s", frame_ids_["odom"].c_str());  
   
-  parameter_->declare_parameter("map_downsample_x", rclcpp::ParameterValue(0.0));
-  rclcpp::Parameter map_downsample_x = parameter_->get_parameter("map_downsample_x");
-  map_downsample_x_ = map_downsample_x.as_double();
-  RCLCPP_INFO(logger_->get_logger(), "map_downsample_x: %.2f", map_downsample_x_);  
-
-  parameter_->declare_parameter("map_downsample_y", rclcpp::ParameterValue(0.0));
-  rclcpp::Parameter map_downsample_y = parameter_->get_parameter("map_downsample_y");
-  map_downsample_y_ = map_downsample_y.as_double();
-  RCLCPP_INFO(logger_->get_logger(), "map_downsample_y: %.2f", map_downsample_y_);  
-
-  parameter_->declare_parameter("map_downsample_z", rclcpp::ParameterValue(0.0));
-  rclcpp::Parameter map_downsample_z = parameter_->get_parameter("map_downsample_z");
-  map_downsample_z_ = map_downsample_z.as_double();
-  RCLCPP_INFO(logger_->get_logger(), "map_downsample_z: %.2f", map_downsample_z_);  
-
-  map_grid_min_ =
-      std::min(
-          std::min(map_downsample_x_, map_downsample_y_),
-          map_downsample_z_);
-  map_grid_max_ =
-      std::max(
-          std::max(map_downsample_x_, map_downsample_y_),
-          map_downsample_z_);
-
   parameter_->declare_parameter("num_particles", rclcpp::ParameterValue(0));
   rclcpp::Parameter num_particles = parameter_->get_parameter("num_particles");
   num_particles_ = num_particles.as_int();
   RCLCPP_INFO(logger_->get_logger(), "num_particles: %d", num_particles_);
+
+  parameter_->declare_parameter("enable_amcl", rclcpp::ParameterValue(true));
+  rclcpp::Parameter enable_amcl = parameter_->get_parameter("enable_amcl");
+  enable_amcl_ = enable_amcl.as_bool();
+  RCLCPP_INFO(logger_->get_logger(), "enable_amcl: %d", enable_amcl_);
+
+  parameter_->declare_parameter("min_particles", rclcpp::ParameterValue(60));
+  rclcpp::Parameter min_particles = parameter_->get_parameter("min_particles");
+  min_particles_ = min_particles.as_int();
+  RCLCPP_INFO(logger_->get_logger(), "min_particles: %d", min_particles_);
+
+  parameter_->declare_parameter("max_particles", rclcpp::ParameterValue(400));
+  rclcpp::Parameter max_particles = parameter_->get_parameter("max_particles");
+  max_particles_ = max_particles.as_int();
+  RCLCPP_INFO(logger_->get_logger(), "max_particles: %d", max_particles_);
+
+  parameter_->declare_parameter("kld_err", rclcpp::ParameterValue(0.1));
+  rclcpp::Parameter kld_err = parameter_->get_parameter("kld_err");
+  kld_err_ = kld_err.as_double();
+  RCLCPP_INFO(logger_->get_logger(), "kld_err: %.3f", kld_err_);
+
+  parameter_->declare_parameter("kld_z", rclcpp::ParameterValue(0.99));
+  rclcpp::Parameter kld_z = parameter_->get_parameter("kld_z");
+  kld_z_ = kld_z.as_double();
+  RCLCPP_INFO(logger_->get_logger(), "kld_z: %.3f", kld_z_);
+
+  parameter_->declare_parameter("kld_bin_size_x", rclcpp::ParameterValue(0.8));
+  rclcpp::Parameter kld_bin_size_x = parameter_->get_parameter("kld_bin_size_x");
+  kld_bin_size_x_ = kld_bin_size_x.as_double();
+  RCLCPP_INFO(logger_->get_logger(), "kld_bin_size_x: %.2f", kld_bin_size_x_);
+
+  parameter_->declare_parameter("kld_bin_size_y", rclcpp::ParameterValue(0.8));
+  rclcpp::Parameter kld_bin_size_y = parameter_->get_parameter("kld_bin_size_y");
+  kld_bin_size_y_ = kld_bin_size_y.as_double();
+  RCLCPP_INFO(logger_->get_logger(), "kld_bin_size_y: %.2f", kld_bin_size_y_);
+
+  parameter_->declare_parameter("kld_bin_size_z", rclcpp::ParameterValue(0.0));
+  rclcpp::Parameter kld_bin_size_z = parameter_->get_parameter("kld_bin_size_z");
+  kld_bin_size_z_ = kld_bin_size_z.as_double();
+  RCLCPP_INFO(logger_->get_logger(), "kld_bin_size_z: %.2f", kld_bin_size_z_);
+
+  parameter_->declare_parameter("kld_bin_size_yaw", rclcpp::ParameterValue(0.8));
+  rclcpp::Parameter kld_bin_size_yaw = parameter_->get_parameter("kld_bin_size_yaw");
+  kld_bin_size_yaw_ = kld_bin_size_yaw.as_double();
+  RCLCPP_INFO(logger_->get_logger(), "kld_bin_size_yaw: %.2f", kld_bin_size_yaw_);
 
   parameter_->declare_parameter("resample_var_x", rclcpp::ParameterValue(0.0));
   rclcpp::Parameter resample_var_x = parameter_->get_parameter("resample_var_x");

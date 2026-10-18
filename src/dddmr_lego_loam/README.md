@@ -209,8 +209,96 @@ Steps:
 
 [![YouTube video thumbnail](https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/pose_graph_editor/merge_yt.png)](https://www.youtube.com/watch?v=QKRoJy30-ds)
  
- </details>
- 
+</details>
+
+<details><summary><h2>💡 Click me to see Exporting Projection Images</h2></summary>
+
+# Exporting Projection Images From a Lidar Bag File
+
+## Record a lidar bag file
+
+we suggest using a dense lidar such as jt128, Airy, mid360. Prepare a lidar bag file or  you can download a one using our script:
+```
+cd ~/dddmr_navigation/CICD_setup
+./download_example_bags.bash
+```
+Choose mapping_airy_t45.
+
+## ROS2 launch Lidar2DepthImage
+```
+docker exec -it dddmr_humble_cuda_dev bash
+cd dddmr_navigation
+source install/setup.bash
+```
+
+Modify bag file path:
+```
+nano ~/dddmr_navigation/src/dddmr_lego_loam/lego_loam_bor/config/loam_bag_lidar2depthimg_config.yaml
+```
+
+You will see something like below:
+```
+bag_reader:
+  ros__parameters:
+    use_sim_time: true
+    bag_file_dir: "/root/dddmr_bags/cicdtest/mapping_airy_t45"
+    bag_format: "mcap"
+    point_cloud_topic: "/airy_points"
+    odometry_topic: "/odom"
+    skip_frame: 1
+
+lego_loam_ip:
+  ros__parameters:
+    use_sim_time: true
+    laser:
+        odom_type: "laser_odometry"         #wheel_odometry/laser_odometry 
+        base_ground_frame: "base_link"
+        num_vertical_scans: 100
+        num_horizontal_scans: 400
+        vertical_angle_bottom: 0.0          # degrees
+        vertical_angle_top: 90.0            # degrees
+        scan_period: 0.0                   # seconds
+```
+
+> [!NOTE]
+> You need to check 7 places:
+> 1. bag_file_dir --> provide the bag folder derectory (not metadata.yaml)
+> 2. bag_format --> either mcap or sqlite3
+> 3. point_cloud_topic --> pointcloud topic in your bag
+> 4. num_vertical_scans --> this number can be lower than your lidar vertical scan
+> 5. num_horizontal_scans --> this number does not need to be the same as the horizontal scan of a lidar (usually the lidar horizontal scan is much larger), we set it smaller to down sample it. In most cases, it is suggested to be 4 times of vertical scans. otherwise the projection image will be too width
+> 6. vertical_angle_bottom --> this number should better fit your lidar spec
+> 7. vertical_angle_top --> this number should better fit your lidar spec
+
+
+Before launch, make sure TF is provided in lego_loam_bag_lidar2depthimg.launch:
+```
+nano ~/dddmr_navigation/src/dddmr_lego_loam/lego_loam_bor/config/loam_bag_lidar2depthimg_config.yaml
+```
+
+Add your lidar TF to base_ground_frame:
+```
+<node pkg="tf2_ros" exec="static_transform_publisher" name="sensor2baselink"  args="0.3 0 0.5 0.0 0.78539815 0 base_link airy" />
+```
+
+Launch the converting:
+```
+ros2 launch lego_loam_bor lego_loam_bag_lidar2depthimg.launch
+```
+
+In the terminal, the log will show where the projection images are stored:
+```
+...
+[lego_loam_bag_lidar2depthimg_node-1] [INFO] [1792323325.097649727] [bag_reader]: bag_file_dir: /root/dddmr_bags/cicdtest/mapping_airy_t45
+[lego_loam_bag_lidar2depthimg_node-1] [INFO] [1792323325.097703971] [bag_reader]: bag_format: mcap
+[lego_loam_bag_lidar2depthimg_node-1] [INFO] [1792323325.097739586] [bag_reader]: point_cloud_topic: /airy_points
+[lego_loam_bag_lidar2depthimg_node-1] [INFO] [1792323325.097765287] [bag_reader]: odometry_topic: /odom
+[lego_loam_bag_lidar2depthimg_node-1] [INFO] [1792323325.097884271] [bag_reader]: skip_frame: 1
+[lego_loam_bag_lidar2depthimg_node-1] [INFO] [1792323325.117104756] [bag_reader]: Create dir: /tmp/2026_10_18_11_35_25
+```
+And then, click resume, the converting is fast, once the bag is finish, ctrl+c the launch 
+
+</details>
 ---
  
 ## 📋 Release Notes

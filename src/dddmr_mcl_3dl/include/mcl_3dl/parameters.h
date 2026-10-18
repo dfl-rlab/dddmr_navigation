@@ -61,11 +61,6 @@ private:
 public:
   Parameters(const rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr& m_logger,
               const rclcpp::node_interfaces::NodeParametersInterface::SharedPtr& m_parameter);
-  double map_downsample_x_;
-  double map_downsample_y_;
-  double map_downsample_z_;
-  double map_grid_min_;
-  double map_grid_max_;
   double global_localization_grid_;
   int global_localization_div_yaw_;
   double resample_var_x_;
@@ -107,6 +102,17 @@ public:
 
   int knn_num_of_ground_normals_;
   double update_min_d_, update_min_a_;
+
+  // AMCL parameters (KLD-sampling)
+  bool enable_amcl_;
+  int min_particles_;
+  int max_particles_;
+  double kld_err_;
+  double kld_z_;
+  double kld_bin_size_x_;
+  double kld_bin_size_y_;
+  double kld_bin_size_z_;
+  double kld_bin_size_yaw_;
 
 };
 }  // namespace mcl_3dl

@@ -30,10 +30,16 @@ mcl_3dl:
     map_frame: "map"
     robot_frame: "base_link"
     odom_frame: "odom"
-    map_downsample_x: 0.1
-    map_downsample_y: 0.1
-    map_downsample_z: 0.1
     num_particles: 60
+    enable_amcl: true
+    min_particles: 60
+    max_particles: 400
+    kld_err: 0.1
+    kld_z: 0.99
+    kld_bin_size_x: 0.8
+    kld_bin_size_y: 0.8
+    kld_bin_size_z: 0.0
+    kld_bin_size_yaw: 0.8
 
     resample_var_x: 0.2
     resample_var_y: 0.2
