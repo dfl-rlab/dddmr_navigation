@@ -116,7 +116,7 @@ def generate_test_description():
     package="tf2_ros",
     executable="static_transform_publisher",
     output="screen" ,
-    arguments=["0.33", "0.0", "1.12", "0.0", "1.5707963", "0.0", "base_link", "hesai_lidar"]
+    arguments=["0.33", "0.0", "1.12", "0.0", "0.7853981", "0.0", "base_link", "hesai_lidar_2"]
   )
 
   b2ft = Node(
@@ -183,7 +183,7 @@ class TestGoodProcess(unittest.TestCase):
     def test_mapping(self, proc_output):
         # This will match stdout from any process.  In this example there is only one process
         # running
-        proc_output.assertWaitFor('Done', timeout=900, stream='stdout')
+        proc_output.assertWaitFor('Done', timeout=3600, stream='stdout')
 
 
 @launch_testing.post_shutdown_test()

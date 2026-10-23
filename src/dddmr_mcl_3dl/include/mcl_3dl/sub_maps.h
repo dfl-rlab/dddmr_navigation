@@ -153,6 +153,7 @@ public:
   pcl::PointCloud<pcl::Normal> normals_ground_warmup_;
   
   int knn_num_of_ground_normals_;
+  double submap_resolution_;
 };
 }  // namespace mcl_3dl
 

@@ -63,11 +63,10 @@ bool MCL3dlNode::configure(const std::shared_ptr<mcl_3dl::SubMaps>& sub_maps)
   lidar_measurements_ = std::make_shared<LidarMeasurementModelLikelihood>();
   lidar_measurements_->loadConfig(this->get_node_logging_interface(), this->get_node_parameters_interface());
 
-  const int init_particle_num = params_->enable_amcl_ ? params_->max_particles_ : params_->num_particles_;
   pf_.reset(new pf::ParticleFilter<State6DOF,
                                     float,
                                     ParticleWeightedMeanQuat,
-                                    std::default_random_engine>(init_particle_num));
+                                    std::default_random_engine>(params_->num_particles_));
   pf_->init(params_->initial_pose_, params_->initial_pose_std_);
 
   f_pos_.reset(new FilterVec3(
@@ -217,66 +216,13 @@ void MCL3dlNode::cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg){
     std::unique_lock<std::mutex> lock(protect_measure_in_odomcb_);
     measure(pcl_segmentations_);
 
-    if (params_->enable_amcl_)
-    {
-      auto bin_func = [this](const State6DOF& s) -> size_t
-      {
-        const Vec3 rpy = s.rot_.getRPY();
-        const int bx = static_cast<int>(std::floor(s.pos_.x_ / params_->kld_bin_size_x_));
-        const int by = static_cast<int>(std::floor(s.pos_.y_ / params_->kld_bin_size_y_));
-        const int byaw = static_cast<int>(std::floor(rpy.z_ / params_->kld_bin_size_yaw_));
-
-        size_t seed = 0;
-        auto hash_combine = [](size_t& seed, int val)
-        {
-          seed ^= std::hash<int>()(val) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        };
-        hash_combine(seed, bx);
-        hash_combine(seed, by);
-        if (params_->kld_bin_size_z_ > 0.0)
-        {
-          const int bz = static_cast<int>(std::floor(s.pos_.z_ / params_->kld_bin_size_z_));
-          hash_combine(seed, bz);
-        }
-        hash_combine(seed, byaw);
-        return seed;
-      };
-
-      RCLCPP_INFO_ONCE(this->get_logger(),
-                       "KLD PARAMS: min=%d, max=%d, err=%.3f, z=%.3f, bin_x=%.2f, bin_y=%.2f, bin_z=%.2f, bin_yaw=%.2f",
-                       params_->min_particles_, params_->max_particles_,
-                       params_->kld_err_, params_->kld_z_,
-                       params_->kld_bin_size_x_, params_->kld_bin_size_y_,
-                       params_->kld_bin_size_z_, params_->kld_bin_size_yaw_);
-
-      pf_->resampleKLD(
-          State6DOF(
-              Vec3(params_->resample_var_x_,
-                   params_->resample_var_y_,
-                   params_->resample_var_z_),
-              Vec3(params_->resample_var_roll_,
-                   params_->resample_var_pitch_,
-                   params_->resample_var_yaw_)),
-          params_->min_particles_,
-          params_->max_particles_,
-          params_->kld_err_,
-          params_->kld_z_,
-          bin_func);
-
-      RCLCPP_DEBUG(this->get_logger(),
-                  "AMCL Resample particle size: %zu (min: %d, max: %d)",
-                  pf_->getParticleSize(), params_->min_particles_, params_->max_particles_);
-    }
-    else
-    {
-      pf_->resample(State6DOF(
-      Vec3(params_->resample_var_x_,
-            params_->resample_var_y_,
-            params_->resample_var_z_),
-      Vec3(params_->resample_var_roll_,
-            params_->resample_var_pitch_,
-            params_->resample_var_yaw_)));
-    }
+    pf_->resample(State6DOF(
+        Vec3(params_->resample_var_x_,
+             params_->resample_var_y_,
+             params_->resample_var_z_),
+        Vec3(params_->resample_var_roll_,
+             params_->resample_var_pitch_,
+             params_->resample_var_yaw_)));
 
     std::normal_distribution<float> noise(0.0, 1.0);
     auto update_noise_func = [this, &noise](State6DOF& s)
@@ -320,6 +266,131 @@ bool MCL3dlNode::getBaselink2SensorAF3(std_msgs::msg::Header sensor_header, Eige
   return true;
 }
 
+pcl::PointCloud<mcl_3dl::pcl_t>::Ptr MCL3dlNode::drawFeaturesFromBin(
+    const pcl::PointCloud<mcl_3dl::pcl_t>::Ptr& pc_less_flat,
+    double bin_size_x,
+    double bin_size_y,
+    double bin_size_z,
+    size_t max_points_per_bin)
+{
+  
+  pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_less_flat_ds(new pcl::PointCloud<mcl_3dl::pcl_t>); 
+  if(params_->voxel_size_before_bin_sampling_>0.05){
+    pc_less_flat_ds = small_gicp::voxelgrid_sampling_omp(*pc_less_flat, params_->voxel_size_before_bin_sampling_, 4);
+  }
+  else{
+    pc_less_flat_ds = pc_less_flat;
+  }
+
+  pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_out(new pcl::PointCloud<mcl_3dl::pcl_t>);
+  if (!pc_less_flat_ds || pc_less_flat_ds->points.empty())
+  {
+    return pc_out;
+  }
+  pc_out->header = pc_less_flat_ds->header;
+
+  if (bin_size_x < 0.0) bin_size_x = (params_ ? params_->draw_flat_feature_bin_size_x_ : 0.2);
+  if (bin_size_y < 0.0) bin_size_y = (params_ ? params_->draw_flat_feature_bin_size_y_ : 0.2);
+  if (bin_size_z < 0.0) bin_size_z = (params_ ? params_->draw_flat_feature_bin_size_z_ : 0.2);
+
+  if (bin_size_x <= 0.0) bin_size_x = 0.2;
+  if (bin_size_y <= 0.0) bin_size_y = 0.2;
+
+  struct BinKey
+  {
+    int x;
+    int y;
+    int z;
+    bool operator==(const BinKey& o) const
+    {
+      return x == o.x && y == o.y && z == o.z;
+    }
+  };
+
+  struct BinKeyHash
+  {
+    size_t operator()(const BinKey& k) const
+    {
+      size_t seed = 0;
+      auto hash_combine = [](size_t& seed, int val)
+      {
+        seed ^= std::hash<int>()(val) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+      };
+      hash_combine(seed, k.x);
+      hash_combine(seed, k.y);
+      hash_combine(seed, k.z);
+      return seed;
+    }
+  };
+
+  struct BinData
+  {
+    std::vector<mcl_3dl::pcl_t> samples;
+    size_t count = 0;
+  };
+
+  std::unordered_map<BinKey, BinData, BinKeyHash> bin_map;
+
+  for (const auto& pt : pc_less_flat_ds->points)
+  {
+    if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z))
+    {
+      continue;
+    }
+    const int bx = static_cast<int>(std::floor(pt.x / bin_size_x));
+    const int by = static_cast<int>(std::floor(pt.y / bin_size_y));
+    const int bz = (bin_size_z > 0.0) ? static_cast<int>(std::floor(pt.z / bin_size_z)) : 0;
+
+    BinKey key{bx, by, bz};
+    auto& bin = bin_map[key];
+    bin.count++;
+
+    if (max_points_per_bin == 0)
+    {
+      continue;
+    }
+
+    if (bin.samples.size() < max_points_per_bin)
+    {
+      bin.samples.push_back(pt);
+    }
+    else
+    {
+      std::uniform_int_distribution<size_t> dist(0, bin.count - 1);
+      const size_t j = dist(engine_);
+      if (j < max_points_per_bin)
+      {
+        bin.samples[j] = pt;
+      }
+    }
+  }
+
+  size_t total_points = 0;
+  for (const auto& kv : bin_map)
+  {
+    total_points += kv.second.samples.size();
+  }
+  pc_out->points.reserve(total_points);
+
+  for (const auto& kv : bin_map)
+  {
+    pc_out->points.insert(pc_out->points.end(), kv.second.samples.begin(), kv.second.samples.end());
+  }
+
+  pc_out->width = pc_out->points.size();
+  pc_out->height = 1;
+  pc_out->is_dense = true;
+  
+  if(pc_less_flat_ds->points.size()>5000 && pc_less_flat_ds->points.size()<3*pc_out->points.size()){
+    RCLCPP_WARN(this->get_logger(),
+                "drawFeaturesFromBin: input points=%lu, bins=%lu, sampled points=%lu, increase bin size!",
+                pc_less_flat_ds->points.size(), bin_map.size(), pc_out->points.size());
+  }
+
+
+  return pc_out;
+}
+
 void MCL3dlNode::cbLeGoFeatureCloud(const sensor_msgs::msg::PointCloud2::SharedPtr pc_sharpMsg,
                     const sensor_msgs::msg::PointCloud2::SharedPtr pc_less_sharpMsg,
                     const sensor_msgs::msg::PointCloud2::SharedPtr pc_flatMsg,
@@ -350,15 +421,16 @@ void MCL3dlNode::cbLeGoFeatureCloud(const sensor_msgs::msg::PointCloud2::SharedP
   //pcl::fromROSMsg(*pc_sharpMsg, *pc_sharp);
   pcl::fromROSMsg(*pc_flatMsg, *pc_flat_in);
   pcl::fromROSMsg(*pc_less_sharpMsg, *pc_less_sharp_in);
-  //pcl::fromROSMsg(*pc_less_flatMsg, *pc_less_flat);
+  pcl::fromROSMsg(*pc_less_flatMsg, *pc_less_flat);
 
   //@Transform point cloud
   //pcl::transformPointCloud(*pc_sharp, *pc_sharp, trans_b2s_af3);
   pcl::transformPointCloud(*pc_less_sharp_in, *pc_less_sharp_in, trans_b2s_af3);
   pcl::transformPointCloud(*pc_flat_in, *pc_flat_in, trans_b2s_af3);
-  //pcl::transformPointCloud(*pc_less_flat, *pc_less_flat, trans_b2s_af3);
-  
-  // *pc_less_sharp_in+=*pc_less_flat;
+  pcl::transformPointCloud(*pc_less_flat, *pc_less_flat, trans_b2s_af3);
+  auto flat_drawed_feature = drawFeaturesFromBin(pc_less_flat, params_->draw_flat_feature_bin_size_x_,
+                                      params_->draw_flat_feature_bin_size_y_, params_->draw_flat_feature_bin_size_z_, 1);
+  *pc_less_sharp_in+=*flat_drawed_feature;
 
   pc_less_sharp_in->header.frame_id = params_->frame_ids_["base_link"];
 
@@ -570,7 +642,7 @@ void MCL3dlNode::measure(std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::
   //@ This block first calculate the weight (p.probability_bias_) based on the particle state
   //@ It means that the particle away from last pose has less weight
   //@ This weight is different from the weight of likelihood
-  if (!params_->enable_amcl_ && static_cast<int>(pf_->getParticleSize()) > params_->num_particles_)
+  if (static_cast<int>(pf_->getParticleSize()) > params_->num_particles_)
   {
     auto bias_func = [](const State6DOF& s, float& p_bias) -> void
     {
@@ -615,7 +687,7 @@ void MCL3dlNode::measure(std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::
   map_rot = e.rot_ * odom_.rot_.inv();
 
   bool jump = false;
-  if (!params_->enable_amcl_ && static_cast<int>(pf_->getParticleSize()) > params_->num_particles_)
+  if (static_cast<int>(pf_->getParticleSize()) > params_->num_particles_)
   {
     jump = true;
     state_prev_ = e;
@@ -660,11 +732,10 @@ void MCL3dlNode::measure(std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::
 
   // Calculate covariance from sampled particles to reduce calculation cost on global localization.
   // Use the number of original particles or at least 10% of full particles.
-  const int ref_particles = params_->enable_amcl_ ? params_->min_particles_ : params_->num_particles_;
   auto cov = pf_->covariance(
       1.0,
       std::max(
-          0.1f, static_cast<float>(ref_particles) / pf_->getParticleSize()));
+          0.1f, static_cast<float>(params_->num_particles_) / pf_->getParticleSize()));
 
   geometry_msgs::msg::PoseWithCovarianceStamped pose;
   pose.header.stamp = odom_last_;
@@ -725,7 +796,7 @@ void MCL3dlNode::measure(std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::
               params_->expansion_var_yaw_)));
   }
 
-  if (!params_->enable_amcl_ && static_cast<int>(pf_->getParticleSize()) > params_->num_particles_)
+  if (static_cast<int>(pf_->getParticleSize()) > params_->num_particles_)
   {
     const int reduced = pf_->getParticleSize() * 0.75;
     if (reduced > params_->num_particles_)
@@ -837,13 +908,7 @@ void MCL3dlNode::cbPosition(const geometry_msgs::msg::PoseWithCovarianceStamped:
                             pose.pose.orientation.z,
                             pose.pose.orientation.w),
                         time_seconds);
-  if (params_->enable_amcl_)
-  {
-    if (static_cast<int>(pf_->getParticleSize()) < params_->max_particles_)
-    {
-      pf_->resizeParticle(params_->max_particles_);
-    }
-  }
+
 
   const MultivariateNoiseGenerator<float> noise_gen(mean, msg->pose.covariance);
   pf_->initUsingNoiseGenerator(noise_gen);

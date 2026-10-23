@@ -36,7 +36,9 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <random>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -164,6 +166,13 @@ class MCL3dlNode : public rclcpp::Node
                     const sensor_msgs::msg::PointCloud2::SharedPtr pc_flatMsg,
                     const sensor_msgs::msg::PointCloud2::SharedPtr pc_less_flatMsg);
     
+    pcl::PointCloud<mcl_3dl::pcl_t>::Ptr drawFeaturesFromBin(
+        const pcl::PointCloud<mcl_3dl::pcl_t>::Ptr& pc_less_flat,
+        double bin_size_x = -1.0,
+        double bin_size_y = -1.0,
+        double bin_size_z = -1.0,
+        size_t max_points_per_bin = 5);
+    
     void measure(std::map<std::string, pcl::PointCloud<pcl_t>::Ptr> pcl_segmentations);
     
     void publishParticles();
@@ -193,7 +202,7 @@ class MCL3dlNode : public rclcpp::Node
     //std::mutex tf_pub_mutex_;
     
     std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::Ptr> pcl_segmentations_;
-    
+     
     /*
     
     void cbLandmark(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg);

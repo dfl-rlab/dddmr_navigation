@@ -13,7 +13,7 @@ lego_loam_ip:
     # leishen16
     laser:
         odom_type: "laser_odometry"         #wheel_odometry/laser_odometry 
-        baselink_frame: "base_link"
+        base_ground_frame: "base_link"
         num_vertical_scans: 16
         num_horizontal_scans: 1000
         vertical_angle_bottom: -15.0          # degrees
@@ -57,6 +57,12 @@ lego_loam_mo:
     use_sim_time: true
     mapping:
 
+        bin_sampling_less_flat_feature: true
+        LM_optimization_iteration_number: 5
+        bin_sampling_x_size: 0.2
+        bin_sampling_y_size: 0.4
+        bin_sampling_z_size: 0.2
+        
         distance_between_key_frame: 1.0
         angle_between_key_frame: 1.0
 

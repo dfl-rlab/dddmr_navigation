@@ -34,7 +34,6 @@
 #include <cmath>
 #include <functional>
 #include <random>
-#include <unordered_set>
 #include <vector>
 
 #include <mcl_3dl/noise_generators/diagonal_noise_generator.h>
@@ -221,100 +220,6 @@ public:
       }
       it_prev = it;
     }
-  }
-  template <typename BIN_FUNC>
-  void resampleKLD(
-      T sigma,
-      const size_t min_particles,
-      const size_t max_particles,
-      const double kld_err,
-      const double kld_z,
-      BIN_FUNC bin_func)
-  {
-    resampleKLDUsingNoiseGenerator(
-        DiagonalNoiseGenerator<FLT_TYPE>(T(), sigma),
-        min_particles,
-        max_particles,
-        kld_err,
-        kld_z,
-        bin_func);
-  }
-  template <typename GEN, typename BIN_FUNC>
-  void resampleKLDUsingNoiseGenerator(
-      const GEN& generator,
-      const size_t min_particles,
-      const size_t max_particles,
-      const double kld_err,
-      const double kld_z,
-      BIN_FUNC bin_func)
-  {
-    if (particles_.empty())
-      return;
-    const size_t clamped_min = std::max(size_t(2), min_particles);
-    const size_t clamped_max = std::max(clamped_min, max_particles);
-
-    FLT_TYPE accum = 0;
-    for (auto& p : particles_)
-    {
-      accum += p.probability_;
-      p.accum_probability_ = accum;
-    }
-
-    if (accum <= 0.0)
-      return;
-
-    particles_dup_ = particles_;
-    std::sort(particles_dup_.begin(), particles_dup_.end());
-
-    std::unordered_set<size_t> non_empty_bins;
-    std::vector<Particle<T, FLT_TYPE>> new_particles;
-    new_particles.reserve(clamped_max);
-
-    size_t target_size = clamped_min;
-    std::uniform_real_distribution<FLT_TYPE> uni_rand(0.0, accum);
-
-    while (new_particles.size() < clamped_max)
-    {
-      if (new_particles.size() >= clamped_min && new_particles.size() >= target_size)
-      {
-        break;
-      }
-
-      Particle<T, FLT_TYPE> new_p;
-      const FLT_TYPE r = uni_rand(engine_);
-      auto it = std::lower_bound(particles_dup_.begin(), particles_dup_.end(), Particle<T, FLT_TYPE>(r));
-      if (it == particles_dup_.end())
-      {
-        it = particles_dup_.end() - 1;
-      }
-
-      new_p.state_ = it->state_ + T::template generateNoise<T>(engine_, generator);
-      new_p.state_.normalize();
-
-      const size_t bin_id = bin_func(new_p.state_);
-      if (non_empty_bins.insert(bin_id).second)
-      {
-        const int k = non_empty_bins.size();
-        if (k > 1)
-        {
-          const double a = 1.0 - (2.0 / (9.0 * (k - 1)));
-          const double b = std::sqrt(2.0 / (9.0 * (k - 1))) * kld_z;
-          const double num = (k - 1) / (2.0 * kld_err) * (a + b) * (a + b) * (a + b);
-          const size_t kld_req = static_cast<size_t>(std::ceil(num));
-          target_size = std::max(clamped_min, std::min(kld_req, clamped_max));
-        }
-      }
-
-      new_particles.push_back(new_p);
-    }
-
-    const FLT_TYPE prob = 1.0 / new_particles.size();
-    for (auto& p : new_particles)
-    {
-      p.probability_ = prob;
-      p.probability_bias_ = 1.0;
-    }
-    particles_ = std::move(new_particles);
   }
   void noise(T sigma)
   {
@@ -557,4 +462,3 @@ protected:
 }  // namespace mcl_3dl
 
 #endif  // MCL_3DL_PF_H
-

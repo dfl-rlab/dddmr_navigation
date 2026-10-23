@@ -70,7 +70,6 @@ sub_maps:
 mcl_3dl:
   ros__parameters:
     use_sim_time: true
-    enable_amcl: true
     init_x: 0.0
     init_y: 0.0
     init_z: 0.0
@@ -86,15 +85,11 @@ mcl_3dl:
     map_frame: "map"
     robot_frame: "base_link"
     odom_frame: "odom"
-    num_particles: 60
-    min_particles: 120
-    max_particles: 200
-    kld_err: 0.1
-    kld_z: 0.99
-    kld_bin_size_x: 0.8
-    kld_bin_size_y: 0.8
-    kld_bin_size_z: 0.5
-    kld_bin_size_yaw: 0.8
+    num_particles: 120
+    draw_flat_feature_bin_size_x: 0.5
+    draw_flat_feature_bin_size_y: 0.5
+    draw_flat_feature_bin_size_z: 0.5
+    voxel_size_before_bin_sampling: 0.01 #smaller than 0.05 means no voxelization
 
     resample_var_x: 0.1
     resample_var_y: 0.1

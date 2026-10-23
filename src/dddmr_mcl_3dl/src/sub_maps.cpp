@@ -54,6 +54,11 @@ SubMaps::SubMaps(std::string name) : Node(name), is_current_ready_(false),
   declare_parameter("sub_map_warmup_trigger_distance", rclcpp::ParameterValue(20.0));
   this->get_parameter("sub_map_warmup_trigger_distance", sub_map_warmup_trigger_distance_);
   RCLCPP_INFO(this->get_logger(), "sub_map_warmup_trigger_distance: %.1f", sub_map_warmup_trigger_distance_);
+
+  declare_parameter("submap_resolution", rclcpp::ParameterValue(0.1));
+  this->get_parameter("submap_resolution", submap_resolution_);
+  RCLCPP_INFO(this->get_logger(), "submap_resolution: %.2f", submap_resolution_);
+
   
   srv_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   get_key_frame_cloud_client_ = this->create_client<dddmr_sys_core::srv::GetKeyFrameCloud>(
@@ -211,7 +216,7 @@ void SubMaps::warmUpThread(){
     }
     
     //@*map_current_  = *map_current_stacked;
-    map_current_ = small_gicp::voxelgrid_sampling_omp(*map_current_stacked, 0.05, 6);
+    map_current_ = small_gicp::voxelgrid_sampling_omp(*map_current_stacked, submap_resolution_, 6);
     pcl::PointCloud<pcl_t>::Ptr ds_ground_current_stacked (new pcl::PointCloud<pcl_t>);
     ds_ground_current_stacked = small_gicp::voxelgrid_sampling_omp(*ground_current_stacked, 0.1, 6);
     
@@ -267,7 +272,7 @@ void SubMaps::warmUpThread(){
     }
     
     //@*map_warmup_ = *map_warmup_current_stacked;
-    map_warmup_ = small_gicp::voxelgrid_sampling_omp(*map_warmup_current_stacked, 0.05, 6);
+    map_warmup_ = small_gicp::voxelgrid_sampling_omp(*map_warmup_current_stacked, submap_resolution_, 6);
     pcl::PointCloud<pcl_t>::Ptr ds_ground_warmup_current_stacked (new pcl::PointCloud<pcl_t>);
     ds_ground_warmup_current_stacked = small_gicp::voxelgrid_sampling_omp(*ground_warmup_current_stacked, 0.1, 6);
 

@@ -42,7 +42,8 @@ using namespace gtsam;
 MapOptimization::MapOptimization(std::string name,
                                  Channel<AssociationOut> &input_channel)
     : Node(name),
-      _input_channel(input_channel)
+      _input_channel(input_channel),
+      engine_(seed_gen_())
 {
   
   corner_voxel_size_ = 0.2;
@@ -136,7 +137,27 @@ MapOptimization::MapOptimization(std::string name,
   declare_parameter("mapping.generate_testing_pg", rclcpp::ParameterValue(false));
   this->get_parameter("mapping.generate_testing_pg", generate_testing_pg_);
   RCLCPP_INFO(this->get_logger(), "mapping.generate_testing_pg: %d", generate_testing_pg_);  
-  
+
+  declare_parameter("mapping.bin_sampling_less_flat_feature", rclcpp::ParameterValue(false));
+  this->get_parameter("mapping.bin_sampling_less_flat_feature", bin_sampling_less_flat_feature_);
+  RCLCPP_INFO(this->get_logger(), "mapping.bin_sampling_less_flat_feature: %d", bin_sampling_less_flat_feature_);    
+
+  declare_parameter("mapping.LM_optimization_iteration_number", rclcpp::ParameterValue(10));
+  this->get_parameter("mapping.LM_optimization_iteration_number", LM_optimization_iteration_number_);
+  RCLCPP_INFO(this->get_logger(), "mapping.LM_optimization_iteration_number: %d", LM_optimization_iteration_number_);    
+
+  declare_parameter("mapping.bin_sampling_x_size", rclcpp::ParameterValue(0.5));
+  this->get_parameter("mapping.bin_sampling_x_size", bin_sampling_x_size_);
+  RCLCPP_INFO(this->get_logger(), "mapping.bin_sampling_x_size: %.2f", bin_sampling_x_size_);    
+
+  declare_parameter("mapping.bin_sampling_y_size", rclcpp::ParameterValue(1.0));
+  this->get_parameter("mapping.bin_sampling_y_size", bin_sampling_y_size_);
+  RCLCPP_INFO(this->get_logger(), "mapping.bin_sampling_y_size: %.2f", bin_sampling_y_size_);    
+
+  declare_parameter("mapping.bin_sampling_z_size", rclcpp::ParameterValue(0.5));
+  this->get_parameter("mapping.bin_sampling_z_size", bin_sampling_y_size_);
+  RCLCPP_INFO(this->get_logger(), "mapping.bin_sampling_z_size: %.2f", bin_sampling_y_size_);    
+
   allocateMemory();
 
   timer_run_cb_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -383,6 +404,9 @@ void MapOptimization::allocateMemory() {
       new pcl::PointCloud<PointType>());  // downsampled corner featuer set
                                           // from odoOptimization
   laserCloudSurfLastDS.reset(
+      new pcl::PointCloud<PointType>());  // downsampled surf featuer set from
+                                          // odoOptimization
+  laserCloudSurfLastDSDrawed.reset(
       new pcl::PointCloud<PointType>());  // downsampled surf featuer set from
                                           // odoOptimization
   laserCloudOutlierLast.reset(
@@ -1274,7 +1298,6 @@ void MapOptimization::downsampleCurrentScan() {
 }
 
 void MapOptimization::cornerOptimization(int iterCount) {
-
   updatePointAssociateToMapSinCos();
   int cnt = 0;
   for (size_t i = 0; i < laserCloudCornerLastDS->points.size(); i++) {
@@ -1387,29 +1410,165 @@ void MapOptimization::cornerOptimization(int iterCount) {
   //RCLCPP_INFO(this->get_logger(), "Corner number: %d", cnt);
 }
 
+pcl::PointCloud<PointType>::Ptr MapOptimization::drawFeaturesFromBin(
+    const pcl::PointCloud<PointType>::Ptr& pc_in,
+    double bin_size_x,
+    double bin_size_y,
+    double bin_size_z,
+    size_t max_points_per_bin)
+{
+  pcl::PointCloud<PointType>::Ptr pc_out(new pcl::PointCloud<PointType>);
+  if (!pc_in || pc_in->points.empty())
+  {
+    return pc_out;
+  }
+  pc_out->header = pc_in->header;
+
+  struct BinKey
+  {
+    int x;
+    int y;
+    int z;
+    bool operator==(const BinKey& o) const
+    {
+      return x == o.x && y == o.y && z == o.z;
+    }
+  };
+  struct BinKeyHash
+  {
+    size_t operator()(const BinKey& k) const
+    {
+      size_t seed = 0;
+      auto hash_combine = [](size_t& seed, int val)
+      {
+        seed ^= std::hash<int>()(val) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+      };
+      hash_combine(seed, k.x);
+      hash_combine(seed, k.y);
+      hash_combine(seed, k.z);
+      return seed;
+    }
+  };
+
+  struct BinData
+  {
+    std::vector<PointType> samples;
+    size_t count = 0;
+  };
+
+  std::unordered_map<BinKey, BinData, BinKeyHash> bin_map;
+
+  for (const auto& pt : pc_in->points)
+  {
+    if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z))
+    {
+      continue;
+    }
+    const int bx = static_cast<int>(std::floor(pt.x / bin_size_x));
+    const int by = static_cast<int>(std::floor(pt.y / bin_size_y));
+    const int bz = (bin_size_z > 0.0) ? static_cast<int>(std::floor(pt.z / bin_size_z)) : 0;
+
+    BinKey key{bx, by, bz};
+    auto& bin = bin_map[key];
+    bin.count++;
+
+    if (max_points_per_bin == 0)
+    {
+      continue;
+    }
+    if (bin.samples.size() < max_points_per_bin)
+    {
+      bin.samples.push_back(pt);
+    }
+    else
+    {
+      std::uniform_int_distribution<size_t> dist(0, bin.count - 1);
+      const size_t j = dist(engine_);
+      if (j < max_points_per_bin)
+      {
+        bin.samples[j] = pt;
+      }
+    }
+  }
+
+  size_t total_points = 0;
+  for (const auto& kv : bin_map)
+  {
+    total_points += kv.second.samples.size();
+  }
+  pc_out->points.reserve(total_points);
+
+  for (const auto& kv : bin_map)
+  {
+    pc_out->points.insert(pc_out->points.end(), kv.second.samples.begin(), kv.second.samples.end());
+  }
+
+  pc_out->width = pc_out->points.size();
+  pc_out->height = 1;
+  pc_out->is_dense = true;
+  
+  if(pc_in->points.size() - pc_out->points.size() < pc_in->points.size()/10){
+    RCLCPP_WARN(this->get_logger(),
+                "drawFeaturesFromBin: input points=%lu, bins=%lu, sampled points=%lu, try to increase bin size",
+                pc_in->points.size(), bin_map.size(), pc_out->points.size());
+  }
+
+
+  return pc_out;
+}
+
+
 void MapOptimization::surfOptimization(int iterCount) {
   updatePointAssociateToMapSinCos();
+  
+  if(bin_sampling_less_flat_feature_){
+    laserCloudSurfLastDSDrawed = drawFeaturesFromBin(laserCloudSurfLastDS, bin_sampling_x_size_, bin_sampling_y_size_, bin_sampling_z_size_, 1);
+  }
+  else{
+    *laserCloudSurfLastDSDrawed = *laserCloudSurfLastDS;
+  }
+
   int cnt_wall = 0;
   int cnt_ground = 0;
   pcl::PointCloud<PointType> ground_pc;
   pcl::PointCloud<PointType> wall_pc;
-  pcl::PointCloud<PointType> ground_coeff;
-  pcl::PointCloud<PointType> wall_coeff;
-  for (size_t i = 0; i < laserCloudSurfLastDS->points.size(); i++) {
-    pointOri = laserCloudSurfLastDS->points[i];
-    pointAssociateToMap(&pointOri, &pointSel);
-    if(!pcl::isFinite(pointSel))
+  pcl::PointCloud<PointType> ground_coeff_parallel;
+  pcl::PointCloud<PointType> wall_coeff_parallel;
+  std::vector<bool> valid_points(laserCloudSurfLastDSDrawed->points.size(), false);
+  std::vector<bool> wall_points(laserCloudSurfLastDSDrawed->points.size(), false);
+
+  ground_coeff_parallel.width = laserCloudSurfLastDSDrawed->points.size(); // Number of points per row (or total points if height is 1)
+  ground_coeff_parallel.height = 1;   // 1 means unorganized; > 1 means organized (image-like structure)
+  ground_coeff_parallel.is_dense = false; // Set to true if there are no invalid (NaN/Inf) points
+  ground_coeff_parallel.resize(ground_coeff_parallel.width * ground_coeff_parallel.height);
+
+  wall_coeff_parallel.width = laserCloudSurfLastDSDrawed->points.size(); // Number of points per row (or total points if height is 1)
+  wall_coeff_parallel.height = 1;   // 1 means unorganized; > 1 means organized (image-like structure)
+  wall_coeff_parallel.is_dense = false; // Set to true if there are no invalid (NaN/Inf) points
+  wall_coeff_parallel.resize(wall_coeff_parallel.width * wall_coeff_parallel.height);
+  
+  //#pragma omp parallel for schedule(static)
+  for (size_t i = 0; i < laserCloudSurfLastDSDrawed->points.size(); i++) {
+
+    PointType p_ori, p_selec;
+
+    p_ori = laserCloudSurfLastDSDrawed->points[i];
+    pointAssociateToMap(&p_ori, &p_selec);
+    if(!pcl::isFinite(p_selec))
       continue;
-    kdtreeSurfFromMap.nearestKSearch(pointSel, 5, pointSearchInd,
-                                      pointSearchSqDis);
-    if (pointSearchSqDis[4] < 1.0) {
+
+    std::vector<int> point_search_ind;
+    std::vector<float> point_search_sq_dis;
+    kdtreeSurfFromMap.nearestKSearch(p_selec, 5, point_search_ind,
+                                      point_search_sq_dis);
+    if (point_search_sq_dis[4] < 1.0) {
       for (int j = 0; j < 5; j++) {
         matA0(j, 0) =
-            laserCloudSurfFromMapDS->points[pointSearchInd[j]].x;
+            laserCloudSurfFromMapDS->points[point_search_ind[j]].x;
         matA0(j, 1) =
-            laserCloudSurfFromMapDS->points[pointSearchInd[j]].y;
+            laserCloudSurfFromMapDS->points[point_search_ind[j]].y;
         matA0(j, 2) =
-            laserCloudSurfFromMapDS->points[pointSearchInd[j]].z;
+            laserCloudSurfFromMapDS->points[point_search_ind[j]].z;
       }
       matX0 = matA0.colPivHouseholderQr().solve(matB0);
 
@@ -1426,9 +1585,9 @@ void MapOptimization::surfOptimization(int iterCount) {
 
       bool planeValid = true;
       for (int j = 0; j < 5; j++) {
-        if (fabs(pa * laserCloudSurfFromMapDS->points[pointSearchInd[j]].x +
-                 pb * laserCloudSurfFromMapDS->points[pointSearchInd[j]].y +
-                 pc * laserCloudSurfFromMapDS->points[pointSearchInd[j]].z +
+        if (fabs(pa * laserCloudSurfFromMapDS->points[point_search_ind[j]].x +
+                 pb * laserCloudSurfFromMapDS->points[point_search_ind[j]].y +
+                 pc * laserCloudSurfFromMapDS->points[point_search_ind[j]].z +
                  pd) > 0.2) {
           planeValid = false;
           break;
@@ -1436,12 +1595,12 @@ void MapOptimization::surfOptimization(int iterCount) {
       }
 
       if (planeValid) {
-        float pd2 = pa * pointSel.x + pb * pointSel.y + pc * pointSel.z + pd;
+        float pd2 = pa * p_selec.x + pb * p_selec.y + pc * p_selec.z + pd;
 
         float s = 1 - 0.9 * fabs(pd2) /
-                          sqrt(sqrt(pointSel.x * pointSel.x +
-                                    pointSel.y * pointSel.y +
-                                    pointSel.z * pointSel.z));
+                          sqrt(sqrt(p_selec.x * p_selec.x +
+                                    p_selec.y * p_selec.y +
+                                    p_selec.z * p_selec.z));
 
         coeff.x = s * pa;
         coeff.y = s * pb;
@@ -1449,24 +1608,42 @@ void MapOptimization::surfOptimization(int iterCount) {
         coeff.intensity = s * pd2;
         //RCLCPP_INFO(this->get_logger(), "%.2f, %.2f, %.2f, %.2f", pa, pb, pc, s);
         if (s > 0.1) {
+          valid_points[i] = true;
           //@ increase weight of y direction (xz plane) to reduce pitch drift
-          if(fabs(pb)>3*fabs(pa)+3*fabs(pc) || fabs(pointOri.y - tf2_trans_b2s_.getOrigin().z())<0.5){
-            cnt_ground++;
-            ground_pc.push_back(pointOri);
-            ground_coeff.push_back(coeff);
+          if(fabs(pb)>3*fabs(pa)+3*fabs(pc) || fabs(p_ori.y - tf2_trans_b2s_.getOrigin().z())<0.5){
+            ground_coeff_parallel.points[i] = coeff;
           }
           else{
-            cnt_wall++;
-            wall_pc.push_back(pointOri);
-            wall_coeff.push_back(coeff);
+            wall_coeff_parallel.points[i] = coeff;
+            wall_points[i] = true;
           }
           
-          //laserCloudOri->push_back(pointOri);
+          //laserCloudOri->push_back(p_ori);
           //coeffSel->push_back(coeff);
         }
       }
     }
   }
+
+  pcl::PointCloud<PointType> ground_coeff;
+  pcl::PointCloud<PointType> wall_coeff;
+
+  for(size_t i = 0; i < laserCloudSurfLastDSDrawed->points.size(); i++){
+    if(valid_points[i]){
+      pointOri = laserCloudSurfLastDSDrawed->points[i];
+      if(wall_points[i]){
+        wall_pc.push_back(pointOri);
+        wall_coeff.push_back(wall_coeff_parallel.points[i]);
+        cnt_ground++;
+      }
+      else{
+        ground_pc.push_back(pointOri);
+        ground_coeff.push_back(ground_coeff_parallel.points[i]);
+        cnt_wall++;
+      }
+    }
+  }
+
   if(cnt_wall>3*cnt_ground){
     //@ surface selection is skewed, resample them
     for(size_t i=0; i<ground_pc.points.size();i++){
@@ -1623,13 +1800,11 @@ void MapOptimization::scan2MapOptimization() {
     kdtreeCornerFromMap.setInputCloud(laserCloudCornerFromMapDS);
     kdtreeSurfFromMap.setInputCloud(laserCloudSurfFromMapDS);
 
-    for (int iterCount = 0; iterCount < 10; iterCount++) {
+    for (int iterCount = 0; iterCount < LM_optimization_iteration_number_; iterCount++) {
       laserCloudOri->clear();
       coeffSel->clear();
-
       cornerOptimization(iterCount);
       surfOptimization(iterCount);
-
       if (LMOptimization(iterCount) == true) break;
     }
 

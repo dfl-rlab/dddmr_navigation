@@ -103,16 +103,13 @@ public:
   int knn_num_of_ground_normals_;
   double update_min_d_, update_min_a_;
 
-  // AMCL parameters (KLD-sampling)
-  bool enable_amcl_;
-  int min_particles_;
-  int max_particles_;
-  double kld_err_;
-  double kld_z_;
-  double kld_bin_size_x_;
-  double kld_bin_size_y_;
-  double kld_bin_size_z_;
-  double kld_bin_size_yaw_;
+  double draw_flat_feature_bin_size_;
+  double draw_flat_feature_bin_size_x_;
+  double draw_flat_feature_bin_size_y_;
+  double draw_flat_feature_bin_size_z_;
+
+  double voxel_size_before_bin_sampling_;
+  double submap_resolution_; 
 
 };
 }  // namespace mcl_3dl

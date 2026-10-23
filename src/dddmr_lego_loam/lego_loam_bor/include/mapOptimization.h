@@ -233,7 +233,9 @@ private:
                               
   pcl::PointCloud<PointType>::Ptr
       laserCloudSurfLastDS; // downsampled surf featuer set from
-                            
+
+  pcl::PointCloud<PointType>::Ptr
+      laserCloudSurfLastDSDrawed; // downsampled surf featuer set from
 
   pcl::PointCloud<PointType>::Ptr
       laserCloudOutlierLast; // corner feature set from odoOptimization
@@ -353,6 +355,13 @@ private:
 
   void clearCloud();
 
+  pcl::PointCloud<PointType>::Ptr drawFeaturesFromBin(
+    const pcl::PointCloud<PointType>::Ptr& pc_less_flat,
+    double bin_size_x,
+    double bin_size_y,
+    double bin_size_z,
+    size_t max_points_per_bin);
+
   double ground_voxel_size_;
   int ground_edge_threshold_num_;
 
@@ -363,6 +372,15 @@ private:
   bool generate_testing_pg_;
   double corner_voxel_size_, surface_voxel_size_, outlier_voxel_size_, surface_icp_voxel_size_;
   tf2::Stamped<tf2::Transform> ideal_sensor_orientation2sensor_;
+  std::random_device seed_gen_;
+  std::default_random_engine engine_;
+
+  bool bin_sampling_less_flat_feature_;
+  int LM_optimization_iteration_number_;
+  double bin_sampling_x_size_;
+  double bin_sampling_y_size_;
+  double bin_sampling_z_size_;
+
 };
 
 #endif // MAPOPTIMIZATION_H

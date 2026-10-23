@@ -63,50 +63,32 @@ Parameters::Parameters(const rclcpp::node_interfaces::NodeLoggingInterface::Shar
   num_particles_ = num_particles.as_int();
   RCLCPP_INFO(logger_->get_logger(), "num_particles: %d", num_particles_);
 
-  parameter_->declare_parameter("enable_amcl", rclcpp::ParameterValue(true));
-  rclcpp::Parameter enable_amcl = parameter_->get_parameter("enable_amcl");
-  enable_amcl_ = enable_amcl.as_bool();
-  RCLCPP_INFO(logger_->get_logger(), "enable_amcl: %d", enable_amcl_);
+  parameter_->declare_parameter("draw_flat_feature_bin_size", rclcpp::ParameterValue(0.2));
+  rclcpp::Parameter draw_flat_feature_bin_size = parameter_->get_parameter("draw_flat_feature_bin_size");
+  draw_flat_feature_bin_size_ = draw_flat_feature_bin_size.as_double();
+  RCLCPP_INFO(logger_->get_logger(), "draw_flat_feature_bin_size: %.2f", draw_flat_feature_bin_size_);
 
-  parameter_->declare_parameter("min_particles", rclcpp::ParameterValue(60));
-  rclcpp::Parameter min_particles = parameter_->get_parameter("min_particles");
-  min_particles_ = min_particles.as_int();
-  RCLCPP_INFO(logger_->get_logger(), "min_particles: %d", min_particles_);
+  parameter_->declare_parameter("draw_flat_feature_bin_size_x", rclcpp::ParameterValue(0.2));
+  rclcpp::Parameter draw_flat_feature_bin_size_x = parameter_->get_parameter("draw_flat_feature_bin_size_x");
+  draw_flat_feature_bin_size_x_ = draw_flat_feature_bin_size_x.as_double();
+  RCLCPP_INFO(logger_->get_logger(), "draw_flat_feature_bin_size_x: %.2f", draw_flat_feature_bin_size_x_);
 
-  parameter_->declare_parameter("max_particles", rclcpp::ParameterValue(400));
-  rclcpp::Parameter max_particles = parameter_->get_parameter("max_particles");
-  max_particles_ = max_particles.as_int();
-  RCLCPP_INFO(logger_->get_logger(), "max_particles: %d", max_particles_);
+  parameter_->declare_parameter("draw_flat_feature_bin_size_y", rclcpp::ParameterValue(0.2));
+  rclcpp::Parameter draw_flat_feature_bin_size_y = parameter_->get_parameter("draw_flat_feature_bin_size_y");
+  draw_flat_feature_bin_size_y_ = draw_flat_feature_bin_size_y.as_double();
+  RCLCPP_INFO(logger_->get_logger(), "draw_flat_feature_bin_size_y: %.2f", draw_flat_feature_bin_size_y_);
 
-  parameter_->declare_parameter("kld_err", rclcpp::ParameterValue(0.1));
-  rclcpp::Parameter kld_err = parameter_->get_parameter("kld_err");
-  kld_err_ = kld_err.as_double();
-  RCLCPP_INFO(logger_->get_logger(), "kld_err: %.3f", kld_err_);
+  parameter_->declare_parameter("draw_flat_feature_bin_size_z", rclcpp::ParameterValue(0.2));
+  rclcpp::Parameter draw_flat_feature_bin_size_z = parameter_->get_parameter("draw_flat_feature_bin_size_z");
+  draw_flat_feature_bin_size_z_ = draw_flat_feature_bin_size_z.as_double();
+  RCLCPP_INFO(logger_->get_logger(), "draw_flat_feature_bin_size_z: %.2f", draw_flat_feature_bin_size_z_);
 
-  parameter_->declare_parameter("kld_z", rclcpp::ParameterValue(0.99));
-  rclcpp::Parameter kld_z = parameter_->get_parameter("kld_z");
-  kld_z_ = kld_z.as_double();
-  RCLCPP_INFO(logger_->get_logger(), "kld_z: %.3f", kld_z_);
-
-  parameter_->declare_parameter("kld_bin_size_x", rclcpp::ParameterValue(0.8));
-  rclcpp::Parameter kld_bin_size_x = parameter_->get_parameter("kld_bin_size_x");
-  kld_bin_size_x_ = kld_bin_size_x.as_double();
-  RCLCPP_INFO(logger_->get_logger(), "kld_bin_size_x: %.2f", kld_bin_size_x_);
-
-  parameter_->declare_parameter("kld_bin_size_y", rclcpp::ParameterValue(0.8));
-  rclcpp::Parameter kld_bin_size_y = parameter_->get_parameter("kld_bin_size_y");
-  kld_bin_size_y_ = kld_bin_size_y.as_double();
-  RCLCPP_INFO(logger_->get_logger(), "kld_bin_size_y: %.2f", kld_bin_size_y_);
-
-  parameter_->declare_parameter("kld_bin_size_z", rclcpp::ParameterValue(0.0));
-  rclcpp::Parameter kld_bin_size_z = parameter_->get_parameter("kld_bin_size_z");
-  kld_bin_size_z_ = kld_bin_size_z.as_double();
-  RCLCPP_INFO(logger_->get_logger(), "kld_bin_size_z: %.2f", kld_bin_size_z_);
-
-  parameter_->declare_parameter("kld_bin_size_yaw", rclcpp::ParameterValue(0.8));
-  rclcpp::Parameter kld_bin_size_yaw = parameter_->get_parameter("kld_bin_size_yaw");
-  kld_bin_size_yaw_ = kld_bin_size_yaw.as_double();
-  RCLCPP_INFO(logger_->get_logger(), "kld_bin_size_yaw: %.2f", kld_bin_size_yaw_);
+  if (draw_flat_feature_bin_size_ != 0.2 && draw_flat_feature_bin_size_x_ == 0.2 && draw_flat_feature_bin_size_y_ == 0.2 && draw_flat_feature_bin_size_z_ == 0.2)
+  {
+    draw_flat_feature_bin_size_x_ = draw_flat_feature_bin_size_;
+    draw_flat_feature_bin_size_y_ = draw_flat_feature_bin_size_;
+    draw_flat_feature_bin_size_z_ = draw_flat_feature_bin_size_;
+  }
 
   parameter_->declare_parameter("resample_var_x", rclcpp::ParameterValue(0.0));
   rclcpp::Parameter resample_var_x = parameter_->get_parameter("resample_var_x");
@@ -338,7 +320,13 @@ Parameters::Parameters(const rclcpp::node_interfaces::NodeLoggingInterface::Shar
   rclcpp::Parameter init_var_yaw = parameter_->get_parameter("init_var_yaw");
   v_yaw = init_var_yaw.as_double();
   RCLCPP_INFO(logger_->get_logger(), "init_var_yaw: %.2f", v_yaw);
-
+  
+  //@For draw
+  parameter_->declare_parameter("voxel_size_before_bin_sampling", rclcpp::ParameterValue(0.1));
+  rclcpp::Parameter voxel_size_before_bin_sampling = parameter_->get_parameter("voxel_size_before_bin_sampling");
+  voxel_size_before_bin_sampling_ = voxel_size_before_bin_sampling.as_double();
+  RCLCPP_INFO(logger_->get_logger(), "voxel_size_before_bin_sampling: %.2f", voxel_size_before_bin_sampling_);
+  
   
   initial_pose_ = State6DOF(
       Vec3(x, y, z),

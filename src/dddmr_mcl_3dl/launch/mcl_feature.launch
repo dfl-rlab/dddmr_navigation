@@ -1,0 +1,11 @@
+<launch>
+  <!--name argument is not required, because it will overwrite all node name in the exec-->
+  <node pkg="lego_loam_bor" exec="mcl_feature" output="screen" respawn="false">
+    <param from="$(find-pkg-share mcl_3dl)/config/mcl_feature_config.yaml" />
+    <remap from="/lslidar_point_cloud" to="/raw_point_cloud"/>
+  </node>
+
+  <!--- TF -->
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="baselink2laserlink" args="0.33 0 2.0 0.0 0.7853981 0 base_link hesai_lidar_2" />
+
+</launch>
