@@ -141,8 +141,7 @@ private:
   //@ affine for final transformation to map when outputing pose graph
   tf2::Stamped<tf2::Transform> tf2_trans_m2ci_;
   tf2::Stamped<tf2::Transform> tf2_trans_c2s_; // camera2sensorlink
-  tf2::Stamped<tf2::Transform>
-      tf2_trans_b2s_; // baselink2sensor to get ground distance
+  tf2::Stamped<tf2::Transform> tf2_trans_b2s_;
   geometry_msgs::msg::TransformStamped trans_m2ci_, trans_c2s_, trans_b2s_;
   std::set<std::pair<int, int>> pose_graph_;
 

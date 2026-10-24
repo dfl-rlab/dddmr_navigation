@@ -293,15 +293,24 @@ void MapOptimization::pcdSaver(const std::shared_ptr<std_srvs::srv::Empty::Reque
   pcl::PointCloud<PointTypePose> cloudKeyPoses6DBaseLink;
   std::vector<geometry_msgs::msg::TransformStamped> cloudKeyPoses6DBaseLink_geo;
   for(auto it = cloudKeyPoses6D->points.begin(); it!=cloudKeyPoses6D->points.end(); it++){
-    tf2::Transform tf2_trans_ci2c;
-    tf2::Quaternion q;
-    q.setRPY( (*it).roll, (*it).pitch, (*it).yaw);
-    tf2_trans_ci2c.setRotation(q);
-    tf2_trans_ci2c.setOrigin(tf2::Vector3((*it).x, (*it).y, (*it).z));
 
-    tf2::Transform tf2_trans_m2c, tf2_trans_m2s, tf2_trans_m2b;
+    tf2::Quaternion quat_tf;
+    quat_tf.setRPY((*it).yaw, -(*it).roll, -(*it).pitch);
+    geometry_msgs::msg::Quaternion geoQuat;
+    tf2::convert(quat_tf, geoQuat);
+
+    tf2::Stamped<tf2::Transform> tf2_trans_ci2c, tf2_trans_o2b;
+    tf2_trans_ci2c.setOrigin(tf2::Vector3((*it).x, (*it).y, (*it).z));
+    tf2_trans_ci2c.setRotation(tf2::Quaternion(-geoQuat.y, -geoQuat.z, geoQuat.x, geoQuat.w));
+
+    tf2::Stamped<tf2::Transform> tf2_trans_m2c;
+    tf2::Stamped<tf2::Transform> tf2_trans_m2is;
+    tf2::Stamped<tf2::Transform> tf2_trans_m2s;
+    tf2::Stamped<tf2::Transform> tf2_trans_m2b;
+    
     tf2_trans_m2c.mult(tf2_trans_m2ci_, tf2_trans_ci2c);
-    tf2_trans_m2s.mult(tf2_trans_m2c, tf2_trans_c2s_);
+    tf2_trans_m2is.mult(tf2_trans_m2c, tf2_trans_c2s_);
+    tf2_trans_m2s.mult(tf2_trans_m2is, ideal_sensor_orientation2sensor_);
     tf2_trans_m2b.mult(tf2_trans_m2s, tf2_trans_b2s_.inverse());
 
     PointTypePose pt;
@@ -794,18 +803,25 @@ void MapOptimization::publishKeyPosesAndFrames() {
 
   geometry_msgs::msg::PoseArray pose_array;
   for(auto it = cloudKeyPoses6D->points.begin(); it!=cloudKeyPoses6D->points.end(); it++){
-    tf2::Transform tf2_trans_ci2c;
-    tf2::Quaternion q;
-    q.setRPY( (*it).roll, (*it).pitch, (*it).yaw);
-    tf2_trans_ci2c.setRotation(q);
+
+
+    tf2::Quaternion quat_tf;
+    quat_tf.setRPY((*it).yaw, -(*it).roll, -(*it).pitch);
+    geometry_msgs::msg::Quaternion geoQuat;
+    tf2::convert(quat_tf, geoQuat);
+
+    tf2::Stamped<tf2::Transform> tf2_trans_ci2c, tf2_trans_o2b;
     tf2_trans_ci2c.setOrigin(tf2::Vector3((*it).x, (*it).y, (*it).z));
+    tf2_trans_ci2c.setRotation(tf2::Quaternion(-geoQuat.y, -geoQuat.z, geoQuat.x, geoQuat.w));
 
     tf2::Stamped<tf2::Transform> tf2_trans_m2c;
+    tf2::Stamped<tf2::Transform> tf2_trans_m2is;
     tf2::Stamped<tf2::Transform> tf2_trans_m2s;
     tf2::Stamped<tf2::Transform> tf2_trans_m2b;
-
+    
     tf2_trans_m2c.mult(tf2_trans_m2ci_, tf2_trans_ci2c);
-    tf2_trans_m2s.mult(tf2_trans_m2c, tf2_trans_c2s_);
+    tf2_trans_m2is.mult(tf2_trans_m2c, tf2_trans_c2s_);
+    tf2_trans_m2s.mult(tf2_trans_m2is, ideal_sensor_orientation2sensor_);
     tf2_trans_m2b.mult(tf2_trans_m2s, tf2_trans_b2s_.inverse());
 
     geometry_msgs::msg::Pose a_pose;
