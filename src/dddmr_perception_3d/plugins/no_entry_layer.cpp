@@ -295,6 +295,7 @@ void NoEntryLayer::resetdGraph(){
   RCLCPP_INFO(node_->get_logger().get_child(name_), "%s starts to reset dynamic graph.", name_.c_str());
   dGraph_.clear();
   dGraph_.initial(shared_data_->static_ground_size_, gbl_utils_->getMaxObstacleDistance());
+  is_zone_initialized_ = false;
 }
 
 double NoEntryLayer::get_dGraphValue(const unsigned int index){
