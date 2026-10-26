@@ -163,7 +163,7 @@ void Perception3D_ROS::initial(){
 
   clear_perceptions_srv_ = 
       this->create_service<std_srvs::srv::Empty>
-          ("clear_perception_marking", 
+          ("~/clear_perception_marking", 
           std::bind(&Perception3D_ROS::clearPerceptionsSrv, this, 
           std::placeholders::_1, std::placeholders::_2), 
           rmw_qos_profile_services_default,
