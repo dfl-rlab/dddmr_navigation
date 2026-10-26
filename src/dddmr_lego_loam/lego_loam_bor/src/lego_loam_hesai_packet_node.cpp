@@ -174,6 +174,9 @@ int main(int argc, char** argv) {
   auto BR = std::make_shared<HesaiBagReader>();
   auto IPGE = std::make_shared<InteractivePoseGraphEditor>("interactive_pose_graph_editor", MO);
   auto LLV = std::make_shared<LegoLoamVisualization>("lego_loam_map_visualization");
+  LLV->sync_map_and_ground_timer_->cancel();
+  LLV->map_publish_timer_->cancel();
+  LLV->timer_ground_edge_detection_->cancel();
   
   IP->tfInitial();
   FA->tfInitial();
