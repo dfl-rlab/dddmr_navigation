@@ -100,7 +100,8 @@ public:
   void run();
   void runWoLO();
   void loopClosureThread();
-
+  tf2::Stamped<tf2::Transform> getM2BTF2(PointTypePose point_pose);
+  
   float _history_keyframe_fitness_score;
   float _history_keyframe_search_radius;
 
@@ -336,7 +337,7 @@ private:
   void transformUpdate();
   void updatePointAssociateToMapSinCos();
   void pointAssociateToMap(PointType const *const pi, PointType *const po);
-
+  
   void publishTF();
 
   bool detectLoopClosure();

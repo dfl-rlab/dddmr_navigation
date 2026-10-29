@@ -734,32 +734,49 @@ pcl::PointCloud<PointType>::Ptr MapOptimization::transformPointCloudInverse(
   return cloudOut2;
 }
 
-void MapOptimization::publishTF() {
+tf2::Stamped<tf2::Transform> MapOptimization::getM2BTF2(PointTypePose point_pose){
 
   tf2::Quaternion quat_tf;
-  quat_tf.setRPY(transformTobeMapped[2], -transformTobeMapped[0], -transformTobeMapped[1]);
+  quat_tf.setRPY(point_pose.yaw, -point_pose.roll, -point_pose.pitch);
   geometry_msgs::msg::Quaternion geoQuat;
   tf2::convert(quat_tf, geoQuat);
 
-  tf2::Stamped<tf2::Transform> tf2_trans_ci2c, tf2_trans_o2b;
-  tf2_trans_ci2c.setOrigin(tf2::Vector3(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5]));
+  tf2::Stamped<tf2::Transform> tf2_trans_ci2c;
+  tf2_trans_ci2c.setOrigin(tf2::Vector3(point_pose.x, point_pose.y, point_pose.z));
   tf2_trans_ci2c.setRotation(tf2::Quaternion(-geoQuat.y, -geoQuat.z, geoQuat.x, geoQuat.w));
   
-  tf2_trans_o2b.setOrigin(tf2::Vector3(externalOdometry.pose.pose.position.x, externalOdometry.pose.pose.position.y, externalOdometry.pose.pose.position.z));
-  tf2_trans_o2b.setRotation(tf2::Quaternion(externalOdometry.pose.pose.orientation.x, externalOdometry.pose.pose.orientation.y, externalOdometry.pose.pose.orientation.z, externalOdometry.pose.pose.orientation.w));
-
   tf2::Stamped<tf2::Transform> tf2_trans_m2c;
   tf2::Stamped<tf2::Transform> tf2_trans_m2is;
   tf2::Stamped<tf2::Transform> tf2_trans_m2s;
   tf2::Stamped<tf2::Transform> tf2_trans_m2b;
-  tf2::Stamped<tf2::Transform> tf2_trans_m2o;
-
+  
   tf2_trans_m2c.mult(tf2_trans_m2ci_, tf2_trans_ci2c);
   //@sensor an is ideal sensor orientation (rolling removed)
   tf2_trans_m2is.mult(tf2_trans_m2c, tf2_trans_c2s_);
   //@so true sensor tf
   tf2_trans_m2s.mult(tf2_trans_m2is, ideal_sensor_orientation2sensor_);
   tf2_trans_m2b.mult(tf2_trans_m2s, tf2_trans_b2s_.inverse());
+
+  return tf2_trans_m2b;
+} 
+
+void MapOptimization::publishTF() {
+
+  PointTypePose point_pose;
+  point_pose.roll = transformTobeMapped[0];
+  point_pose.pitch = transformTobeMapped[1];
+  point_pose.yaw = transformTobeMapped[2];
+  point_pose.x = transformTobeMapped[3];
+  point_pose.y = transformTobeMapped[4];
+  point_pose.z = transformTobeMapped[5];
+
+  tf2::Stamped<tf2::Transform> tf2_trans_m2b = getM2BTF2(point_pose);
+  tf2::Stamped<tf2::Transform> tf2_trans_o2b;
+  tf2::Stamped<tf2::Transform> tf2_trans_m2o;
+
+  tf2_trans_o2b.setOrigin(tf2::Vector3(externalOdometry.pose.pose.position.x, externalOdometry.pose.pose.position.y, externalOdometry.pose.pose.position.z));
+  tf2_trans_o2b.setRotation(tf2::Quaternion(externalOdometry.pose.pose.orientation.x, externalOdometry.pose.pose.orientation.y, externalOdometry.pose.pose.orientation.z, externalOdometry.pose.pose.orientation.w));
+
   tf2_trans_m2o.mult(tf2_trans_m2b, tf2_trans_o2b.inverse());
   
   geometry_msgs::msg::TransformStamped map2odom;

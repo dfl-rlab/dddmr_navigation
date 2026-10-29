@@ -53,6 +53,7 @@ InteractivePoseGraphEditor::InteractivePoseGraphEditor(std::string name, std::sh
 
   node_1_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("~/node_1_pointcloud", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
   node_2_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("~/node_2_pointcloud", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+  node_2_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("~/node_2_pose", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
 
   node_selection_sub_ = this->create_subscription<std_msgs::msg::String>(
       "node_selection_msg", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(), 
@@ -103,6 +104,68 @@ void InteractivePoseGraphEditor::convert2Global(){
     patchedGroundCloudKeyFrames_global_.push_back(a_patched_ground_pcd);
   }
   
+}
+
+void InteractivePoseGraphEditor::publishNode2Pose(const tf2::Transform& pose) {
+  geometry_msgs::msg::PoseStamped pose_msg;
+  pose_msg.header.stamp = clock_->now();
+  pose_msg.header.frame_id = "map";
+  pose_msg.pose.position.x = pose.getOrigin().x();
+  pose_msg.pose.position.y = pose.getOrigin().y();
+  pose_msg.pose.position.z = pose.getOrigin().z();
+  pose_msg.pose.orientation.x = pose.getRotation().x();
+  pose_msg.pose.orientation.y = pose.getRotation().y();
+  pose_msg.pose.orientation.z = pose.getRotation().z();
+  pose_msg.pose.orientation.w = pose.getRotation().w();
+  node_2_pose_pub_->publish(pose_msg);
+}
+
+PointTypePose InteractivePoseGraphEditor::getCurrentNode2Pose() {
+  if (current_operation_nodes_.second < 0 || !mo_->cloudKeyPoses6D ||
+      current_operation_nodes_.second >= static_cast<int>(mo_->cloudKeyPoses6D->points.size())) {
+    return PointTypePose();
+  }
+  PointTypePose node2 = mo_->cloudKeyPoses6D->points[current_operation_nodes_.second];
+  tf2::Transform tf2_node2_pose;
+  tf2::Quaternion q2;
+  q2.setRPY(node2.roll, node2.pitch, node2.yaw);
+  tf2_node2_pose.setRotation(q2);
+  tf2_node2_pose.setOrigin(tf2::Vector3(node2.x, node2.y, node2.z));
+
+  Eigen::Affine3f correctionCameraFrame = node1_2_node2_af3_;
+  Eigen::Quaternionf q_eig(correctionCameraFrame.rotation());
+  tf2::Quaternion q_corr(q_eig.x(), q_eig.y(), q_eig.z(), q_eig.w());
+  tf2::Transform tf2_correction;
+  tf2_correction.setOrigin(tf2::Vector3(correctionCameraFrame.translation().x(),
+                                        correctionCameraFrame.translation().y(),
+                                        correctionCameraFrame.translation().z()));
+  tf2_correction.setRotation(q_corr);
+
+  tf2::Transform tf2_new_node2_pose;
+  tf2_new_node2_pose.mult(tf2_correction, tf2_node2_pose);
+  
+  PointTypePose new_node2_pose = node2;
+  new_node2_pose.x = tf2_new_node2_pose.getOrigin().x();
+  new_node2_pose.y = tf2_new_node2_pose.getOrigin().y();
+  new_node2_pose.z = tf2_new_node2_pose.getOrigin().z();
+  tf2::Matrix3x3 m(tf2_new_node2_pose.getRotation());
+  double roll, pitch, yaw;
+  m.getRPY(roll, pitch, yaw);
+  new_node2_pose.roll = roll;
+  new_node2_pose.pitch = pitch;
+  new_node2_pose.yaw = yaw;
+
+  return new_node2_pose;
+}
+
+void InteractivePoseGraphEditor::publishNode2Pose() {
+  if (current_operation_nodes_.second < 0 || !mo_->cloudKeyPoses6D ||
+      current_operation_nodes_.second >= static_cast<int>(mo_->cloudKeyPoses6D->points.size())) {
+    return;
+  }
+  tf2::Stamped<tf2::Transform> tf2_trans_m2b = mo_->getM2BTF2(getCurrentNode2Pose());
+  RCLCPP_ERROR(this->get_logger(), "aaaaaa");
+  publishNode2Pose(static_cast<tf2::Transform>(tf2_trans_m2b));
 }
 
 void InteractivePoseGraphEditor::nodeSelectionCB(const std_msgs::msg::String::SharedPtr msg){
@@ -205,6 +268,7 @@ void InteractivePoseGraphEditor::nodeSelectionCB(const std_msgs::msg::String::Sh
     RCLCPP_INFO(this->get_logger(), "Node 2 to Node 1 relative pose: %.2f, %.2f, %.2f", tf2_node22node1.getOrigin().x(), tf2_node22node1.getOrigin().y(), tf2_node22node1.getOrigin().z());  
     
     node1_2_node2_af3_ = Eigen::Affine3f::Identity();
+    publishNode2Pose();
 
   }
 
@@ -292,6 +356,7 @@ void InteractivePoseGraphEditor::operationCommandCB(const std_msgs::msg::String:
     icpedcloud2MsgTemp.header.stamp = clock_->now();
     icpedcloud2MsgTemp.header.frame_id = "camera_init";
     node_2_pub_->publish(icpedcloud2MsgTemp);
+    publishNode2Pose();
     return;
   }
 
@@ -340,7 +405,7 @@ void InteractivePoseGraphEditor::operationCommandCB(const std_msgs::msg::String:
     publish_icped_pc = true;
   }
 
-  if(cmd == "px-"){
+  if(cmd == "px-" || cmd == "px_"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
     transform.translation() << -trans_step, 0.0, 0.0;
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
@@ -354,7 +419,7 @@ void InteractivePoseGraphEditor::operationCommandCB(const std_msgs::msg::String:
     publish_icped_pc = true;
   }
 
-  if(cmd == "py-"){
+  if(cmd == "py-" || cmd == "py_"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
     transform.translation() << 0.0, -trans_step, 0.0;
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
@@ -368,7 +433,7 @@ void InteractivePoseGraphEditor::operationCommandCB(const std_msgs::msg::String:
     publish_icped_pc = true;
   }
 
-  if(cmd == "pz-"){
+  if(cmd == "pz-" || cmd == "pz_"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
     transform.translation() << 0.0, 0.0, -trans_step;
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
@@ -382,7 +447,7 @@ void InteractivePoseGraphEditor::operationCommandCB(const std_msgs::msg::String:
     publish_icped_pc = true;
   }
 
-  if(cmd == "roll-"){
+  if(cmd == "roll-" || cmd == "roll_"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
     transform.rotate (Eigen::AngleAxisf (-rot_step, Eigen::Vector3f::UnitX()));  
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
@@ -396,7 +461,7 @@ void InteractivePoseGraphEditor::operationCommandCB(const std_msgs::msg::String:
     publish_icped_pc = true;
   }
 
-  if(cmd == "pitch-"){
+  if(cmd == "pitch-" || cmd == "pitch_"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
     transform.rotate (Eigen::AngleAxisf (-rot_step, Eigen::Vector3f::UnitY()));  
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
@@ -410,7 +475,7 @@ void InteractivePoseGraphEditor::operationCommandCB(const std_msgs::msg::String:
     publish_icped_pc = true;
   }
 
-  if(cmd == "yaw-"){
+  if(cmd == "yaw-" || cmd == "yaw_"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
     transform.rotate (Eigen::AngleAxisf (-rot_step, Eigen::Vector3f::UnitZ()));  
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
@@ -464,6 +529,8 @@ void InteractivePoseGraphEditor::operationCommandCB(const std_msgs::msg::String:
                 tf2_new_node2_pose.getOrigin().y(),
                 tf2_new_node2_pose.getOrigin().z());
 
+    publishNode2Pose();
+
     mo_->updateGtsamPose(current_operation_nodes_.second, new_node2_pose);
     mo_->correctPoses();
     mo_->publishKeyPosesAndFrames();
@@ -471,15 +538,18 @@ void InteractivePoseGraphEditor::operationCommandCB(const std_msgs::msg::String:
     return;
   }
   if(publish_icped_pc){
-    //@ The if statement is to prevent no icp has been done
-    node_2_pointcloud_icp_.reset(new pcl::PointCloud<PointType>());
-    pcl::transformPointCloud(*node_2_pointcloud_, *node_2_pointcloud_icp_, node1_2_node2_af3_);
+    if (node_2_pointcloud_ && !node_2_pointcloud_->points.empty()) {
+      //@ The if statement is to prevent no icp has been done
+      node_2_pointcloud_icp_.reset(new pcl::PointCloud<PointType>());
+      pcl::transformPointCloud(*node_2_pointcloud_, *node_2_pointcloud_icp_, node1_2_node2_af3_);
 
-    sensor_msgs::msg::PointCloud2 icpedcloud2MsgTemp;
-    pcl::toROSMsg(*node_2_pointcloud_icp_, icpedcloud2MsgTemp);
-    icpedcloud2MsgTemp.header.stamp = clock_->now();
-    icpedcloud2MsgTemp.header.frame_id = "camera_init";
-    node_2_pub_->publish(icpedcloud2MsgTemp);
+      sensor_msgs::msg::PointCloud2 icpedcloud2MsgTemp;
+      pcl::toROSMsg(*node_2_pointcloud_icp_, icpedcloud2MsgTemp);
+      icpedcloud2MsgTemp.header.stamp = clock_->now();
+      icpedcloud2MsgTemp.header.frame_id = "camera_init";
+      node_2_pub_->publish(icpedcloud2MsgTemp);
+    }
+    publishNode2Pose();
   }
 
 

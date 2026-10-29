@@ -16,6 +16,7 @@
 
 #include <std_msgs/msg/string.hpp>
 #include <std_msgs/msg/float32.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 //optimized icp gaussian newton
 #include "opt_icp_gn/optimized_ICP_GN.h"
 #include "opt_icp_gn/common.h"
@@ -78,6 +79,7 @@ private:
   
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr node_1_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr node_2_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr node_2_pose_pub_;
 
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr node_selection_sub_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr operation_command_sub_;
@@ -88,6 +90,9 @@ private:
   void operationCommandCB(const std_msgs::msg::String::SharedPtr msg);
   
   void convert2Global();
+  void publishNode2Pose(const tf2::Transform& pose);
+  void publishNode2Pose();
+  PointTypePose getCurrentNode2Pose();
 
 };
 
