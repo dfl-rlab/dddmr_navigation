@@ -65,6 +65,8 @@ private:
   Eigen::Affine3f node1_2_node2_af3_;
   Eigen::Affine3d node1_2_node2_af3d_;
   float icp_score_;
+  double trans_step_ = 0.5;
+  double rot_step_ = 0.1;
   geometry_msgs::msg::TransformStamped trans_node1_2_node2_;
 
   std::vector<pcl::PointCloud<PointType>::Ptr> cornerCloudKeyFrames_global_; 

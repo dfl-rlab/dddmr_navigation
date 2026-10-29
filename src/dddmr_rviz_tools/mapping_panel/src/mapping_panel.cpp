@@ -87,8 +87,10 @@ MappingPanel::MappingPanel(QWidget *parent) : rviz_common::Panel(parent)
 
   do_icp_ = new QPushButton(tr("ICP"));
   connect(do_icp_, SIGNAL(clicked()), this, SLOT(icp_clicked ()));
-  accept_result_ = new QPushButton(tr("Accept"));
+  accept_result_ = new QPushButton(tr("Accept ICP"));
   connect(accept_result_, SIGNAL(clicked()), this, SLOT(accept_clicked ()));
+  set_pose_ = new QPushButton(tr("Set Pose"));
+  connect(set_pose_, SIGNAL(clicked()), this, SLOT(set_pose_clicked ()));
 
   px_increase_ = new QPushButton(tr("px+"));
   px_decrease_ = new QPushButton(tr("px-"));
@@ -121,6 +123,7 @@ MappingPanel::MappingPanel(QWidget *parent) : rviz_common::Panel(parent)
   //addWidget(*Widget, row, column, rowspan, colspan)
   icp_grid_layout->addWidget(do_icp_, 0, 0, 1, 1);
   icp_grid_layout->addWidget(accept_result_, 0, 1, 1, 1);
+  icp_grid_layout->addWidget(set_pose_, 0, 2, 1, 1);
 
   icp_grid_layout->addWidget(px_increase_, 1, 0, 1, 1);
   icp_grid_layout->addWidget(py_increase_, 1, 1, 1, 1);
@@ -135,6 +138,29 @@ MappingPanel::MappingPanel(QWidget *parent) : rviz_common::Panel(parent)
   icp_grid_layout->addWidget(roll_decrease_, 2, 3, 1, 1);
   icp_grid_layout->addWidget(pitch_decrease_, 2, 4, 1, 1);
   icp_grid_layout->addWidget(yaw_decrease_, 2, 5, 1, 1);
+
+  QLabel *trans_step_label = new QLabel(tr("Trans Step:"), this);
+  trans_step_spin_ = new QDoubleSpinBox(this);
+  trans_step_spin_->setRange(0.001, 100.0);
+  trans_step_spin_->setValue(0.5);
+  trans_step_spin_->setSingleStep(0.1);
+  trans_step_spin_->setDecimals(3);
+
+  QLabel *rot_step_label = new QLabel(tr("Rot Step:"), this);
+  rot_step_spin_ = new QDoubleSpinBox(this);
+  rot_step_spin_->setRange(0.001, 3.14159);
+  rot_step_spin_->setValue(0.1);
+  rot_step_spin_->setSingleStep(0.05);
+  rot_step_spin_->setDecimals(3);
+
+  icp_grid_layout->addWidget(trans_step_label, 3, 0, 1, 1);
+  icp_grid_layout->addWidget(trans_step_spin_, 3, 1, 1, 2);
+  icp_grid_layout->addWidget(rot_step_label, 3, 3, 1, 1);
+  icp_grid_layout->addWidget(rot_step_spin_, 3, 4, 1, 2);
+
+  connect(trans_step_spin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MappingPanel::setTransStepValue);
+  connect(rot_step_spin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MappingPanel::setRotStepValue);
+
   icp_groupBox->setLayout(icp_grid_layout);
 
   //@ add everything to layout
@@ -170,6 +196,7 @@ void MappingPanel::pubOperationCommand(std::string m_string){
 
 void MappingPanel::icp_clicked(){ pubOperationCommand(std::string("icp")); }
 void MappingPanel::accept_clicked(){ pubOperationCommand(std::string("accept")); }
+void MappingPanel::set_pose_clicked(){ pubOperationCommand(std::string("set_pose")); }
 
 void MappingPanel::pxIncrease(){ pubOperationCommand(std::string("px+")); }
 void MappingPanel::pxDecrease(){ pubOperationCommand(std::string("px-")); }
@@ -217,6 +244,14 @@ void MappingPanel::setSkipFrameValue(){
   std_msgs::msg::Int32 tmp_int;
   tmp_int.data = skip_frame_slider_->value();
   skip_frame_pub_->publish(tmp_int);
+}
+
+void MappingPanel::setTransStepValue(){
+  pubOperationCommand(std::string("trans_step: ") + std::to_string(trans_step_spin_->value()));
+}
+
+void MappingPanel::setRotStepValue(){
+  pubOperationCommand(std::string("rot_step: ") + std::to_string(rot_step_spin_->value()));
 }
 
 }  // namespace mapping_panel

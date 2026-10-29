@@ -123,6 +123,7 @@ public:
   void correctPoses();
   void addEdgeFromPose(int pose_1, int pose_2, gtsam::Pose3 poseFrom,
                        gtsam::Pose3 poseTo, float icp_score);
+  void updateGtsamPose(int node_num, gtsam::Pose3 new_pose);
   void publishKeyPosesAndFrames();
 
   nav_msgs::msg::Odometry externalOdometry;

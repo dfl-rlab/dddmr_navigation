@@ -36,6 +36,7 @@
 
 #include "interactive_pose_graph_editor.h"
 #include <future>
+#include <sstream>
 
 using namespace gtsam;
 
@@ -216,8 +217,39 @@ void InteractivePoseGraphEditor::operationCommandCB(const std_msgs::msg::String:
   
   bool publish_icped_pc = false;
 
+  std::stringstream ss(msg->data);
+  std::string cmd;
+  double custom_step = 0.0;
+  ss >> cmd;
+  bool has_custom_step = false;
+  if (ss >> custom_step) {
+    has_custom_step = true;
+  }
+
+  if (cmd == "trans_step:" || cmd == "trans_step") {
+    if (has_custom_step) {
+      trans_step_ = custom_step;
+    } else {
+      std::string val_str = msg->data.substr(msg->data.find(":") + 1);
+      try { trans_step_ = std::stod(val_str); } catch (...) {}
+    }
+    RCLCPP_INFO(this->get_logger(), "Updated trans_step to %.3f", trans_step_);
+    return;
+  }
+
+  if (cmd == "rot_step:" || cmd == "rot_step") {
+    if (has_custom_step) {
+      rot_step_ = custom_step;
+    } else {
+      std::string val_str = msg->data.substr(msg->data.find(":") + 1);
+      try { rot_step_ = std::stod(val_str); } catch (...) {}
+    }
+    RCLCPP_INFO(this->get_logger(), "Updated rot_step to %.3f", rot_step_);
+    return;
+  }
+
   //@-----ICP-----
-  if(msg->data=="icp"){
+  if(cmd=="icp"){
     if(node_1_pointcloud_->points.empty() || node_2_pointcloud_->points.empty()){
       RCLCPP_INFO(this->get_logger(), "Nodes are not selected yet.");
       return;
@@ -265,7 +297,7 @@ void InteractivePoseGraphEditor::operationCommandCB(const std_msgs::msg::String:
 
   
   //@-----Accept the icp result-----
-  if(msg->data=="accept"){
+  if(cmd=="accept"){
     
     RCLCPP_INFO(this->get_logger(), "Accept edge from: %d, %d", current_operation_nodes_.second, current_operation_nodes_.first);
 
@@ -288,38 +320,6 @@ void InteractivePoseGraphEditor::operationCommandCB(const std_msgs::msg::String:
         Pose3(Rot3::RzRyRx(roll, pitch, yaw), Point3(x, y, z));
     gtsam::Pose3 poseTo =
         pclPointTogtsamPose3(mo_->cloudKeyPoses6D->points[current_operation_nodes_.first]);  
-    /*
-    PointTypePose node2 = mo_->cloudKeyPoses6D->points[current_operation_nodes_.second];
-    //Pose transform
-    geometry_msgs::msg::TransformStamped tf2_ros_node1_2_node2 = tf2::eigenToTransform(node1_2_node2_af3d_);
-    tf2::Stamped<tf2::Transform> tf2_node1_2_node2;
-    tf2::fromMsg(tf2_ros_node1_2_node2, tf2_node1_2_node2);
-    RCLCPP_INFO(this->get_logger(), "ICP transform: %.2f, %.2f, %.2f", tf2_node1_2_node2.getOrigin().x(), tf2_node1_2_node2.getOrigin().y(), tf2_node1_2_node2.getOrigin().z());
-    
-    tf2::Stamped<tf2::Transform> tf2_node2_pose;
-    tf2::Quaternion q;
-    q.setRPY( node2.roll, node2.pitch, node2.yaw);
-    tf2_node2_pose.setRotation(q);
-    tf2_node2_pose.setOrigin(tf2::Vector3(node2.x, node2.y, node2.z));
-    RCLCPP_INFO(this->get_logger(), "original node 2 pose: %.2f, %.2f, %.2f", tf2_node2_pose.getOrigin().x(), tf2_node2_pose.getOrigin().y(), tf2_node2_pose.getOrigin().z());
-
-    tf2::Transform tf2_icped_node2;
-    tf2_icped_node2.mult(tf2_node1_2_node2, tf2_node2_pose); //@ here is very important, it is icp_trans*node_2 pose
-    RCLCPP_INFO(this->get_logger(), "icped node 2 pose: %.2f, %.2f, %.2f", tf2_icped_node2.getOrigin().x(), tf2_icped_node2.getOrigin().y(), tf2_icped_node2.getOrigin().z());
-    
-    std::pair<int, int> edge;
-    edge.first = current_operation_nodes_.first;
-    edge.second = current_operation_nodes_.second;
-
-    PointTypePose node1 = mo_->cloudKeyPoses6D->points[current_operation_nodes_.first];
-    gtsam::Pose3 poseFrom = Pose3(Rot3::RzRyRx(node1.roll, node1.pitch, node1.yaw), Point3(node1.x, node1.y, node1.z));
-
-    tf2::Matrix3x3 m(tf2_icped_node2.getRotation());
-    double roll, pitch, yaw;
-    m.getRPY(roll, pitch, yaw);
-    gtsam::Pose3 poseTo = Pose3(Rot3::RzRyRx(roll, pitch, yaw), 
-                                Point3(tf2_icped_node2.getOrigin().x(), tf2_icped_node2.getOrigin().y(), tf2_icped_node2.getOrigin().z()));
-    */
     // manual closure, so make it very strong by increasing weight
     for(int i=0;i<10;i++){
       mo_->addEdgeFromPose(current_operation_nodes_.second, current_operation_nodes_.first, poseFrom, poseTo, icp_score_);
@@ -330,92 +330,146 @@ void InteractivePoseGraphEditor::operationCommandCB(const std_msgs::msg::String:
     return;
   }
   
-  double step = 0.5;
-  if(msg->data == "px+"){
+  double trans_step = has_custom_step ? custom_step : trans_step_;
+  double rot_step = has_custom_step ? custom_step : rot_step_;
+
+  if(cmd == "px+"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << 0.5, 0.0, 0.0;
+    transform.translation() << trans_step, 0.0, 0.0;
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "px-"){
+  if(cmd == "px-"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << -0.5, 0.0, 0.0;
+    transform.translation() << -trans_step, 0.0, 0.0;
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "py+"){
+  if(cmd == "py+"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << 0.0, 0.5, 0.0;
+    transform.translation() << 0.0, trans_step, 0.0;
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "py-"){
+  if(cmd == "py-"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << 0.0, -0.5, 0.0;
+    transform.translation() << 0.0, -trans_step, 0.0;
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "pz+"){
+  if(cmd == "pz+"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << 0.0, 0.0, 0.5;
+    transform.translation() << 0.0, 0.0, trans_step;
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "pz-"){
+  if(cmd == "pz-"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << 0.0, 0.0, -0.5;
+    transform.translation() << 0.0, 0.0, -trans_step;
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "roll+"){
+  if(cmd == "roll+"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate (Eigen::AngleAxisf (0.1, Eigen::Vector3f::UnitX()));  
+    transform.rotate (Eigen::AngleAxisf (rot_step, Eigen::Vector3f::UnitX()));  
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "roll-"){
+  if(cmd == "roll-"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate (Eigen::AngleAxisf (-0.1, Eigen::Vector3f::UnitX()));  
+    transform.rotate (Eigen::AngleAxisf (-rot_step, Eigen::Vector3f::UnitX()));  
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "pitch+"){
+  if(cmd == "pitch+"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate (Eigen::AngleAxisf (0.1, Eigen::Vector3f::UnitY()));  
+    transform.rotate (Eigen::AngleAxisf (rot_step, Eigen::Vector3f::UnitY()));  
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "pitch-"){
+  if(cmd == "pitch-"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate (Eigen::AngleAxisf (-0.1, Eigen::Vector3f::UnitY()));  
+    transform.rotate (Eigen::AngleAxisf (-rot_step, Eigen::Vector3f::UnitY()));  
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "yaw+"){
+  if(cmd == "yaw+"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate (Eigen::AngleAxisf (0.1, Eigen::Vector3f::UnitZ()));  
+    transform.rotate (Eigen::AngleAxisf (rot_step, Eigen::Vector3f::UnitZ()));  
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "yaw-"){
+  if(cmd == "yaw-"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate (Eigen::AngleAxisf (-0.1, Eigen::Vector3f::UnitZ()));  
+    transform.rotate (Eigen::AngleAxisf (-rot_step, Eigen::Vector3f::UnitZ()));  
     node1_2_node2_af3_ = transform*node1_2_node2_af3_;
     publish_icped_pc = true;
   }
 
+  if(cmd == "set_pose"){
+    if(current_operation_nodes_.second < 0){
+      RCLCPP_INFO(this->get_logger(), "Node 2 is not selected yet.");
+      return;
+    }
 
+    //@printing node 2 info
+    PointTypePose node2 = mo_->cloudKeyPoses6D->points[current_operation_nodes_.second];
+    tf2::Transform tf2_node2_pose;
+    tf2::Quaternion q2;
+    q2.setRPY( node2.roll, node2.pitch, node2.yaw);
+    tf2_node2_pose.setRotation(q2);
+    tf2_node2_pose.setOrigin(tf2::Vector3(node2.x, node2.y, node2.z));
+    RCLCPP_INFO(this->get_logger(), "Node 2 pose: %.2f, %.2f, %.2f", tf2_node2_pose.getOrigin().x(), tf2_node2_pose.getOrigin().y(), tf2_node2_pose.getOrigin().z());    
+
+    float x, y, z, roll, pitch, yaw;
+    Eigen::Affine3f correctionCameraFrame;
+    correctionCameraFrame = node1_2_node2_af3_;  // get transformation in camera frame
+    pcl::getTranslationAndEulerAngles(correctionCameraFrame, x, y, z, roll, pitch, yaw);
+
+    Eigen::Affine3f correctionLidarFrame =
+        pcl::getTransformation(z, x, y, yaw, roll, pitch);
+    // transform from world origin to wrong pose
+    Eigen::Affine3f tWrong = pclPointToAffine3fCameraToLidar(node2);
+    // transform from world origin to corrected pose
+    Eigen::Affine3f tCorrect =
+        correctionLidarFrame *
+        tWrong;  // pre-multiplying -> successive rotation about a fixed frame
+    pcl::getTranslationAndEulerAngles(tCorrect, x, y, z, roll, pitch, yaw);
+    gtsam::Pose3 new_node2_pose =
+        Pose3(Rot3::RzRyRx(roll, pitch, yaw), Point3(x, y, z));
+
+    //@ calculate new pose in camera frame as well for logging
+    tf2::Transform tf2_correction;
+    Eigen::Quaternionf q_eig(correctionCameraFrame.rotation());
+    tf2::Quaternion q_corr(q_eig.x(), q_eig.y(), q_eig.z(), q_eig.w());
+    tf2_correction.setOrigin(tf2::Vector3(correctionCameraFrame.translation().x(),
+                                          correctionCameraFrame.translation().y(),
+                                          correctionCameraFrame.translation().z()));
+    tf2_correction.setRotation(q_corr);
+    tf2::Transform tf2_new_node2_pose;
+    tf2_new_node2_pose.mult(tf2_correction, tf2_node2_pose);
+    RCLCPP_INFO(this->get_logger(), "New Node 2 pose: %.2f, %.2f, %.2f",
+                tf2_new_node2_pose.getOrigin().x(),
+                tf2_new_node2_pose.getOrigin().y(),
+                tf2_new_node2_pose.getOrigin().z());
+
+    mo_->updateGtsamPose(current_operation_nodes_.second, new_node2_pose);
+    mo_->correctPoses();
+    mo_->publishKeyPosesAndFrames();
+
+    return;
+  }
   if(publish_icped_pc){
     //@ The if statement is to prevent no icp has been done
     node_2_pointcloud_icp_.reset(new pcl::PointCloud<PointType>());

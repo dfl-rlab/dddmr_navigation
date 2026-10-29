@@ -1215,6 +1215,18 @@ void MapOptimization::addEdgeFromPose(int pose_1, int pose_2, gtsam::Pose3 poseF
   aLoopIsClosed = true;
 }
 
+void MapOptimization::updateGtsamPose(int node_num, gtsam::Pose3 new_pose) {
+  auto priorNoise = noiseModel::Diagonal::Sigmas(
+      (Vector(6) << 1e-4, 1e-4, 1e-4, 1e-4, 1e-4, 1e-4).finished());
+  gtSAMgraph.add(PriorFactor<Pose3>(node_num, new_pose, priorNoise));
+
+  isam->update(gtSAMgraph);
+  isam->update();
+  gtSAMgraph.resize(0);
+  isamCurrentEstimate = isam->calculateEstimate();
+  aLoopIsClosed = true;
+}
+
 void MapOptimization::extractSurroundingKeyFrames() {
 
   if (cloudKeyPoses3D->points.empty() == true) return;
@@ -1931,7 +1943,7 @@ void MapOptimization::saveKeyFramesAndFactor() {
         Pose3(Rot3::RzRyRx(transformAftMapped[2], transformAftMapped[0],
                            transformAftMapped[1]),
               Point3(transformAftMapped[5], transformAftMapped[3],
-                     transformAftMapped[4])));
+                     transformAftMapped[4]))); //cloud6d:(yaw, roll, pitch, z, x, y)
   }
   //
   // update iSAM

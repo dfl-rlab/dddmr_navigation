@@ -152,6 +152,8 @@ private:
   std::string current_focus_pg_;
   
   Eigen::Affine3f first_frame_2_second_frame_af3_;
+  double trans_step_ = 0.5;
+  double rot_step_ = 0.1;
   
 };
 

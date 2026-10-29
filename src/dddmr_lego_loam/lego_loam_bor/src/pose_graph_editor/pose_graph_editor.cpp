@@ -36,6 +36,7 @@
 
 #include "pose_graph_editor.h"
 #include <future>
+#include <sstream>
 
 using namespace gtsam;
 
@@ -698,15 +699,46 @@ void PoseGraphEditor::operationCommandCB(const std_msgs::msg::String::SharedPtr 
   if(current_focus_pg_!=name_)
     return;
   
+  std::stringstream ss(msg->data);
+  std::string cmd;
+  double custom_step = 0.0;
+  ss >> cmd;
+  bool has_custom_step = false;
+  if (ss >> custom_step) {
+    has_custom_step = true;
+  }
+
+  if (cmd == "trans_step:" || cmd == "trans_step") {
+    if (has_custom_step) {
+      trans_step_ = custom_step;
+    } else {
+      std::string val_str = msg->data.substr(msg->data.find(":") + 1);
+      try { trans_step_ = std::stod(val_str); } catch (...) {}
+    }
+    RCLCPP_INFO(this->get_logger(), "Updated trans_step to %.3f", trans_step_);
+    return;
+  }
+
+  if (cmd == "rot_step:" || cmd == "rot_step") {
+    if (has_custom_step) {
+      rot_step_ = custom_step;
+    } else {
+      std::string val_str = msg->data.substr(msg->data.find(":") + 1);
+      try { rot_step_ = std::stod(val_str); } catch (...) {}
+    }
+    RCLCPP_INFO(this->get_logger(), "Updated rot_step to %.3f", rot_step_);
+    return;
+  }
+
   //@-----Last step-----
-  if(msg->data=="last"){
+  if(cmd=="last"){
     if(!history_operation_.empty())
       popHistory();
     return;
   }
   
   //@-----Export map-----
-  if(msg->data=="export_map"){
+  if(cmd=="export_map"){
     //Create sub folder
     std::string export_dir_string = pose_graph_dir_ + "/" + currentDateTime();
     std::filesystem::create_directory(export_dir_string);
@@ -747,7 +779,7 @@ void PoseGraphEditor::operationCommandCB(const std_msgs::msg::String::SharedPtr 
   }  
   
   //@-----ICP-----
-  if(msg->data=="icp"){
+  if(cmd=="icp"){
     if(node_1_pointcloud_->points.empty() || node_2_pointcloud_->points.empty()){
       RCLCPP_INFO(this->get_logger(), "Nodes are not selected yet.");
       return;
@@ -806,7 +838,7 @@ void PoseGraphEditor::operationCommandCB(const std_msgs::msg::String::SharedPtr 
   }
   
   //@-----Accept the icp result-----
-  if(msg->data=="accept"){
+  if(cmd=="accept"){
     add2History();
     PointTypePose node2 = poses_.points[current_operation_nodes_.second];
     //Pose transform
@@ -872,86 +904,89 @@ void PoseGraphEditor::operationCommandCB(const std_msgs::msg::String::SharedPtr 
     return;
   }
 
-  if(msg->data == "px+"){
+  double trans_step = has_custom_step ? custom_step : trans_step_;
+  double rot_step = has_custom_step ? custom_step : rot_step_;
+
+  if(cmd == "px+"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << 0.5, 0.0, 0.0;
+    transform.translation() << trans_step, 0.0, 0.0;
     first_frame_2_second_frame_af3_ = transform*first_frame_2_second_frame_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "px-"){
+  if(cmd == "px-"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << -0.5, 0.0, 0.0;
+    transform.translation() << -trans_step, 0.0, 0.0;
     first_frame_2_second_frame_af3_ = transform*first_frame_2_second_frame_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "py+"){
+  if(cmd == "py+"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << 0.0, 0.5, 0.0;
+    transform.translation() << 0.0, trans_step, 0.0;
     first_frame_2_second_frame_af3_ = transform*first_frame_2_second_frame_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "py-"){
+  if(cmd == "py-"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << 0.0, -0.5, 0.0;
+    transform.translation() << 0.0, -trans_step, 0.0;
     first_frame_2_second_frame_af3_ = transform*first_frame_2_second_frame_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "pz+"){
+  if(cmd == "pz+"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << 0.0, 0.0, 0.5;
+    transform.translation() << 0.0, 0.0, trans_step;
     first_frame_2_second_frame_af3_ = transform*first_frame_2_second_frame_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "pz-"){
+  if(cmd == "pz-"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << 0.0, 0.0, -0.5;
+    transform.translation() << 0.0, 0.0, -trans_step;
     first_frame_2_second_frame_af3_ = transform*first_frame_2_second_frame_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "roll+"){
+  if(cmd == "roll+"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate (Eigen::AngleAxisf (0.1, Eigen::Vector3f::UnitX()));  
+    transform.rotate (Eigen::AngleAxisf (rot_step, Eigen::Vector3f::UnitX()));  
     first_frame_2_second_frame_af3_ = transform*first_frame_2_second_frame_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "roll-"){
+  if(cmd == "roll-"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate (Eigen::AngleAxisf (-0.1, Eigen::Vector3f::UnitX()));  
+    transform.rotate (Eigen::AngleAxisf (-rot_step, Eigen::Vector3f::UnitX()));  
     first_frame_2_second_frame_af3_ = transform*first_frame_2_second_frame_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "pitch+"){
+  if(cmd == "pitch+"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate (Eigen::AngleAxisf (0.1, Eigen::Vector3f::UnitY()));  
+    transform.rotate (Eigen::AngleAxisf (rot_step, Eigen::Vector3f::UnitY()));  
     first_frame_2_second_frame_af3_ = transform*first_frame_2_second_frame_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "pitch-"){
+  if(cmd == "pitch-"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate (Eigen::AngleAxisf (-0.1, Eigen::Vector3f::UnitY()));  
+    transform.rotate (Eigen::AngleAxisf (-rot_step, Eigen::Vector3f::UnitY()));  
     first_frame_2_second_frame_af3_ = transform*first_frame_2_second_frame_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "yaw+"){
+  if(cmd == "yaw+"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate (Eigen::AngleAxisf (0.1, Eigen::Vector3f::UnitZ()));  
+    transform.rotate (Eigen::AngleAxisf (rot_step, Eigen::Vector3f::UnitZ()));  
     first_frame_2_second_frame_af3_ = transform*first_frame_2_second_frame_af3_;
     publish_icped_pc = true;
   }
 
-  if(msg->data == "yaw-"){
+  if(cmd == "yaw-"){
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate (Eigen::AngleAxisf (-0.1, Eigen::Vector3f::UnitZ()));  
+    transform.rotate (Eigen::AngleAxisf (-rot_step, Eigen::Vector3f::UnitZ()));  
     first_frame_2_second_frame_af3_ = transform*first_frame_2_second_frame_af3_;
     publish_icped_pc = true;
   }

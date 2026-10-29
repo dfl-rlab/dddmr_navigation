@@ -10,6 +10,7 @@
 #include <QFormLayout>
 #include <QMessageBox>
 #include <QSlider>
+#include <QDoubleSpinBox>
 
 #include "rclcpp/rclcpp.hpp"
 #include <rviz_common/display_context.hpp>
@@ -85,6 +86,10 @@ namespace mapping_panel
     
     QPushButton *do_icp_;
     QPushButton *accept_result_;
+    QPushButton *set_pose_;
+
+    QDoubleSpinBox *trans_step_spin_;
+    QDoubleSpinBox *rot_step_spin_;
 
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pause_resume_pub_;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr icp_score_pub_;
@@ -121,6 +126,10 @@ namespace mapping_panel
 
     void icp_clicked();
     void accept_clicked();
+    void set_pose_clicked();
+
+    void setTransStepValue();
+    void setRotStepValue();
 
 };
 
