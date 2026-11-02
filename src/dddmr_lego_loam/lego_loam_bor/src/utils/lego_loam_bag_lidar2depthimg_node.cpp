@@ -1,4 +1,4 @@
-#include "imageProjection.h"
+#include "imageProjectionTool.h"
 #include "featureAssociation.h"
 #include "mapOptimization.h"
 #include <chrono>
@@ -17,6 +17,7 @@
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/float32.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "interactive_pose_graph_editor.h"
 
 using namespace std::chrono_literals;
@@ -30,13 +31,13 @@ class BagReader : public rclcpp::Node
     std::string getOdometryTopic(){return odometry_topic_;}
     void writeLog(std::string input_str){RCLCPP_INFO(this->get_logger(), "%s", input_str.c_str());}
     rclcpp::Time first_odom_stamp_, current_odom_stamp_;
-    int skip_frame_;
     bool pause_mapping_;
-    float icp_score_;
-    float history_keyframe_search_radius_;
-    bool save_current_map_;
+    std::string operation_command_;
+    bool next_frame_{false};
+    bool export_current_selection_{false};
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr raw_point_cloud_pub_;
     std::string bag_format_;
+    pcl::PointCloud<PointType>::Ptr selected_cloud_;
 
   private:
 
@@ -46,17 +47,13 @@ class BagReader : public rclcpp::Node
     
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_pause_;
     void bagPauseCb(const std_msgs::msg::Bool::SharedPtr msg);
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sub_skip_frame_;
-    void bagSkipFrameCb(const std_msgs::msg::Int32::SharedPtr msg);
-    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_icp_score_;
-    void bagICPScoreCb(const std_msgs::msg::Float32::SharedPtr msg);
-    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_history_keyframe_search_radius_;
-    void bagHistoryKeyframeSearchRadiusCb(const std_msgs::msg::Float32::SharedPtr msg);
-    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_save_current_map_;
-    void saveCurrentMapCb(const std_msgs::msg::Bool::SharedPtr msg);
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_operation_command_;
+    void operationCommandCb(const std_msgs::msg::String::SharedPtr msg);
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_selected_points_;
+    void selectedPointsCb(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
 };
 
-BagReader::BagReader():Node("bag_reader"), pause_mapping_(true), save_current_map_(false){
+BagReader::BagReader():Node("bag_reader"), pause_mapping_(true){
   
   declare_parameter("bag_file_dir", rclcpp::ParameterValue(""));
   this->get_parameter("bag_file_dir", bag_file_dir_);
@@ -73,44 +70,38 @@ BagReader::BagReader():Node("bag_reader"), pause_mapping_(true), save_current_ma
   declare_parameter("odometry_topic", rclcpp::ParameterValue(""));
   this->get_parameter("odometry_topic", odometry_topic_);
   RCLCPP_INFO(this->get_logger(), "odometry_topic: %s", odometry_topic_.c_str());
-
-  declare_parameter("skip_frame", rclcpp::ParameterValue(2));
-  this->get_parameter("skip_frame", skip_frame_);
-  RCLCPP_INFO(this->get_logger(), "skip_frame: %d", skip_frame_);  
-
-  raw_point_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(point_cloud_topic_, 1);  
-
+  raw_point_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("raw_point_cloud", 1);  
   sub_pause_ = this->create_subscription<std_msgs::msg::Bool>(
         "lego_loam_bag_pause", 1,
         std::bind(&BagReader::bagPauseCb, this, std::placeholders::_1));
-  sub_skip_frame_ = this->create_subscription<std_msgs::msg::Int32>(
-        "lego_loam_bag_skip_frame", 1,
-        std::bind(&BagReader::bagSkipFrameCb, this, std::placeholders::_1));
-  sub_icp_score_ = this->create_subscription<std_msgs::msg::Float32>(
-        "lego_loam_bag_icp_score", 1,
-        std::bind(&BagReader::bagICPScoreCb, this, std::placeholders::_1));
-  sub_history_keyframe_search_radius_ = this->create_subscription<std_msgs::msg::Float32>(
-        "lego_loam_bag_history_keyframe_search_radius", 1,
-        std::bind(&BagReader::bagHistoryKeyframeSearchRadiusCb, this, std::placeholders::_1));
-  sub_save_current_map_ = this->create_subscription<std_msgs::msg::Bool>(
-        "lego_loam_bag_save_current_map", 1,
-        std::bind(&BagReader::saveCurrentMapCb, this, std::placeholders::_1));
+  sub_operation_command_ = this->create_subscription<std_msgs::msg::String>(
+        "operation_command_msg", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
+        std::bind(&BagReader::operationCommandCb, this, std::placeholders::_1));
+  sub_selected_points_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+        "point_cloud_selection/selected_points", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
+        std::bind(&BagReader::selectedPointsCb, this, std::placeholders::_1));
+  selected_cloud_.reset(new pcl::PointCloud<PointType>());
 }
 
 void BagReader::bagPauseCb(const std_msgs::msg::Bool::SharedPtr msg){
   pause_mapping_ = msg->data;
 }
-void BagReader::bagSkipFrameCb(const std_msgs::msg::Int32::SharedPtr msg){
-  skip_frame_ = msg->data;
+
+void BagReader::operationCommandCb(const std_msgs::msg::String::SharedPtr msg){
+  operation_command_ = msg->data;
+  RCLCPP_INFO(this->get_logger(), "Received operation command: %s", msg->data.c_str());
+  if(msg->data == "next_frame"){
+    next_frame_ = true;
+  }
+  else if(msg->data == "export_current_selection"){
+    export_current_selection_ = true;
+  }
 }
-void BagReader::bagICPScoreCb(const std_msgs::msg::Float32::SharedPtr msg){
-  icp_score_ = msg->data;
-}
-void BagReader::bagHistoryKeyframeSearchRadiusCb(const std_msgs::msg::Float32::SharedPtr msg){
-  history_keyframe_search_radius_ = msg->data;
-}
-void BagReader::saveCurrentMapCb(const std_msgs::msg::Bool::SharedPtr msg){
-  save_current_map_ = msg->data;
+
+void BagReader::selectedPointsCb(const sensor_msgs::msg::PointCloud2::SharedPtr msg){
+  selected_cloud_->clear();
+  pcl::fromROSMsg(*msg, *selected_cloud_);
+  RCLCPP_INFO(this->get_logger(), "Received selected points: %lu", selected_cloud_->points.size());
 }
 
 int main(int argc, char** argv) {
@@ -118,19 +109,13 @@ int main(int argc, char** argv) {
   rclcpp::init(argc, argv);
 
   Channel<ProjectionOut> projection_out_channel(true);
-  auto IP = std::make_shared<ImageProjection>("lego_loam_ip", projection_out_channel);
+  auto IP = std::make_shared<ImageProjectionTool>("lego_loam_ip", projection_out_channel);
   Channel<AssociationOut> association_out_channel(false);
-  auto FA = std::make_shared<FeatureAssociation>("lego_loam_fa", projection_out_channel, association_out_channel);
-  auto MO = std::make_shared<MapOptimization>("lego_loam_mo", association_out_channel);
+  //auto FA = std::make_shared<FeatureAssociation>("lego_loam_fa", projection_out_channel, association_out_channel);
+  //auto MO = std::make_shared<MapOptimization>("lego_loam_mo", association_out_channel);
   auto BR = std::make_shared<BagReader>();
-  auto IPGE = std::make_shared<InteractivePoseGraphEditor>("interactive_pose_graph_editor", MO);
+  //auto IPGE = std::make_shared<InteractivePoseGraphEditor>("interactive_pose_graph_editor", MO);
   
-  IP->tfInitial();
-  FA->tfInitial();
-  
-  BR->icp_score_ = MO->_history_keyframe_fitness_score;
-  BR->history_keyframe_search_radius_ = MO->_history_keyframe_search_radius;
-
   rosbag2_storage::StorageOptions storage_options{};
   storage_options.uri = BR->getBagFilePath();
   storage_options.storage_id = BR->bag_format_;
@@ -146,7 +131,7 @@ int main(int argc, char** argv) {
   double last_wall_time = 0.0;
   double last_global_map_pub_time = 0.0;
   double last_frame_number_print_time = 0.0;
-  bool go_first_odom = false;
+  bool got_first_odom = false;
   struct timeval start, inloop, end;
   gettimeofday(&start, NULL);
   int cycle_cnt = 0;
@@ -165,19 +150,25 @@ int main(int argc, char** argv) {
     BR->writeLog("Create dir: " + mapping_dir_string);
   }
   IP->mapping_dir_string_ = mapping_dir_string;
+  *IP->selected_cloud_ = *BR->selected_cloud_;
 
   while (rclcpp::ok() && reader.has_next())
   {
     
     if(BR->pause_mapping_){
       rclcpp::spin_some(BR);
-      rclcpp::spin_some(IPGE);
+      *IP->selected_cloud_ = *BR->selected_cloud_;
+      IP->projectImageBySelection();
+      if(BR->export_current_selection_){
+        IP->exportProjectedImages();
+        BR->export_current_selection_ = false;
+      }
+      //rclcpp::spin_some(IPGE);
+      if(BR->next_frame_){
+        BR->pause_mapping_ = false;
+      }
       continue;
     }
-    
-    //assign interactive values
-    MO->_history_keyframe_fitness_score = BR->icp_score_;
-    MO->_history_keyframe_search_radius = BR->history_keyframe_search_radius_;
 
     // serialized data
     auto serialized_message = reader.read_next();
@@ -192,11 +183,11 @@ int main(int argc, char** argv) {
       nav_msgs::msg::Odometry::SharedPtr odom;
       odom = std::make_shared<nav_msgs::msg::Odometry>();
       *odom = msg;
-      FA->odomHandler(odom);
-      if(!go_first_odom){
+      //FA->odomHandler(odom);
+      if(!got_first_odom){
         BR->first_odom_stamp_ = msg.header.stamp;
         BR->current_odom_stamp_ = msg.header.stamp;
-        go_first_odom = true;
+        got_first_odom = true;
       }
       else{
         BR->current_odom_stamp_ = msg.header.stamp;
@@ -210,6 +201,7 @@ int main(int argc, char** argv) {
       auto zero_time_stamp = msg.header.stamp;
       auto serializer = rclcpp::Serialization<sensor_msgs::msg::PointCloud2>();
       serializer.deserialize_message(&extracted_serialized_msg, &msg);
+      msg.header.frame_id = "lidar";
       sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg;
       laserCloudMsg = std::make_shared<sensor_msgs::msg::PointCloud2>();
       *laserCloudMsg = msg;
@@ -233,7 +225,11 @@ int main(int argc, char** argv) {
       BR->writeLog("Processing Frame Number: " + std::to_string(cycle_cnt));
       last_frame_number_print_time = wall_time_diff;
     }
-    rclcpp::spin_some(BR); 
+    rclcpp::spin_some(BR);  
+    if(BR->next_frame_){
+      BR->pause_mapping_ = true;
+      BR->next_frame_ = false;
+    }
   }
   rclcpp::shutdown();
 

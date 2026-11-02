@@ -1,0 +1,5 @@
+<library path="libpc2depthimg_panel">
+  <class name="pc2depthimg_panel/Pc2DepthImgPanel" type="pc2depthimg_panel::Pc2DepthImgPanel" base_class_type="rviz_common::Panel">
+    <description>pc2depthimg_panel</description>
+  </class>
+</library>

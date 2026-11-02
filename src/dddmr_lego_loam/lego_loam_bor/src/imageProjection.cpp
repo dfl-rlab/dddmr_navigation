@@ -231,6 +231,8 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
 #ifdef TRT_ENABLED
   if(is_trt_engine_exist_){
     YoloV8Config config;
+    config.segH = 160;
+    config.segW = 160;
     yolov8_ = std::make_shared<YoloV8>("", trt_model_path_, config);
   }
   else{
@@ -308,6 +310,9 @@ void ImageProjection::tfInitial(){
 
 bool ImageProjection::allEssentialTFReady(std::string sensor_frame){
   
+  if(!to_fa_)
+    return true;
+
   if(!got_baselink2sensor_tf_){
     sensor_frame_ = sensor_frame;
     try
@@ -434,14 +439,16 @@ void ImageProjection::cloudHandler(
   _seg_msg.header = laserCloudMsg->header;
   _seg_msg.header.stamp = laserCloudMsg->header.stamp;
   _seg_msg.header.frame_id = laserCloudMsg->header.frame_id;
-
-  geometry_msgs::msg::TransformStamped trans_lidar2horizontal;
-  tf2::Quaternion q;
-  q.setRPY( 0, 0, yaw_correction_);
-  trans_lidar2horizontal.transform.rotation.x = q.x(); trans_lidar2horizontal.transform.rotation.y = q.y();
-  trans_lidar2horizontal.transform.rotation.z = q.z(); trans_lidar2horizontal.transform.rotation.w = q.w();
-  Eigen::Affine3d trans_lidar2horizontal_af3 = tf2::transformToEigen(trans_lidar2horizontal);
-  pcl::transformPointCloud(*_laser_cloud_in, *_laser_cloud_in, trans_lidar2horizontal_af3);
+  
+  if(fabs(yaw_correction_)>0){
+    geometry_msgs::msg::TransformStamped trans_lidar2horizontal;
+    tf2::Quaternion q;
+    q.setRPY( 0, 0, yaw_correction_);
+    trans_lidar2horizontal.transform.rotation.x = q.x(); trans_lidar2horizontal.transform.rotation.y = q.y();
+    trans_lidar2horizontal.transform.rotation.z = q.z(); trans_lidar2horizontal.transform.rotation.w = q.w();
+    Eigen::Affine3d trans_lidar2horizontal_af3 = tf2::transformToEigen(trans_lidar2horizontal);
+    pcl::transformPointCloud(*_laser_cloud_in, *_laser_cloud_in, trans_lidar2horizontal_af3);
+  }
 
 
   findStartEndAngle();
@@ -471,7 +478,7 @@ void ImageProjection::projectPointCloud() {
 
   for (size_t i = 0; i < cloudSize; ++i) {
     PointType thisPoint = _laser_cloud_in->points[i];
-
+    
     float range = sqrt(thisPoint.x * thisPoint.x +
                        thisPoint.y * thisPoint.y +
                        thisPoint.z * thisPoint.z);
@@ -480,6 +487,7 @@ void ImageProjection::projectPointCloud() {
     float verticalAngle = std::asin(thisPoint.z / range);
 
     int rowIdn = (verticalAngle + _ang_bottom) / _ang_resolution_Y;
+
     if (rowIdn < 0 || rowIdn >= _vertical_scans) {
       continue;
     }
@@ -505,25 +513,37 @@ void ImageProjection::projectPointCloud() {
     //@ the rowIdn for _range_mat is from top to bottom, which means the line 0 is the first row
     //@ to visualize the depth image more intuitively, we make line 0 to the last rowIdn
 
-    if(rowIdn>0 && rowIdn<=_vertical_scans && viscolumnIdn<_horizontal_scans && viscolumnIdn>=0){
+    if (rowIdn >= 0 && rowIdn < _vertical_scans && viscolumnIdn >= 0 && viscolumnIdn < _horizontal_scans) {
+      float range_span = 20.0f;
+      float norm = (range - _minimum_detection_range) / range_span;
+      norm = std::max(0.0f, std::min(1.0f, norm));
 
-      uint16_t scaled_int = static_cast<uint16_t>(range*100);
-      // 2. Split the 16-bit integer into high and low bytes
-      uint8_t high_byte = (uint8_t)(scaled_int >> 8);
-      uint8_t low_byte = (uint8_t)(scaled_int & 0xFF);
-      if(high_byte>0){
-        high_byte*=4;
-        projected_image.at<cv::Vec3b>(_vertical_scans-rowIdn, viscolumnIdn)[0] = 0XFF;
-        projected_image.at<cv::Vec3b>(_vertical_scans-rowIdn, viscolumnIdn)[1] = 0XFF-low_byte;
-        projected_image.at<cv::Vec3b>(_vertical_scans-rowIdn, viscolumnIdn)[2] = 0xFF-high_byte*8;
-      }
-      else{
-        projected_image.at<cv::Vec3b>(_vertical_scans-rowIdn, viscolumnIdn)[0] = high_byte;
-        projected_image.at<cv::Vec3b>(_vertical_scans-rowIdn, viscolumnIdn)[1] = low_byte;
-        projected_image.at<cv::Vec3b>(_vertical_scans-rowIdn, viscolumnIdn)[2] = 0;
+      // Continuous 4-segment BGR gradient: Blue -> Cyan -> Green -> Yellow -> Red
+      uint8_t b = 0, g = 0, r = 0;
+      if (norm < 0.25f) {
+        float f = norm / 0.25f;
+        b = 255;
+        g = static_cast<uint8_t>(f * 255.0f);
+        r = 0;
+      } else if (norm < 0.5f) {
+        float f = (norm - 0.25f) / 0.25f;
+        b = static_cast<uint8_t>((1.0f - f) * 255.0f);
+        g = 255;
+        r = 0;
+      } else if (norm < 0.75f) {
+        float f = (norm - 0.5f) / 0.25f;
+        b = 0;
+        g = 255;
+        r = static_cast<uint8_t>(f * 255.0f);
+      } else {
+        float f = (norm - 0.75f) / 0.25f;
+        b = 0;
+        g = static_cast<uint8_t>((1.0f - f) * 255.0f);
+        r = 255;
       }
 
-      
+      int img_row = _vertical_scans - 1 - rowIdn;
+      projected_image.at<cv::Vec3b>(img_row, viscolumnIdn) = cv::Vec3b(b, g, r);
     }
 
     thisPoint.intensity = (float)rowIdn + (float)viscolumnIdn / 10000.0;

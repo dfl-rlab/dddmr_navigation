@@ -5,10 +5,7 @@
     <param from="$(find-pkg-share lego_loam_bor)/config/loam_bag_lidar2depthimg_config.yaml" />
   </node>
 
-  <node pkg="rviz2" exec="rviz2" output="screen" respawn="false" args="-d $(find-pkg-share lego_loam_bor)/rviz/lego_loam.rviz">
+  <node pkg="rviz2" exec="rviz2" output="screen" respawn="false" args="-d $(find-pkg-share lego_loam_bor)/rviz/lego_loam_bag_pc2depth.rviz">
   </node>
 
-  <!--- TF -->
-  
-  <node pkg="tf2_ros" exec="static_transform_publisher" name="sensor2baselink"  args="0.3 0 0.5 0.0 0.78539815 0 base_link airy" />
 </launch>

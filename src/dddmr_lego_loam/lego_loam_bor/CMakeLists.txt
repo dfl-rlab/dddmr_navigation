@@ -123,6 +123,7 @@ if(TRT_ENABLED)
   # yolo lego loam ip
   add_library(image_projection SHARED
     src/imageProjection.cpp
+    src/imageProjectionTool.cpp
   )
   
   target_link_libraries(image_projection
@@ -143,6 +144,7 @@ else()
   # mcl/lego loam ip
   add_library(image_projection SHARED
     src/imageProjection.cpp
+    src/imageProjectionTool.cpp
   )
   target_link_libraries(image_projection
     ${PCL_LIBRARIES}
