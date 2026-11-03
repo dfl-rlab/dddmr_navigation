@@ -61,9 +61,11 @@ namespace pc2depthimg_panel
     QPushButton *resume_btn_;
     QPushButton *next_frame_btn_;
     QPushButton *export_selection_btn_;
+    QPushButton *clear_selection_btn_;
 
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pause_resume_pub_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr operation_command_pub_;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr selection_panel_command_pub_;
 
     rclcpp::Clock::SharedPtr clock_;
     
@@ -74,6 +76,7 @@ namespace pc2depthimg_panel
     void resume();
     void nextFrame();
     void exportCurrentSelection();
+    void clearSelection();
 
     void pubOperationCommand(std::string m_string);
 

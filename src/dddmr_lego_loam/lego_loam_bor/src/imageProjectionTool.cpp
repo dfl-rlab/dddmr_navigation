@@ -446,7 +446,8 @@ void ImageProjectionTool::projectPointCloud() {
 
   //@ write depth img
   double image_time = _seg_msg.header.stamp.sec + _seg_msg.header.stamp.nanosec/1e9;
-
+  
+  
   if(!to_fa_ && image_time - last_save_depth_img_time_ >= time_step_between_depth_image_){
     std::string timestamp;
     std::stringstream ss;
@@ -460,7 +461,7 @@ void ImageProjectionTool::projectPointCloud() {
     cv::imwrite(file_name, projected_stack_result_);
     last_save_depth_img_time_ = image_time;
   }
-
+  
 }
 
 void ImageProjectionTool::projectImageBySelection() {
@@ -568,8 +569,10 @@ void ImageProjectionTool::exportProjectedImages() {
     "_stitch" + std::to_string(stitcher_num_) +
     "_vstack" + std::to_string(projected_image_stack_size_);
 
+  std::string base_image_name = timestamp + "_" + spec + ".png";
+
   if (!projected_stack_result_.empty()) {
-    std::string file_name = mapping_dir_string_ + "/" + timestamp + "_" + spec + ".png";
+    std::string file_name = mapping_dir_string_ + "/" + base_image_name;
     cv::imwrite(file_name, projected_stack_result_);
     RCLCPP_INFO(this->get_logger(), "Saved projected image: %s", file_name.c_str());
   }
@@ -578,6 +581,85 @@ void ImageProjectionTool::exportProjectedImages() {
     std::string selected_file_name = mapping_dir_string_ + "/" + timestamp + "_" + spec + "_selected.png";
     cv::imwrite(selected_file_name, projected_selected_stack_result_);
     RCLCPP_INFO(this->get_logger(), "Saved selected projected image: %s", selected_file_name.c_str());
+
+    // Auto-generate polygon annotations for each stacked slice
+    std::vector<std::vector<cv::Point2f>> all_polygons;
+    int num_slices = projected_selected_stack_result_.rows / _vertical_scans;
+    const int pad = 3;
+    cv::Mat close_kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
+
+    for (int s = 0; s < num_slices; ++s) {
+      int y_offset = s * _vertical_scans;
+      cv::Mat slice_img = projected_selected_stack_result_(cv::Rect(0, y_offset, _horizontal_scans, _vertical_scans));
+
+      cv::Mat gray, mask, padded, closed_padded, closed;
+      cv::cvtColor(slice_img, gray, cv::COLOR_BGR2GRAY);
+      cv::threshold(gray, mask, 0, 255, cv::THRESH_BINARY);
+
+      // Pad before morphological closing so boundary pixels (e.g. y = _vertical_scans - 1) are not eroded
+      cv::copyMakeBorder(mask, padded, pad, pad, pad, pad, cv::BORDER_CONSTANT, cv::Scalar(0));
+      cv::morphologyEx(padded, closed_padded, cv::MORPH_CLOSE, close_kernel);
+      closed = closed_padded(cv::Rect(pad, pad, mask.cols, mask.rows));
+      cv::bitwise_or(closed, mask, closed);
+
+      std::vector<std::vector<cv::Point>> contours;
+      cv::findContours(closed, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+
+      for (size_t c = 0; c < contours.size(); ++c) {
+        if (contours[c].size() < 3 || cv::contourArea(contours[c]) < 2.0) {
+          continue;
+        }
+
+        std::vector<cv::Point> poly;
+        cv::approxPolyDP(contours[c], poly, 0.75, true);
+        if (poly.size() < 3) {
+          poly = contours[c];
+        }
+        if (poly.size() < 3) {
+          continue;
+        }
+
+        std::vector<cv::Point2f> poly_global;
+        for (const auto& pt : poly) {
+          poly_global.emplace_back(static_cast<float>(pt.x), static_cast<float>(pt.y + y_offset));
+        }
+        all_polygons.push_back(poly_global);
+      }
+    }
+
+    std::string json_file_name = mapping_dir_string_ + "/" + timestamp + "_" + spec + ".json";
+    std::ofstream json_file(json_file_name);
+    if (json_file.is_open()) {
+      json_file << "{\n";
+      json_file << "  \"version\": \"0.4.30\",\n";
+      json_file << "  \"flags\": {},\n";
+      json_file << "  \"shapes\": [\n";
+      for (size_t i = 0; i < all_polygons.size(); ++i) {
+        json_file << "    {\n";
+        json_file << "      \"label\": \"people\",\n";
+        json_file << "      \"text\": \"\",\n";
+        json_file << "      \"points\": [\n";
+        for (size_t j = 0; j < all_polygons[i].size(); ++j) {
+          json_file << "        [\n";
+          json_file << "          " << all_polygons[i][j].x << ",\n";
+          json_file << "          " << all_polygons[i][j].y << "\n";
+          json_file << "        ]" << (j + 1 < all_polygons[i].size() ? "," : "") << "\n";
+        }
+        json_file << "      ],\n";
+        json_file << "      \"group_id\": null,\n";
+        json_file << "      \"shape_type\": \"polygon\",\n";
+        json_file << "      \"flags\": {}\n";
+        json_file << "    }" << (i + 1 < all_polygons.size() ? "," : "") << "\n";
+      }
+      json_file << "  ],\n";
+      json_file << "  \"imagePath\": \"" << base_image_name << "\",\n";
+      json_file << "  \"imageData\": null,\n";
+      json_file << "  \"imageHeight\": " << projected_selected_stack_result_.rows << ",\n";
+      json_file << "  \"imageWidth\": " << projected_selected_stack_result_.cols << "\n";
+      json_file << "}\n";
+      json_file.close();
+      RCLCPP_INFO(this->get_logger(), "Saved annotation json: %s", json_file_name.c_str());
+    }
   }
 }
 

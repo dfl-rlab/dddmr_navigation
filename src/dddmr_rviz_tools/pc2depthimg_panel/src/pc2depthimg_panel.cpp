@@ -27,12 +27,17 @@ Pc2DepthImgPanel::Pc2DepthImgPanel(QWidget *parent) : rviz_common::Panel(parent)
   export_selection_btn_->setText("Export Current Selection");
   connect(export_selection_btn_, SIGNAL(clicked()), this, SLOT(exportCurrentSelection()));
 
+  clear_selection_btn_ = new QPushButton(this);
+  clear_selection_btn_->setText("Clear Selection");
+  connect(clear_selection_btn_, SIGNAL(clicked()), this, SLOT(clearSelection()));
+
   //addWidget(*Widget, row, column, rowspan, colspan)
   QGridLayout *pause_resume_grid_layout = new QGridLayout;
   pause_resume_grid_layout->addWidget(pause_btn_, 0, 0, 1, 1);
   pause_resume_grid_layout->addWidget(resume_btn_, 0, 1, 1, 1);
   pause_resume_grid_layout->addWidget(next_frame_btn_, 0, 2, 1, 1);
-  pause_resume_grid_layout->addWidget(export_selection_btn_, 1, 0, 1, 3);
+  pause_resume_grid_layout->addWidget(export_selection_btn_, 1, 0, 1, 2);
+  pause_resume_grid_layout->addWidget(clear_selection_btn_, 1, 2, 1, 1);
   operation_groupBox->setLayout(pause_resume_grid_layout);
   
   //@ add everything to layout
@@ -48,6 +53,7 @@ void Pc2DepthImgPanel::onInitialize()
   auto raw_node = getDisplayContext()->getRosNodeAbstraction().lock()->get_raw_node();
   pause_resume_pub_ = raw_node->create_publisher<std_msgs::msg::Bool>("lego_loam_bag_pause", 1);
   operation_command_pub_ = raw_node->create_publisher<std_msgs::msg::String>("operation_command_msg", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+  selection_panel_command_pub_ = raw_node->create_publisher<std_msgs::msg::String>("point_cloud_selection/panel_command", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
   clock_ = raw_node->get_clock();
 
 }
@@ -77,6 +83,12 @@ void Pc2DepthImgPanel::nextFrame(){
 
 void Pc2DepthImgPanel::exportCurrentSelection(){
   pubOperationCommand("export_current_selection");
+}
+
+void Pc2DepthImgPanel::clearSelection(){
+  std_msgs::msg::String tmp_str;
+  tmp_str.data = "clear";
+  selection_panel_command_pub_->publish(tmp_str);
 }
 
 
