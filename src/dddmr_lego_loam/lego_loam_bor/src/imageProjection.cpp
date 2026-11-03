@@ -915,9 +915,6 @@ void ImageProjection::zPitchRollFeatureRemoval() {
         lowerInd_pt_no_pitch = _full_cloud_no_pitch[lowerInd];
         upperInd_pt_no_pitch = _full_cloud_no_pitch[upperInd];
 
-        PointType lowerInd_pt = _full_cloud->points[lowerInd];
-        PointType upperInd_pt = _full_cloud->points[upperInd];
-
         float dXg = upperInd_pt_no_pitch.x - lowerInd_pt_no_pitch.x;
         float dYg = upperInd_pt_no_pitch.y - lowerInd_pt_no_pitch.y;
         float dZg = upperInd_pt_no_pitch.z - lowerInd_pt_no_pitch.z;
@@ -932,21 +929,32 @@ void ImageProjection::zPitchRollFeatureRemoval() {
         
         //@ if distance between is too large, we do not patch, because of too many unknown betweem rings
         if(ds<distance_for_patch_between_rings_){
+
+          PointType lowerInd_pt = _full_cloud->points[lowerInd];
+          PointType upperInd_pt = _full_cloud->points[upperInd];
+          
+          float dXp =
+              _full_cloud->points[upperInd].x - _full_cloud->points[lowerInd].x;
+          float dYp =
+              _full_cloud->points[upperInd].y - _full_cloud->points[lowerInd].y;
+          float dZp =
+              _full_cloud->points[upperInd].z - _full_cloud->points[lowerInd].z;
+
           ring_edge = i+1;
           float dt = 1.0/(ds/0.1+1);
           for(float t=0; t<=1.0; t+=dt){
             PointType a_pt;
             a_pt.intensity = 0.0;
-            a_pt.x = lowerInd_pt.x + dX*t;
-            a_pt.y = lowerInd_pt.y + dY*t;
-            a_pt.z = lowerInd_pt.z + dZ*t;
+            a_pt.x = lowerInd_pt.x + dXp*t;
+            a_pt.y = lowerInd_pt.y + dYp*t;
+            a_pt.z = lowerInd_pt.z + dZp*t;
             patched_ground_->push_back(a_pt);
           }
           PointType a_pt;
           a_pt.intensity = 0.0;
-          a_pt.x = lowerInd_pt.x + dX;
-          a_pt.y = lowerInd_pt.y + dY;
-          a_pt.z = lowerInd_pt.z + dZ;
+          a_pt.x = lowerInd_pt.x + dXp;
+          a_pt.y = lowerInd_pt.y + dYp;
+          a_pt.z = lowerInd_pt.z + dZp;
           patched_ground_->push_back(a_pt);
           do_patch = true;
         }
