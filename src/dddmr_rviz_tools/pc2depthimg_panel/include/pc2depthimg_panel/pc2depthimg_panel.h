@@ -63,9 +63,28 @@ namespace pc2depthimg_panel
     QPushButton *export_selection_btn_;
     QPushButton *clear_selection_btn_;
 
+    QSlider *xmax_slider_;
+    QLabel *xmax_value_;
+    QSlider *xmin_slider_;
+    QLabel *xmin_value_;
+    QSlider *ymax_slider_;
+    QLabel *ymax_value_;
+    QSlider *ymin_slider_;
+    QLabel *ymin_value_;
+    QSlider *zmax_slider_;
+    QLabel *zmax_value_;
+    QSlider *zmin_slider_;
+    QLabel *zmin_value_;
+
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pause_resume_pub_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr operation_command_pub_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr selection_panel_command_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr xmax_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr xmin_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr ymax_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr ymin_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr zmax_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr zmin_pub_;
 
     rclcpp::Clock::SharedPtr clock_;
     
@@ -77,6 +96,12 @@ namespace pc2depthimg_panel
     void nextFrame();
     void exportCurrentSelection();
     void clearSelection();
+    void setXmaxValue();
+    void setXminValue();
+    void setYmaxValue();
+    void setYminValue();
+    void setZmaxValue();
+    void setZminValue();
 
     void pubOperationCommand(std::string m_string);
 

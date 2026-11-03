@@ -227,6 +227,14 @@ ImageProjectionTool::ImageProjectionTool(std::string name, Channel<ProjectionOut
 
   yolo_labelled_point_cloud_.reset(new pcl::PointCloud<PointType>());
   selected_cloud_.reset(new pcl::PointCloud<PointType>());
+
+  xmax_ = 50.0f;
+  xmin_ = -50.0f;
+  ymax_ = 50.0f;
+  ymin_ = -50.0f;
+  zmax_ = 50.0f;
+  zmin_ = -50.0f;
+  tf2_trans_b2s_.setIdentity();
 }
 
 
@@ -263,7 +271,6 @@ void ImageProjectionTool::resetParameters() {
   _seg_msg.segmented_cloud_col_ind.assign(cloud_size_, 0);
   _seg_msg.segmented_cloud_range.assign(cloud_size_, 0);
 }
-
 
 void ImageProjectionTool::cloudHandler(
     const sensor_msgs::msg::PointCloud2::SharedPtr laserCloudMsg){
@@ -425,12 +432,7 @@ void ImageProjectionTool::projectPointCloud() {
   }
 
   //@ publish each point cloud frame in the stack
-  for(size_t i=0; i<projected_pc_queue_.size(); i++){
-    sensor_msgs::msg::PointCloud2 laserCloudTemp;
-    pcl::toROSMsg(projected_pc_queue_[i], laserCloudTemp);
-    laserCloudTemp.header = _seg_msg.header;
-    point_cloud_publishers_vector_[i]->publish(laserCloudTemp);
-  }
+  publishProjectedPointClouds();
 
   //@ stack all projected image to get time elapse
   projected_stack_result_ = projected_image_queue_.front();
@@ -464,13 +466,71 @@ void ImageProjectionTool::projectPointCloud() {
   
 }
 
+pcl::PointCloud<PointType>::Ptr ImageProjectionTool::filterPointCloud(const pcl::PointCloud<PointType>& cloud_in) {
+  pcl::PointCloud<PointType>::Ptr cloud_filtered(new pcl::PointCloud<PointType>());
+
+  geometry_msgs::msg::TransformStamped trans_b2s;
+  trans_b2s.transform.translation.x = tf2_trans_b2s_.getOrigin().x();
+  trans_b2s.transform.translation.y = tf2_trans_b2s_.getOrigin().y();
+  trans_b2s.transform.translation.z = tf2_trans_b2s_.getOrigin().z();
+  trans_b2s.transform.rotation.x = tf2_trans_b2s_.getRotation().x();
+  trans_b2s.transform.rotation.y = tf2_trans_b2s_.getRotation().y();
+  trans_b2s.transform.rotation.z = tf2_trans_b2s_.getRotation().z();
+  trans_b2s.transform.rotation.w = tf2_trans_b2s_.getRotation().w();
+  Eigen::Affine3d trans_b2s_af3 = tf2::transformToEigen(trans_b2s);
+  pcl::transformPointCloud(cloud_in, *cloud_filtered, trans_b2s_af3);
+
+  pcl::PassThrough<PointType> pass;
+  pass.setInputCloud(cloud_filtered);
+  pass.setFilterFieldName("x");
+  pass.setFilterLimits(xmin_, xmax_);
+  pass.filter(*cloud_filtered);
+
+  pass.setInputCloud(cloud_filtered);
+  pass.setFilterFieldName("y");
+  pass.setFilterLimits(ymin_, ymax_);
+  pass.filter(*cloud_filtered);
+
+  pass.setInputCloud(cloud_filtered);
+  pass.setFilterFieldName("z");
+  pass.setFilterLimits(zmin_, zmax_);
+  pass.filter(*cloud_filtered);
+
+  return cloud_filtered;
+}
+
+void ImageProjectionTool::publishProjectedPointClouds() {
+  //@ publish each point cloud frame in the stack
+  for(size_t i=0; i<projected_pc_queue_.size(); i++){
+    pcl::PointCloud<PointType>::Ptr cloud_filtered = filterPointCloud(projected_pc_queue_[i]);
+    sensor_msgs::msg::PointCloud2 laserCloudTemp;
+    pcl::toROSMsg(*cloud_filtered, laserCloudTemp);
+    laserCloudTemp.header = _seg_msg.header;
+    point_cloud_publishers_vector_[i]->publish(laserCloudTemp);
+  }
+}
+
 void ImageProjectionTool::projectImageBySelection() {
   if (selected_cloud_->points.empty() || projected_pc_queue_.empty()) {
     return;
   }
 
+  tf2::Transform tf2_trans_s2b = tf2_trans_b2s_.inverse();
+  geometry_msgs::msg::TransformStamped trans_s2b;
+  trans_s2b.transform.translation.x = tf2_trans_s2b.getOrigin().x();
+  trans_s2b.transform.translation.y = tf2_trans_s2b.getOrigin().y();
+  trans_s2b.transform.translation.z = tf2_trans_s2b.getOrigin().z();
+  trans_s2b.transform.rotation.x = tf2_trans_s2b.getRotation().x();
+  trans_s2b.transform.rotation.y = tf2_trans_s2b.getRotation().y();
+  trans_s2b.transform.rotation.z = tf2_trans_s2b.getRotation().z();
+  trans_s2b.transform.rotation.w = tf2_trans_s2b.getRotation().w();
+  Eigen::Affine3d trans_s2b_af3 = tf2::transformToEigen(trans_s2b);
+
+  pcl::PointCloud<PointType>::Ptr selected_cloud_sensor(new pcl::PointCloud<PointType>());
+  pcl::transformPointCloud(*selected_cloud_, *selected_cloud_sensor, trans_s2b_af3);
+
   pcl::KdTreeFLANN<PointType>::Ptr kdtree(new pcl::KdTreeFLANN<PointType>());
-  kdtree->setInputCloud(selected_cloud_);
+  kdtree->setInputCloud(selected_cloud_sensor);
 
   std::vector<int> pointIdxNKNSearch(1);
   std::vector<float> pointNKNSquaredDistance(1);

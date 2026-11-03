@@ -25,7 +25,9 @@ using namespace std::chrono_literals;
 class BagReader : public rclcpp::Node
 {
   public:
-    BagReader();
+    BagReader(std::shared_ptr<ImageProjectionTool> ip);
+    void tfInitial();
+    bool allEssentialTFReady(std::string sensor_frame);
     std::string getBagFilePath(){return bag_file_dir_;}
     std::string getPointCloudTopic(){return point_cloud_topic_;}
     std::string getOdometryTopic(){return odometry_topic_;}
@@ -38,8 +40,14 @@ class BagReader : public rclcpp::Node
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr raw_point_cloud_pub_;
     std::string bag_format_;
     pcl::PointCloud<PointType>::Ptr selected_cloud_;
+    std::shared_ptr<ImageProjectionTool> ip_;
+    float xmax_{50.0f}, xmin_{-50.0f}, ymax_{50.0f}, ymin_{-50.0f}, zmax_{50.0f}, zmin_{-50.0f};
 
   private:
+
+    rclcpp::CallbackGroup::SharedPtr tf_listener_group_;
+    std::shared_ptr<tf2_ros::TransformListener> tfl_;
+    std::shared_ptr<tf2_ros::Buffer> tf2Buffer_;
 
     std::string bag_file_dir_;
     std::string point_cloud_topic_;
@@ -51,9 +59,21 @@ class BagReader : public rclcpp::Node
     void operationCommandCb(const std_msgs::msg::String::SharedPtr msg);
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_selected_points_;
     void selectedPointsCb(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_xmax_;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_xmin_;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_ymax_;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_ymin_;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_zmax_;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_zmin_;
+    void xmaxCb(const std_msgs::msg::Float32::SharedPtr msg);
+    void xminCb(const std_msgs::msg::Float32::SharedPtr msg);
+    void ymaxCb(const std_msgs::msg::Float32::SharedPtr msg);
+    void yminCb(const std_msgs::msg::Float32::SharedPtr msg);
+    void zmaxCb(const std_msgs::msg::Float32::SharedPtr msg);
+    void zminCb(const std_msgs::msg::Float32::SharedPtr msg);
 };
 
-BagReader::BagReader():Node("bag_reader"), pause_mapping_(true){
+BagReader::BagReader(std::shared_ptr<ImageProjectionTool> ip):Node("bag_reader"), pause_mapping_(true), ip_(ip){
   
   declare_parameter("bag_file_dir", rclcpp::ParameterValue(""));
   this->get_parameter("bag_file_dir", bag_file_dir_);
@@ -80,6 +100,19 @@ BagReader::BagReader():Node("bag_reader"), pause_mapping_(true){
   sub_selected_points_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "point_cloud_selection/selected_points", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
         std::bind(&BagReader::selectedPointsCb, this, std::placeholders::_1));
+  auto qos_tl = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
+  sub_xmax_ = this->create_subscription<std_msgs::msg::Float32>(
+        "pc2depthimg/xmax", qos_tl, std::bind(&BagReader::xmaxCb, this, std::placeholders::_1));
+  sub_xmin_ = this->create_subscription<std_msgs::msg::Float32>(
+        "pc2depthimg/xmin", qos_tl, std::bind(&BagReader::xminCb, this, std::placeholders::_1));
+  sub_ymax_ = this->create_subscription<std_msgs::msg::Float32>(
+        "pc2depthimg/ymax", qos_tl, std::bind(&BagReader::ymaxCb, this, std::placeholders::_1));
+  sub_ymin_ = this->create_subscription<std_msgs::msg::Float32>(
+        "pc2depthimg/ymin", qos_tl, std::bind(&BagReader::yminCb, this, std::placeholders::_1));
+  sub_zmax_ = this->create_subscription<std_msgs::msg::Float32>(
+        "pc2depthimg/zmax", qos_tl, std::bind(&BagReader::zmaxCb, this, std::placeholders::_1));
+  sub_zmin_ = this->create_subscription<std_msgs::msg::Float32>(
+        "pc2depthimg/zmin", qos_tl, std::bind(&BagReader::zminCb, this, std::placeholders::_1));
   selected_cloud_.reset(new pcl::PointCloud<PointType>());
 }
 
@@ -104,6 +137,50 @@ void BagReader::selectedPointsCb(const sensor_msgs::msg::PointCloud2::SharedPtr 
   RCLCPP_INFO(this->get_logger(), "Received selected points: %lu", selected_cloud_->points.size());
 }
 
+void BagReader::xmaxCb(const std_msgs::msg::Float32::SharedPtr msg){ xmax_ = msg->data; ip_->xmax_ = xmax_; ip_->publishProjectedPointClouds(); }
+void BagReader::xminCb(const std_msgs::msg::Float32::SharedPtr msg){ xmin_ = msg->data; ip_->xmin_ = xmin_; ip_->publishProjectedPointClouds(); }
+void BagReader::ymaxCb(const std_msgs::msg::Float32::SharedPtr msg){ ymax_ = msg->data; ip_->ymax_ = ymax_; ip_->publishProjectedPointClouds(); }
+void BagReader::yminCb(const std_msgs::msg::Float32::SharedPtr msg){ ymin_ = msg->data; ip_->ymin_ = ymin_; ip_->publishProjectedPointClouds(); }
+void BagReader::zmaxCb(const std_msgs::msg::Float32::SharedPtr msg){ zmax_ = msg->data; ip_->zmax_ = zmax_; ip_->publishProjectedPointClouds(); }
+void BagReader::zminCb(const std_msgs::msg::Float32::SharedPtr msg){ zmin_ = msg->data; ip_->zmin_ = zmin_; ip_->publishProjectedPointClouds(); }
+
+void BagReader::tfInitial(){
+  //@Initialize transform listener and broadcaster
+  tf_listener_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  tf2Buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+  auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
+    this->get_node_base_interface(),
+    this->get_node_timers_interface(),
+    tf_listener_group_);
+  tf2Buffer_->setCreateTimerInterface(timer_interface);
+  tfl_ = std::make_shared<tf2_ros::TransformListener>(*tf2Buffer_);
+}
+
+bool BagReader::allEssentialTFReady(std::string sensor_frame){
+  if(!ip_->got_baselink2sensor_tf_){
+    ip_->sensor_frame_ = sensor_frame;
+    try
+    {
+      ip_->trans_b2s_ = tf2Buffer_->lookupTransform(
+          ip_->base_ground_frame_, ip_->sensor_frame_, tf2::TimePointZero);
+      
+      ip_->tf2_trans_b2s_.setRotation(tf2::Quaternion(ip_->trans_b2s_.transform.rotation.x, ip_->trans_b2s_.transform.rotation.y, ip_->trans_b2s_.transform.rotation.z, ip_->trans_b2s_.transform.rotation.w));
+      ip_->tf2_trans_b2s_.setOrigin(tf2::Vector3(ip_->trans_b2s_.transform.translation.x, ip_->trans_b2s_.transform.translation.y, ip_->trans_b2s_.transform.translation.z));
+      ip_->got_baselink2sensor_tf_ = true;
+
+      return true;
+    }
+    catch (tf2::TransformException& e)
+    {
+      RCLCPP_ERROR(this->get_logger(), "Could not get footprint frame to sensor frame, did you launch a static broadcaster node for the tf between footprint to sensor? %s", e.what());
+      return false;
+    }
+  }
+  else{
+    return true;
+  }
+}
+
 int main(int argc, char** argv) {
 
   rclcpp::init(argc, argv);
@@ -113,8 +190,9 @@ int main(int argc, char** argv) {
   Channel<AssociationOut> association_out_channel(false);
   //auto FA = std::make_shared<FeatureAssociation>("lego_loam_fa", projection_out_channel, association_out_channel);
   //auto MO = std::make_shared<MapOptimization>("lego_loam_mo", association_out_channel);
-  auto BR = std::make_shared<BagReader>();
+  auto BR = std::make_shared<BagReader>(IP);
   //auto IPGE = std::make_shared<InteractivePoseGraphEditor>("interactive_pose_graph_editor", MO);
+  BR->tfInitial();
   
   rosbag2_storage::StorageOptions storage_options{};
   storage_options.uri = BR->getBagFilePath();
@@ -158,6 +236,12 @@ int main(int argc, char** argv) {
     if(BR->pause_mapping_){
       rclcpp::spin_some(BR);
       *IP->selected_cloud_ = *BR->selected_cloud_;
+      IP->xmax_ = BR->xmax_;
+      IP->xmin_ = BR->xmin_;
+      IP->ymax_ = BR->ymax_;
+      IP->ymin_ = BR->ymin_;
+      IP->zmax_ = BR->zmax_;
+      IP->zmin_ = BR->zmin_;
       IP->projectImageBySelection();
       if(BR->export_current_selection_){
         IP->exportProjectedImages();
@@ -207,7 +291,21 @@ int main(int argc, char** argv) {
       *laserCloudMsg = msg;
       msg.header.stamp = zero_time_stamp;
       BR->raw_point_cloud_pub_->publish(msg);
-      IP->cloudHandler(laserCloudMsg);
+      IP->xmax_ = BR->xmax_;
+      IP->xmin_ = BR->xmin_;
+      IP->ymax_ = BR->ymax_;
+      IP->ymin_ = BR->ymin_;
+      IP->zmax_ = BR->zmax_;
+      IP->zmin_ = BR->zmin_;
+      if(BR->allEssentialTFReady(laserCloudMsg->header.frame_id)){
+        IP->cloudHandler(laserCloudMsg);
+      }
+      else{
+        while(!BR->allEssentialTFReady(laserCloudMsg->header.frame_id) && rclcpp::ok() ){
+          BR->allEssentialTFReady(laserCloudMsg->header.frame_id);
+          rclcpp::spin_some(BR);
+        }
+      }
     }
     //@ calculate bag time and wall ime
     double bag_time_diff = (BR->current_odom_stamp_ - BR->first_odom_stamp_).seconds();

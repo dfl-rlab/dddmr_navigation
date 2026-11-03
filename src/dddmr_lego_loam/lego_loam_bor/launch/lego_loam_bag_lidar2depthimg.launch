@@ -7,5 +7,8 @@
 
   <node pkg="rviz2" exec="rviz2" output="screen" respawn="false" args="-d $(find-pkg-share lego_loam_bor)/rviz/lego_loam_bag_pc2depth.rviz">
   </node>
+  
+  <!-- Just need to change x,y,z, yaw, pitch, roll, becasue we overwrite frame to lidar-->
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="sensor2baselink"  args="0.0 0 1.69 0.0 0.7853981 0 base_link lidar" />
 
 </launch>

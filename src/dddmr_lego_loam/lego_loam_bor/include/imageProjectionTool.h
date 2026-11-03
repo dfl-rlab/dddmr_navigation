@@ -4,6 +4,7 @@
 #include "utility.h"
 #include "channel.h"
 #include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/filters/passthrough.h>
 #include <Eigen/QR>
 
 // for tilted lidar
@@ -45,6 +46,8 @@ class ImageProjectionTool : public rclcpp::Node
     ~ImageProjectionTool() = default;
     
     void cloudHandler(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+    pcl::PointCloud<PointType>::Ptr filterPointCloud(const pcl::PointCloud<PointType>& cloud_in);
+    void publishProjectedPointClouds();
     void projectImageBySelection();
     void exportProjectedImages();
 
@@ -55,14 +58,15 @@ class ImageProjectionTool : public rclcpp::Node
     pcl::PointCloud<PointType>::Ptr selected_cloud_;
     cv::Mat projected_stack_result_;
     cv::Mat projected_selected_stack_result_;
+    float xmax_{50.0f}, xmin_{-50.0f}, ymax_{50.0f}, ymin_{-50.0f}, zmax_{50.0f}, zmin_{-50.0f};
+    std::string base_ground_frame_, sensor_frame_;
+    bool got_baselink2sensor_tf_;
+    geometry_msgs::msg::TransformStamped trans_b2s_;
+    tf2::Stamped<tf2::Transform> tf2_trans_b2s_, tf2_trans_c2s_;
 
   private:
 
     rclcpp::Clock::SharedPtr clock_;
-    rclcpp::CallbackGroup::SharedPtr tf_listener_group_;
-
-    std::shared_ptr<tf2_ros::TransformListener> tfl_;
-    std::shared_ptr<tf2_ros::Buffer> tf2Buffer_;  ///< @brief Used for transforming point clouds
 
     void resetParameters();
     void projectPointCloud();
@@ -95,7 +99,6 @@ class ImageProjectionTool : public rclcpp::Node
     int _segment_valid_point_num;
     int _segment_valid_line_num;
     std::string odom_type_;
-    std::string base_ground_frame_, sensor_frame_;
 
     Channel<ProjectionOut>& _output_channel;
 
@@ -121,9 +124,6 @@ class ImageProjectionTool : public rclcpp::Node
     float _minimum_detection_range;
     double distance_for_patch_between_rings_;
     int first_frame_processed_;
-    bool got_baselink2sensor_tf_;
-    geometry_msgs::msg::TransformStamped trans_b2s_;
-    tf2::Stamped<tf2::Transform> tf2_trans_b2s_, tf2_trans_c2s_;
     geometry_msgs::msg::TransformStamped trans_c2s_;
     geometry_msgs::msg::TransformStamped trans_c2b_;
     geometry_msgs::msg::TransformStamped trans_m2ci_;
