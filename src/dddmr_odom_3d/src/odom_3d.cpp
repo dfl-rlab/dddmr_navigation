@@ -44,6 +44,12 @@ void GenericDriveOdom::init(){
   this->get_parameter("output_frequency", output_frequency_);
   RCLCPP_INFO(this->get_logger(), "output_frequency: %.2f", output_frequency_);
 
+  declare_parameter("odom_topic", "/odom_2d");
+  auto odom_topic = this->get_parameter("odom_topic").as_string();
+
+  declare_parameter("imu_topic", "/imu/data");
+  auto imu_topic = this->get_parameter("imu_topic").as_string();
+
   //quaternion initialized
   latest_imu_.orientation.x = 0.0;
   latest_imu_.orientation.y = 0.0;
@@ -58,14 +64,14 @@ void GenericDriveOdom::init(){
   //based on the pub_timer
   dt_ = 1.0/output_frequency_; 
   
-  odom_3d_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("odom_3d",rclcpp::QoS(rclcpp::KeepLast(1)).durability_volatile().reliable());
+  odom_3d_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("odom",rclcpp::QoS(rclcpp::KeepLast(1)).durability_volatile().reliable());
 
   sub_odom_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      "/odom_2d", rclcpp::QoS(rclcpp::KeepLast(1)).durability_volatile().best_effort(),
+      odom_topic, rclcpp::QoS(rclcpp::KeepLast(1)).durability_volatile().best_effort(),
       std::bind(&GenericDriveOdom::cbOdom2D, this, std::placeholders::_1), options);  
 
   sub_imu_ = this->create_subscription<sensor_msgs::msg::Imu>(
-  "/imu/data", rclcpp::QoS(rclcpp::KeepLast(1)).durability_volatile().best_effort(),
+  imu_topic, rclcpp::QoS(rclcpp::KeepLast(1)).durability_volatile().best_effort(),
       std::bind(&GenericDriveOdom::cbImu, this, std::placeholders::_1), options);
 
   tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
@@ -148,5 +154,3 @@ int main(int argc, char** argv)
   rclcpp::shutdown();  
   return 0;
 }
-
-
