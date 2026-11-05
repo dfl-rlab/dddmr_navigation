@@ -119,6 +119,13 @@ def generate_test_description():
     arguments=["0.3", "0.0", "0.5", "0.0", "0.78539815", "0.0", "base_link", "airy"]
   )
 
+  b2g = Node(
+    package="tf2_ros",
+    executable="static_transform_publisher",
+    output="screen" ,
+    arguments=["0.0", "0.0", "-0.45", "0.0", "0.0", "0.0", "base_link", "base_footprint"]
+  )
+
   the_yaml = os.path.join(
     get_package_share_directory('lego_loam_bor'),
     'test', 'config',
@@ -152,6 +159,7 @@ def generate_test_description():
 
   return LaunchDescription([
       s2b,
+      b2g,
       lego_loam_bag_node,
       shutdown_on_crash,
       rviz,

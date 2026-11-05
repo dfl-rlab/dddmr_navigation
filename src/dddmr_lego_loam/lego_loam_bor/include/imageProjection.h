@@ -99,7 +99,7 @@ class ImageProjection : public rclcpp::Node
     int _segment_valid_point_num;
     int _segment_valid_line_num;
     std::string odom_type_;
-    std::string base_ground_frame_, sensor_frame_;
+    std::string base_ground_frame_, sensor_frame_, odom_child_frame_;
 
     Channel<ProjectionOut>& _output_channel;
 
@@ -129,7 +129,7 @@ class ImageProjection : public rclcpp::Node
     double distance_for_patch_between_rings_;
     int first_frame_processed_;
     bool got_baselink2sensor_tf_;
-    geometry_msgs::msg::TransformStamped trans_b2s_;
+    geometry_msgs::msg::TransformStamped trans_b2s_, trans_b2g_;
     tf2::Stamped<tf2::Transform> tf2_trans_b2s_, tf2_trans_c2s_;
     geometry_msgs::msg::TransformStamped trans_c2s_;
     geometry_msgs::msg::TransformStamped trans_c2b_;
