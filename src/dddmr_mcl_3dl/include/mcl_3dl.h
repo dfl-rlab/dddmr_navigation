@@ -144,7 +144,7 @@ class MCL3dlNode : public rclcpp::Node
 
   private:
 
-    bool is_trans_b2s_initialized_;
+    bool is_trans_g2s_initialized_;
     bool tf_ready_;
     bool first_tf_;
     
@@ -159,7 +159,7 @@ class MCL3dlNode : public rclcpp::Node
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr pub_particle_;
 
     void cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg);
-    bool getBaselink2SensorAF3(std_msgs::msg::Header sensor_header, Eigen::Affine3d& trans_b2s_af3);
+    bool getBaseGround2SensorAF3(std_msgs::msg::Header sensor_header, Eigen::Affine3d& trans_g2s_af3);
 
     void cbLeGoFeatureCloud(const sensor_msgs::msg::PointCloud2::SharedPtr pc_sharpMsg,
                     const sensor_msgs::msg::PointCloud2::SharedPtr pc_less_sharpMsg,
@@ -190,7 +190,10 @@ class MCL3dlNode : public rclcpp::Node
     std::shared_ptr<tf2_ros::TransformListener> tfl_;
     std::shared_ptr<tf2_ros::TransformBroadcaster> tfb_;
     
-    geometry_msgs::msg::TransformStamped trans_b2s_;
+    geometry_msgs::msg::TransformStamped trans_g2s_;
+    geometry_msgs::msg::TransformStamped trans_child2g_;
+    
+    tf2::Transform tf2_trans_child2g_;
 
     rclcpp::CallbackGroup::SharedPtr cbs_group_;
     rclcpp::CallbackGroup::SharedPtr tf_pub_group_;   
@@ -235,7 +238,7 @@ class MCL3dlNode : public rclcpp::Node
     rclcpp::Time odom_last_;
     bool has_odom_;
     std_msgs::msg::Header laser_header_;
-    std_msgs::msg::Header odom_header_;
+    nav_msgs::msg::Odometry odom_msg_;
     State6DOF odom_;
     State6DOF odom_prev_;
     State6DOF state_prev_;

@@ -362,26 +362,34 @@ void StaticLayer::radiusSearchConnection(){
 
       seg.setInputCloud (nn_pc);
       seg.segment (*inliers, *coefficients);
-      
-      for(float ring_radius=max_radius; ring_radius>0; ring_radius-=0.25){
-        for(float d_theta=-3.1415926; d_theta<=3.1415926; d_theta+=0.174){ //per 10 deg
-          pcl::PointXYZI pcl_ring;
-          pcl_ring.x = pcl_node.x + ring_radius*sin(d_theta);
-          pcl_ring.y = pcl_node.y + ring_radius*cos(d_theta);
-          pcl_ring.z = (-coefficients->values[3]-coefficients->values[0]*pcl_ring.x-coefficients->values[1]*pcl_ring.y)/coefficients->values[2];
-          if(isinf(pcl_ring.z)){
-            pcl_ring.z = 0.0;
-          }
-          if(std::isnan(pcl_ring.z))
-            continue;
-          
-          std::vector<int> pointIdxRadiusSearch_ring;
-          std::vector<float> pointRadiusSquaredDistance_ring;
-          if(shared_data_->kdtree_ground_->radiusSearch (pcl_ring, 0.3, pointIdxRadiusSearch_ring, pointRadiusSquaredDistance_ring)<1) 
-            reject_threshold++;
-        }
+
+      // Check if segmentation failed to find a solution
+      if (inliers->indices.empty()) {
+        RCLCPP_DEBUG(node_->get_logger().get_child(name_), "No plane found in the current thread's point cloud.");
+        intensity_penality = 9999;
       }
-      intensity_penality += reject_threshold*intensity_search_punish_weight_;
+      else{
+        for(float ring_radius=max_radius; ring_radius>0; ring_radius-=0.25){
+          for(float d_theta=-3.1415926; d_theta<=3.1415926; d_theta+=0.174){ //per 10 deg
+            pcl::PointXYZI pcl_ring;
+            pcl_ring.x = pcl_node.x + ring_radius*sin(d_theta);
+            pcl_ring.y = pcl_node.y + ring_radius*cos(d_theta);
+            pcl_ring.z = (-coefficients->values[3]-coefficients->values[0]*pcl_ring.x-coefficients->values[1]*pcl_ring.y)/coefficients->values[2];
+            if(isinf(pcl_ring.z)){
+              pcl_ring.z = 0.0;
+            }
+            if(std::isnan(pcl_ring.z))
+              continue;
+            
+            std::vector<int> pointIdxRadiusSearch_ring;
+            std::vector<float> pointRadiusSquaredDistance_ring;
+            if(shared_data_->kdtree_ground_->radiusSearch (pcl_ring, 0.3, pointIdxRadiusSearch_ring, pointRadiusSquaredDistance_ring)<1) 
+              reject_threshold++;
+          }
+        }
+        intensity_penality += reject_threshold*intensity_search_punish_weight_;
+      }
+
       
       //@ use map to impose weight on each node
       pointIdxRadiusSearch.clear();

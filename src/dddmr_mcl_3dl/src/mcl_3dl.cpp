@@ -40,7 +40,7 @@ namespace mcl_3dl
 MCL3dlNode::MCL3dlNode(std::string name) : Node(name) 
   , global_localization_fix_cnt_(0)
   , engine_(seed_gen_())
-  , is_trans_b2s_initialized_(false)
+  , is_trans_g2s_initialized_(false)
   , tf_ready_(false)
   , first_tf_(false)
 {
@@ -145,18 +145,7 @@ bool MCL3dlNode::configure(const std::shared_ptr<mcl_3dl::SubMaps>& sub_maps)
 void MCL3dlNode::cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg){
   
   double time_seconds = msg->header.stamp.sec + (msg->header.stamp.nanosec * 1e-9);
-  odom_ =
-      State6DOF(
-          Vec3(msg->pose.pose.position.x,
-                msg->pose.pose.position.y,
-                msg->pose.pose.position.z),
-          Quat(msg->pose.pose.orientation.x,
-                msg->pose.pose.orientation.y,
-                msg->pose.pose.orientation.z,
-                msg->pose.pose.orientation.w),
-          time_seconds);
-
-  odom_header_ = msg->header;
+  odom_msg_ = *msg;
   odom_trans_.header = msg->header;
   odom_trans_.child_frame_id = msg->child_frame_id;
   odom_trans_.transform.translation.x = msg->pose.pose.position.x;
@@ -166,7 +155,7 @@ void MCL3dlNode::cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg){
   odom_trans_.transform.rotation.y = msg->pose.pose.orientation.y;
   odom_trans_.transform.rotation.z = msg->pose.pose.orientation.z;
   odom_trans_.transform.rotation.w = msg->pose.pose.orientation.w;
-  if(odom_header_.stamp.sec==0 && odom_header_.stamp.nanosec == 0){
+  if(odom_msg_.header.stamp.sec==0 && odom_msg_.header.stamp.nanosec == 0){
     odom_trans_.header.stamp = clock_->now();
     RCLCPP_WARN_THROTTLE(this->get_logger(), *clock_, 3000, "Odometry msg.header.timestamp = 0, use clock.now() as the timestamp");
   }
@@ -180,6 +169,30 @@ void MCL3dlNode::cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg){
     return;
   }
   
+  if(!is_trans_g2s_initialized_){
+    RCLCPP_WARN_THROTTLE(this->get_logger(), *clock_, 3000, "Wait for child to ground and ground to sensor TF");
+    return;
+  }
+  else{
+  //@ All data/tf ready, assign odom_ for particle filter
+  tf2::Transform tf2_odom;
+  tf2::fromMsg(odom_trans_.transform, tf2_odom);
+  tf2::Transform tf2_odom2ground;
+  tf2_odom2ground.mult(tf2_odom, tf2_trans_child2g_);
+
+  odom_ =
+    State6DOF(
+        Vec3(tf2_odom2ground.getOrigin().x(),
+              tf2_odom2ground.getOrigin().y(),
+              tf2_odom2ground.getOrigin().z()),
+        Quat(tf2_odom2ground.getRotation().x(),
+              tf2_odom2ground.getRotation().y(),
+              tf2_odom2ground.getRotation().z(),
+              tf2_odom2ground.getRotation().w()),
+        time_seconds);
+
+  }
+
   double dx = odom_.pos_.x_ - odom_prev_.pos_.x_;
   double dy = odom_.pos_.y_ - odom_prev_.pos_.y_;
   double dz = odom_.pos_.z_ - odom_prev_.pos_.z_;
@@ -238,9 +251,29 @@ void MCL3dlNode::cbOdom(const nav_msgs::msg::Odometry::SharedPtr msg){
   }
 }
 
-bool MCL3dlNode::getBaselink2SensorAF3(std_msgs::msg::Header sensor_header, Eigen::Affine3d& trans_b2s_af3){
+bool MCL3dlNode::getBaseGround2SensorAF3(std_msgs::msg::Header sensor_header, Eigen::Affine3d& trans_g2s_af3){
 
-  if(! is_trans_b2s_initialized_){
+  if (!has_odom_)
+  {
+    RCLCPP_INFO(this->get_logger(), "Wait for the first odom msg to get odom_child->base_ground frame");
+    return false;
+  }
+  else{
+    try
+    {
+      trans_child2g_ = tfbuf_->lookupTransform(
+          odom_msg_.child_frame_id, params_->frame_ids_["base_ground"], tf2::TimePointZero);
+      tf2::fromMsg(trans_child2g_.transform, tf2_trans_child2g_);
+    }
+    catch (tf2::TransformException& e)
+    {
+      RCLCPP_INFO(this->get_logger(), "Failed to get: %s to %s, %s", odom_msg_.child_frame_id.c_str(), params_->frame_ids_["base_ground"].c_str(), e.what());
+      return false;
+    }
+
+  }
+
+  if(!is_trans_g2s_initialized_){
   
     if(sensor_header.frame_id.at(0) == '/'){
       sensor_header.frame_id.erase(0, 1);
@@ -248,20 +281,20 @@ bool MCL3dlNode::getBaselink2SensorAF3(std_msgs::msg::Header sensor_header, Eige
 
     try
     {
-      trans_b2s_ = tfbuf_->lookupTransform(
-          params_->frame_ids_["base_link"], sensor_header.frame_id, tf2::TimePointZero);
+      trans_g2s_ = tfbuf_->lookupTransform(
+          params_->frame_ids_["base_ground"], sensor_header.frame_id, tf2::TimePointZero);
     }
     catch (tf2::TransformException& e)
     {
-      RCLCPP_INFO(this->get_logger(), "Failed to transform pointcloud: %s", e.what());
+      RCLCPP_INFO(this->get_logger(), "Failed to get: %s to %s, %s", params_->frame_ids_["base_ground"].c_str(), sensor_header.frame_id.c_str(), e.what());
       return false;
     }
-    //@Transform into base_link frame, and then we can perform passthrough
-    is_trans_b2s_initialized_ = true;
-    trans_b2s_af3 = tf2::transformToEigen(trans_b2s_);
+    //@Transform into base_ground frame, and then we can perform passthrough
+    is_trans_g2s_initialized_ = true;
+    trans_g2s_af3 = tf2::transformToEigen(trans_g2s_);
   }
   else{
-    trans_b2s_af3 = tf2::transformToEigen(trans_b2s_);
+    trans_g2s_af3 = tf2::transformToEigen(trans_g2s_);
   }
   return true;
 }
@@ -403,8 +436,8 @@ void MCL3dlNode::cbLeGoFeatureCloud(const sensor_msgs::msg::PointCloud2::SharedP
   if(!sub_maps_->isCurrentReady())
     return;
 
-  Eigen::Affine3d trans_b2s_af3;
-  if(! getBaselink2SensorAF3(pc_less_sharpMsg->header, trans_b2s_af3))
+  Eigen::Affine3d trans_g2s_af3;
+  if(! getBaseGround2SensorAF3(pc_less_sharpMsg->header, trans_g2s_af3))
     return;
 
   pcl::PointCloud<mcl_3dl::pcl_t>::Ptr pc_sharp(new pcl::PointCloud<mcl_3dl::pcl_t>);
@@ -424,15 +457,15 @@ void MCL3dlNode::cbLeGoFeatureCloud(const sensor_msgs::msg::PointCloud2::SharedP
   pcl::fromROSMsg(*pc_less_flatMsg, *pc_less_flat);
 
   //@Transform point cloud
-  //pcl::transformPointCloud(*pc_sharp, *pc_sharp, trans_b2s_af3);
-  pcl::transformPointCloud(*pc_less_sharp_in, *pc_less_sharp_in, trans_b2s_af3);
-  pcl::transformPointCloud(*pc_flat_in, *pc_flat_in, trans_b2s_af3);
-  pcl::transformPointCloud(*pc_less_flat, *pc_less_flat, trans_b2s_af3);
+  //pcl::transformPointCloud(*pc_sharp, *pc_sharp, trans_g2s_af3);
+  pcl::transformPointCloud(*pc_less_sharp_in, *pc_less_sharp_in, trans_g2s_af3);
+  pcl::transformPointCloud(*pc_flat_in, *pc_flat_in, trans_g2s_af3);
+  pcl::transformPointCloud(*pc_less_flat, *pc_less_flat, trans_g2s_af3);
   auto flat_drawed_feature = drawFeaturesFromBin(pc_less_flat, params_->draw_flat_feature_bin_size_x_,
                                       params_->draw_flat_feature_bin_size_y_, params_->draw_flat_feature_bin_size_z_, 1);
   *pc_less_sharp_in+=*flat_drawed_feature;
 
-  pc_less_sharp_in->header.frame_id = params_->frame_ids_["base_link"];
+  pc_less_sharp_in->header.frame_id = params_->frame_ids_["base_ground"];
 
   RCLCPP_DEBUG(this->get_logger(), "Size pc_sharp: %lu, pc_less_sharp_in: %lu, pc_flat_in: %lu, pc_less_flat: %lu", 
                           pc_sharp->points.size(), pc_less_sharp_in->points.size(), pc_flat_in->points.size(), pc_less_flat->points.size());
@@ -597,7 +630,7 @@ void MCL3dlNode::cbLeGoFeatureCloud(const sensor_msgs::msg::PointCloud2::SharedP
   sensor_msgs::msg::PointCloud2 ec_out;
   pcl::toROSMsg(*pc_less_sharp_intensity, ec_out);
   ec_out.header = pc_less_sharpMsg->header;
-  ec_out.header.frame_id = params_->frame_ids_["base_link"];
+  ec_out.header.frame_id = params_->frame_ids_["base_ground"];
   pub_pc_ec_->publish(ec_out);
   
   pcl_segmentations_[std::string("flat")] = pc_flat;
@@ -820,7 +853,7 @@ void MCL3dlNode::measure(std::map<std::string, pcl::PointCloud<mcl_3dl::pcl_t>::
 void MCL3dlNode::publishParticles()
 {
   geometry_msgs::msg::PoseArray pa;
-  pa.header.stamp = odom_header_.stamp;
+  pa.header.stamp = odom_msg_.header.stamp;
   pa.header.frame_id = params_->frame_ids_["map"];
   for (size_t i = 0; i < pf_->getParticleSize(); i++)
   {
@@ -842,7 +875,7 @@ void MCL3dlNode::publishParticles()
 void MCL3dlNode::publishTFThread()
 {
   if (tf_ready_ && params_->publish_tf_){
-    map2odom_trans_.header.stamp = odom_header_.stamp;
+    map2odom_trans_.header.stamp = odom_msg_.header.stamp;
     tfb_->sendTransform(map2odom_trans_);
     first_tf_ = true;
   }

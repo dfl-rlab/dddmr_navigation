@@ -107,7 +107,7 @@ mcl_3dl:
     init_var_pitch: 0.005
     init_var_yaw: 0.5
     map_frame: "map"
-    robot_frame: "base_footprint"
+    ground_frame: "base_footprint"
     odom_frame: "odom"
     map_downsample_x: 0.1
     map_downsample_y: 0.1

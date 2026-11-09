@@ -48,10 +48,10 @@ Parameters::Parameters(const rclcpp::node_interfaces::NodeLoggingInterface::Shar
   frame_ids_["map"] = map_frame.as_string();
   RCLCPP_INFO(logger_->get_logger(), "map_frame: %s", frame_ids_["map"].c_str());
 
-  parameter_->declare_parameter("robot_frame", rclcpp::ParameterValue(""));
-  rclcpp::Parameter robot_frame = parameter_->get_parameter("robot_frame");
-  frame_ids_["base_link"] = robot_frame.as_string();
-  RCLCPP_INFO(logger_->get_logger(), "robot_frame: %s", frame_ids_["base_link"].c_str());  
+  parameter_->declare_parameter("ground_frame", rclcpp::ParameterValue(""));
+  rclcpp::Parameter ground_frame = parameter_->get_parameter("ground_frame");
+  frame_ids_["base_ground"] = ground_frame.as_string();
+  RCLCPP_INFO(logger_->get_logger(), "ground_frame: %s", frame_ids_["base_ground"].c_str());  
   
   parameter_->declare_parameter("odom_frame", rclcpp::ParameterValue(""));
   rclcpp::Parameter odom_frame = parameter_->get_parameter("odom_frame");
