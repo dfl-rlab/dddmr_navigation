@@ -216,16 +216,23 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
   this->get_parameter("imageProjection.patch_first_ring_to_baselink", patch_first_ring_to_baselink_);
   RCLCPP_INFO(this->get_logger(), "imageProjection.patch_first_ring_to_baselink: %d", patch_first_ring_to_baselink_);
 
-  this->declare_parameter("imageProjection.trt_model_path", rclcpp::ParameterValue(""));
-  this->get_parameter("imageProjection.trt_model_path", trt_model_path_);
-  RCLCPP_INFO(this->get_logger(), "imageProjection.trt_model_path: %s" , trt_model_path_.c_str());
+  this->declare_parameter("imageProjection.deep_learning.trt_model_path", rclcpp::ParameterValue(""));
+  this->get_parameter("imageProjection.deep_learning.trt_model_path", trt_model_path_);
+  RCLCPP_INFO(this->get_logger(), "imageProjection.deep_learning.trt_model_path: %s" , trt_model_path_.c_str());
 
-  this->declare_parameter("imageProjection.projected_image_stack_size", rclcpp::ParameterValue(0));
-  this->get_parameter("imageProjection.projected_image_stack_size", projected_image_stack_size_);
-  RCLCPP_INFO(this->get_logger(), "imageProjection.projected_image_stack_size: %d" , projected_image_stack_size_);
+  this->declare_parameter("imageProjection.deep_learning.projected_image_stack_size", rclcpp::ParameterValue(0));
+  this->get_parameter("imageProjection.deep_learning.projected_image_stack_size", projected_image_stack_size_);
+  RCLCPP_INFO(this->get_logger(), "imageProjection.deep_learning.projected_image_stack_size: %d" , projected_image_stack_size_);
   if(projected_image_stack_size_<1){
     projected_image_stack_size_ = 1;
   }
+
+  this->declare_parameter("imageProjection.deep_learning.moving_object_labels", std::vector<int64_t>());
+  this->get_parameter("imageProjection.deep_learning.moving_object_labels", moving_object_labels_);
+  for (const auto& label : moving_object_labels_) {
+    RCLCPP_INFO(this->get_logger(), "imageProjection.deep_learning.moving_object_labels: %ld", label);
+  }
+
   std::string filename = "my_file.txt"; // Replace with your file name
 
   if (std::filesystem::exists(trt_model_path_)) {
@@ -586,19 +593,17 @@ void ImageProjection::projectPointCloud() {
   yolov8_->drawObjectLabels(inferenced_image, objects);
 
   // Remove object from projected_image
-  cv::Mat full_sized_mask = cv::Mat::zeros(inferenced_image.size(), CV_8UC1);
+  cv::Mat full_moving_obj_sized_mask = cv::Mat::zeros(inferenced_image.size(), CV_8UC1);
   for (const auto &object : objects) {
 
     //@ label=0 is people, remove it
-    if(object.label==0){
-      cv::Mat roi_mask = full_sized_mask(object.rect);
+    if(std::find(moving_object_labels_.begin(), moving_object_labels_.end(), object.label) != moving_object_labels_.end()){
+      cv::Mat roi_mask = full_moving_obj_sized_mask(object.rect);
       object.boxMask.copyTo(roi_mask);
     }
-    //cv::Size imageSize = object.boxMask.size();
-    //RCLCPP_INFO(this->get_logger(), "object class: %d, confidence: %.2f", object.label, object.probability);
   }
   cv::Mat inverted_mask;
-  cv::bitwise_not(full_sized_mask, inverted_mask);
+  cv::bitwise_not(full_moving_obj_sized_mask, inverted_mask);
   cv::bitwise_and(inferenced_image, inferenced_image, range_mat_removing_moving_object_, inverted_mask);
   
   

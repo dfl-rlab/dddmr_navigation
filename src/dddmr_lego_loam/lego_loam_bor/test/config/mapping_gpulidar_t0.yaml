@@ -29,8 +29,6 @@ lego_loam_ip:
         maximum_detection_range: 100.0            # point cloud within this range will be used to project image
         distance_for_patch_between_rings: 1.0    # patch ground between rings within this range, i.e. ring0 and ring1 is smaller than 1 meter, patch them
         stitcher_num: 0                          # for non-repetitive scan lidar use 2~4 (i.e. mid360)
-        trt_model_path: ""                       # provide trt engine for yolo
-        projected_image_stack_size: 1            # Stack this number of image for yolo11n to inference as time elapsed yolo (only work when TRT is loaded)
         ground_slope_tolerance: 0.34
         ground_dz_tolerance: 0.1
         patch_first_ring_to_baselink: true

@@ -164,7 +164,7 @@ private:
       RCLCPP_INFO(this->get_logger(), "Human point cloud size in map: %lu", person_map->points.size());
       
       //@ previous manual check is 550~800 points
-      if (person_map->points.size()>550 && person_map->points.size()<800) {
+      if (person_map->points.size()>550 && person_map->points.size()<1200) {
         RCLCPP_INFO(this->get_logger(), "Changing state to SUCCEED");
         current_state_ = State::SUCCEED;
       } else {

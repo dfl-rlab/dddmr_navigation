@@ -149,6 +149,7 @@ class ImageProjection : public rclcpp::Node
     bool is_trt_engine_exist_;
     std::string trt_model_path_;
     int projected_image_stack_size_;
+    std::vector<int64_t> moving_object_labels_;
     std::deque<cv::Mat> projected_image_queue_;
     
     double sensor_install_pitch_;
