@@ -70,8 +70,9 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
 
   _pub_outlier_cloud = this->create_publisher<sensor_msgs::msg::PointCloud2>
       ("outlier_cloud", 1); 
-  
-  pub_annotated_img_ = this->create_publisher<sensor_msgs::msg::Image>("annotated_image", 1);
+
+  pub_objects_excluding_cloud_ = this->create_publisher<sensor_msgs::msg::PointCloud2>
+      ("objects_excluding_cloud", 1);
   
   declare_parameter("laser.num_vertical_scans", rclcpp::ParameterValue(0));
   this->get_parameter("laser.num_vertical_scans", _vertical_scans);
@@ -232,7 +233,14 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
   for (const auto& label : moving_object_labels_) {
     RCLCPP_INFO(this->get_logger(), "imageProjection.deep_learning.moving_object_labels: %ld", label);
   }
+ 
+  this->declare_parameter("imageProjection.deep_learning.objects_excluding_labels", std::vector<int64_t>());
+  this->get_parameter("imageProjection.deep_learning.objects_excluding_labels", objects_excluding_labels_);
+  for (const auto& label : objects_excluding_labels_) {
+    RCLCPP_INFO(this->get_logger(), "imageProjection.deep_learning.objects_excluding_labels: %ld", label);
+  }
 
+  
   std::string filename = "my_file.txt"; // Replace with your file name
 
   if (std::filesystem::exists(trt_model_path_)) {
@@ -269,6 +277,7 @@ ImageProjection::ImageProjection(std::string name, Channel<ProjectionOut>& outpu
   dsf_patched_ground_.setLeafSize(0.1, 0.1, 0.1);
 
   yolo_labelled_point_cloud_.reset(new pcl::PointCloud<PointType>());
+  objects_excluding_cloud_.reset(new pcl::PointCloud<PointType>());
 }
 
 
@@ -478,7 +487,8 @@ void ImageProjection::cloudHandler(
 void ImageProjection::projectPointCloud() {
   
   //cv image
-  range_mat_removing_moving_object_ = cv::Mat::zeros(_vertical_scans, _horizontal_scans, CV_8UC3); 
+  range_mat_removing_moving_object_ = cv::Mat::zeros(_vertical_scans, _horizontal_scans, CV_8UC1); 
+  range_mat_objects_excluding_object_ = cv::Mat::zeros(_vertical_scans, _horizontal_scans, CV_8UC1);
   cv::Mat projected_image(_vertical_scans, _horizontal_scans, CV_8UC3, cv::Scalar(0,0,0));
   cv::Mat projected_stack_result;
 
@@ -522,12 +532,12 @@ void ImageProjection::projectPointCloud() {
     _range_mat(rowIdn, viscolumnIdn) = range;
     
     //@ generate projected_image
-    //@ the rowIdn for _range_mat is from top to bottom, which means the line 0 is the first row
-    //@ to visualize the depth image more intuitively, we make line 0 to the last rowIdn
+    //@ the rowIdn for _range_mat is from top to bottom, which means the line 0 (lowest line in lidar) is the first row (top row of _range_mat)
+    //@ to visualize the depth image more intuitively, we make line 0 to the last row (bottom row in projected in line 0)
 
     if (rowIdn >= 0 && rowIdn < _vertical_scans && viscolumnIdn >= 0 && viscolumnIdn < _horizontal_scans) {
-      float range_span = 20.0f;
-      float norm = (range - _minimum_detection_range) / range_span;
+      float range_span = 50.0f;
+      float norm = (range) / range_span;
       norm = std::max(0.0f, std::min(1.0f, norm));
 
       // Continuous 4-segment BGR gradient: Blue -> Cyan -> Green -> Yellow -> Red
@@ -585,42 +595,39 @@ void ImageProjection::projectPointCloud() {
 #ifdef TRT_ENABLED
   
   if(to_fa_ && is_trt_engine_exist_ && projected_image_queue_.size()==projected_image_stack_size_){ //to_fa means we are not exporting depth image, so skip inference to save time 
-  cv::Mat inferenced_image = projected_stack_result;
-  // Run inference
-  const auto objects = yolov8_->detectObjects(inferenced_image);
+    cv::Mat inferenced_image = projected_stack_result;
+    // Run inference
+    const auto objects = yolov8_->detectObjects(inferenced_image);
 
-  // Draw the bounding boxes on the image
-  yolov8_->drawObjectLabels(inferenced_image, objects);
+    // Draw the bounding boxes on the image
+    yolov8_->drawObjectLabels(inferenced_image, objects);
 
-  // Remove object from projected_image
-  cv::Mat full_moving_obj_sized_mask = cv::Mat::zeros(inferenced_image.size(), CV_8UC1);
-  for (const auto &object : objects) {
+    // Remove object from projected_image
+    cv::Mat full_moving_obj_sized_mask = cv::Mat::zeros(inferenced_image.size(), CV_8UC1);
+    cv::Mat full_objects_excluding_obj_sized_mask = cv::Mat::zeros(inferenced_image.size(), CV_8UC1);
+    for (const auto &object : objects) {
 
-    //@ label=0 is people, remove it
-    if(std::find(moving_object_labels_.begin(), moving_object_labels_.end(), object.label) != moving_object_labels_.end()){
-      cv::Mat roi_mask = full_moving_obj_sized_mask(object.rect);
-      object.boxMask.copyTo(roi_mask);
+      //@ label=0 is people, remove it
+      if(std::find(moving_object_labels_.begin(), moving_object_labels_.end(), object.label) != moving_object_labels_.end()){
+        cv::Mat roi_mask = full_moving_obj_sized_mask(object.rect);
+        cv::bitwise_or(roi_mask, object.boxMask, roi_mask);
+      }
+      if(std::find(objects_excluding_labels_.begin(), objects_excluding_labels_.end(), object.label) != objects_excluding_labels_.end()){
+        cv::Mat roi_mask = full_objects_excluding_obj_sized_mask(object.rect);
+        cv::bitwise_or(roi_mask, object.boxMask, roi_mask);
+      }
     }
-  }
-  cv::Mat inverted_mask;
-  cv::bitwise_not(full_moving_obj_sized_mask, inverted_mask);
-  cv::bitwise_and(inferenced_image, inferenced_image, range_mat_removing_moving_object_, inverted_mask);
-  
-  
-  //@ cut final inferenced image
-  int x_start = 0;
-  int y_start = inferenced_image.rows - inferenced_image.rows/projected_image_stack_size_;
-  int crop_width = inferenced_image.cols;
-  int crop_height = inferenced_image.rows/projected_image_stack_size_;
-  cv::Rect myROI(x_start, y_start, crop_width, crop_height);
-  cv::Mat last_row_of_projected_image = inferenced_image(myROI);//@inferenced image is sizeof(projected_image_stack_size_ by 1)
-  range_mat_removing_moving_object_ = range_mat_removing_moving_object_(myROI);
-  
-  cv_bridge::CvImage img_annotated;
-  img_annotated.image = last_row_of_projected_image;
-  img_annotated.encoding = sensor_msgs::image_encodings::TYPE_8UC3;
-  sensor_msgs::msg::Image::SharedPtr ros2_annotated_img = img_annotated.toImageMsg();
-  pub_annotated_img_->publish(*ros2_annotated_img);
+    
+    //@ cut final inferenced image
+    int x_start = 0;
+    int y_start = inferenced_image.rows - inferenced_image.rows/projected_image_stack_size_;
+    int crop_width = inferenced_image.cols;
+    int crop_height = inferenced_image.rows/projected_image_stack_size_;
+    cv::Rect myROI(x_start, y_start, crop_width, crop_height);
+    cv::Mat last_row_of_projected_image = inferenced_image(myROI);//@inferenced image is sizeof(projected_image_stack_size_ by 1)
+    range_mat_removing_moving_object_ = full_moving_obj_sized_mask(myROI);
+    range_mat_objects_excluding_object_ = full_objects_excluding_obj_sized_mask(myROI);
+    
   }
 #endif
 
@@ -686,6 +693,7 @@ void ImageProjection::getNoPitchPoint(PointType& pt_in, PointType& pt_out){
 void ImageProjection::zPitchRollFeatureRemoval() {
   
   yolo_labelled_point_cloud_.reset(new pcl::PointCloud<PointType>());
+  objects_excluding_cloud_.reset(new pcl::PointCloud<PointType>());
 
   geometry_msgs::msg::TransformStamped trans_lidar2horizontal;
   tf2::Quaternion q;
@@ -812,13 +820,20 @@ void ImageProjection::zPitchRollFeatureRemoval() {
       // TRT object detection to remove things we dont want to use for SLAM, such as moving object
       if(is_trt_engine_exist_ && projected_image_queue_.size()==projected_image_stack_size_){
         // it was generated as _range_mat(rowIdn, viscolumnIdn) = range;
-        cv::Vec3b pixel = range_mat_removing_moving_object_.at<cv::Vec3b>(_vertical_scans-i, j);
-        if(pixel[0]==0 && pixel[1]==0 && pixel[2]==0){
+        uint8_t pixel = range_mat_removing_moving_object_.at<uint8_t>(_vertical_scans - i, j);
+        if(pixel > 0){
           _label_mat(i, j) = -1;
           _ground_mat(i, j) = -1;
           _label_mat(i+1, j) = -1;
           yolo_labelled_point_cloud_->push_back(_full_cloud->points[lowerInd]);
           in_ground_fov = false;
+        }
+        uint8_t objects_excluding_pixel = range_mat_objects_excluding_object_.at<uint8_t>(_vertical_scans - i, j);
+        if(i<2 || objects_excluding_pixel > 0){
+          //exclude last line, because labeling is difficult to label first line
+        }
+        else{
+          objects_excluding_cloud_->push_back(_full_cloud->points[lowerInd]);
         }
       }
 #endif
@@ -1190,6 +1205,7 @@ void ImageProjection::publishClouds() {
   //PublishCloud(_pub_segmented_cloud, _segmented_cloud);
   PublishCloud(_pub_ground_cloud, ds_patched_ground_);
   PublishCloud(_pub_segmented_cloud_pure, _segmented_cloud_pure);
+  PublishCloud(pub_objects_excluding_cloud_, objects_excluding_cloud_);
   //PublishCloud(_pub_full_info_cloud, _full_info_cloud);
   if (_pub_segmented_cloud_info->get_subscription_count() != 0) {
     _pub_segmented_cloud_info->publish(_seg_msg);

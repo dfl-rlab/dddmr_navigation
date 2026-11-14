@@ -1,9 +1,9 @@
 bag_reader:
   ros__parameters:
     use_sim_time: true
-    bag_file_dir: "/root/dddmr_bags/cicdtest/mapping_airy_t45"
+    bag_file_dir: "/root/dddmr_bags/jt128_stair_11"
     bag_format: "mcap"
-    point_cloud_topic: "/airy_points"
+    point_cloud_topic: "/dome_lidar/points"
     odometry_topic: "/odom"
     skip_frame: 1
 
@@ -24,7 +24,7 @@ lego_loam_ip:
         segment_valid_point_num: 5
         segment_valid_line_num: 2
         segment_theta: 60.0                      # decrese this value may improve accuracy
-        minimum_detection_range: 0.5
+        minimum_detection_range: 0.05
         maximum_detection_range: 100.0            # point cloud within this range will be used to project image
         distance_for_patch_between_rings: 1.0    # patch ground between rings within this range, i.e. ring0 and ring1 is smaller than 1 meter, patch them
         stitcher_num: 0                          # for non-repetitive scan lidar use 2~4 (i.e. mid360)

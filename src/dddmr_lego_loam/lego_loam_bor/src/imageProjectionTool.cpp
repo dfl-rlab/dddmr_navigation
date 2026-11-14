@@ -202,6 +202,20 @@ ImageProjectionTool::ImageProjectionTool(std::string name, Channel<ProjectionOut
   if(projected_image_stack_size_<1){
     projected_image_stack_size_ = 1;
   }
+
+  this->declare_parameter("imageProjection.auto_label_morph_kernel_width", rclcpp::ParameterValue(3));
+  this->get_parameter("imageProjection.auto_label_morph_kernel_width", auto_label_morph_kernel_width_);
+  auto_label_morph_kernel_width_ = std::max(1, auto_label_morph_kernel_width_);
+  RCLCPP_INFO(this->get_logger(), "imageProjection.auto_label_morph_kernel_width: %d", auto_label_morph_kernel_width_);
+
+  this->declare_parameter("imageProjection.auto_label_morph_kernel_height", rclcpp::ParameterValue(3));
+  this->get_parameter("imageProjection.auto_label_morph_kernel_height", auto_label_morph_kernel_height_);
+  auto_label_morph_kernel_height_ = std::max(1, auto_label_morph_kernel_height_);
+  RCLCPP_INFO(this->get_logger(), "imageProjection.auto_label_morph_kernel_height: %d", auto_label_morph_kernel_height_);
+
+  this->declare_parameter("imageProjection.auto_label_morph_kernel_shape", rclcpp::ParameterValue("rect"));
+  this->get_parameter("imageProjection.auto_label_morph_kernel_shape", auto_label_morph_kernel_shape_);
+  RCLCPP_INFO(this->get_logger(), "imageProjection.auto_label_morph_kernel_shape: %s", auto_label_morph_kernel_shape_.c_str());
   for(int i=0; i<projected_image_stack_size_; i++){
     std::string topic_name = "projected_point_cloud_" + std::to_string(i);
     point_cloud_publishers_vector_.push_back(
@@ -334,7 +348,8 @@ void ImageProjectionTool::projectPointCloud() {
   //cv image
   range_mat_removing_moving_object_ = cv::Mat::zeros(_vertical_scans, _horizontal_scans, CV_8UC3); 
   cv::Mat projected_image(_vertical_scans, _horizontal_scans, CV_8UC3, cv::Scalar(0,0,0));
-
+  cv::Mat projected_intensity_image(_vertical_scans, _horizontal_scans, CV_8UC3, cv::Scalar(0,0,0));
+  pcl::PointCloud<pcl::PointXYZI>::Ptr projected_intensity_cloud (new pcl::PointCloud<pcl::PointXYZI>);
   // range image projection
   const size_t cloudSize = _laser_cloud_in->points.size();
 
@@ -375,12 +390,12 @@ void ImageProjectionTool::projectPointCloud() {
     _range_mat(rowIdn, viscolumnIdn) = range;
     
     //@ generate projected_image
-    //@ the rowIdn for _range_mat is from top to bottom, which means the line 0 is the first row
-    //@ to visualize the depth image more intuitively, we make line 0 to the last rowIdn
+    //@ the rowIdn for _range_mat is from top to bottom, which means the line 0 (lowest line in lidar) is the first row (top row of _range_mat)
+    //@ to visualize the depth image more intuitively, we make line 0 to the last row (bottom row in projected in line 0)
 
     if (rowIdn >= 0 && rowIdn < _vertical_scans && viscolumnIdn >= 0 && viscolumnIdn < _horizontal_scans) {
-      float range_span = 20.0f;
-      float norm = (range - _minimum_detection_range) / range_span;
+      float range_span = 50.0f;
+      float norm = (range) / range_span;
       norm = std::max(0.0f, std::min(1.0f, norm));
 
       // Continuous 4-segment BGR gradient: Blue -> Cyan -> Green -> Yellow -> Red
@@ -409,6 +424,14 @@ void ImageProjectionTool::projectPointCloud() {
 
       int img_row = _vertical_scans - 1 - rowIdn;
       projected_image.at<cv::Vec3b>(img_row, viscolumnIdn) = cv::Vec3b(b, g, r);
+
+      if(thisPoint.intensity > 0){
+        PointType pt_idx;
+        pt_idx.x = thisPoint.x; pt_idx.y = thisPoint.y; pt_idx.z = thisPoint.z;
+        pt_idx.intensity = static_cast<float>(img_row) + static_cast<float>(viscolumnIdn) / 10000.0f;
+        projected_intensity_image.at<cv::Vec3b>(img_row, viscolumnIdn) = cv::Vec3b(b, g, r);
+        projected_intensity_cloud->push_back(pt_idx);
+      }
     }
 
     thisPoint.intensity = (float)rowIdn + (float)viscolumnIdn / 10000.0;
@@ -418,17 +441,22 @@ void ImageProjectionTool::projectPointCloud() {
     _full_info_cloud->points[index] = thisPoint;
     _full_info_cloud->points[index].intensity = range;
   }
-  
+
+  cliffSegmentation(projected_intensity_image, projected_intensity_cloud);
+
   //@ queue projected image and point cloud
   if(projected_image_queue_.size()<projected_image_stack_size_){
     projected_image_queue_.push_back(projected_image);
     projected_pc_queue_.push_back(*_full_info_cloud);
+    projected_intensity_image_queue_.push_back(projected_intensity_image);
   }
   else{
     projected_image_queue_.push_back(projected_image);
     projected_image_queue_.pop_front();
     projected_pc_queue_.push_back(*_full_info_cloud);
     projected_pc_queue_.pop_front();
+    projected_intensity_image_queue_.push_back(projected_intensity_image);
+    projected_intensity_image_queue_.pop_front();
   }
 
   //@ publish each point cloud frame in the stack
@@ -438,6 +466,11 @@ void ImageProjectionTool::projectPointCloud() {
   projected_stack_result_ = projected_image_queue_.front();
   for(auto it=projected_image_queue_.begin()+1; it!=projected_image_queue_.end(); it++){
     cv::vconcat(projected_stack_result_, (*it), projected_stack_result_);
+  }
+
+  projected_intensity_stack_result_ = projected_intensity_image_queue_.front();
+  for(auto it=projected_intensity_image_queue_.begin()+1; it!=projected_intensity_image_queue_.end(); it++){
+    cv::vconcat(projected_intensity_stack_result_, (*it), projected_intensity_stack_result_);
   }
 
   cv_bridge::CvImage img_bridge;
@@ -462,6 +495,7 @@ void ImageProjectionTool::projectPointCloud() {
     std::string file_name = mapping_dir_string_ + "/" + timestamp + "_" + spec + ".png";
     cv::imwrite(file_name, projected_stack_result_);
     last_save_depth_img_time_ = image_time;
+    autoLabelProjectedIntensityImages();
   }
   
 }
@@ -721,6 +755,225 @@ void ImageProjectionTool::exportProjectedImages() {
       RCLCPP_INFO(this->get_logger(), "Saved annotation json: %s", json_file_name.c_str());
     }
   }
+}
+
+void ImageProjectionTool::autoLabelProjectedIntensityImages() {
+  if (projected_intensity_image_queue_.empty()) {
+    return;
+  }
+
+  projected_intensity_stack_result_ = projected_intensity_image_queue_.front();
+  for (auto it = projected_intensity_image_queue_.begin() + 1; it != projected_intensity_image_queue_.end(); ++it) {
+    cv::vconcat(projected_intensity_stack_result_, (*it), projected_intensity_stack_result_);
+  }
+
+  std::stringstream ss;
+  ss << _seg_msg.header.stamp.sec << "_" << std::setw(9) << std::setfill('0') << _seg_msg.header.stamp.nanosec;
+  std::string timestamp = ss.str();
+  std::string spec =
+    std::to_string(_vertical_scans) + "x" + std::to_string(_horizontal_scans) +
+    "_stitch" + std::to_string(stitcher_num_) +
+    "_vstack" + std::to_string(projected_image_stack_size_);
+
+  std::string base_image_name = timestamp + "_" + spec + ".png";
+
+  if (!projected_stack_result_.empty()) {
+    std::string file_name = mapping_dir_string_ + "/" + base_image_name;
+    cv::imwrite(file_name, projected_stack_result_);
+    RCLCPP_INFO(this->get_logger(), "Saved projected image: %s", file_name.c_str());
+  }
+
+  if (!projected_intensity_stack_result_.empty()) {
+    //std::string intensity_file_name = mapping_dir_string_ + "/" + timestamp + "_" + spec + "_intensity.png";
+    //cv::imwrite(intensity_file_name, projected_intensity_stack_result_);
+    //RCLCPP_INFO(this->get_logger(), "Saved intensity projected image: %s", intensity_file_name.c_str());
+
+    // Auto-generate polygon annotations for each stacked slice
+    std::vector<std::vector<cv::Point2f>> all_polygons;
+    int num_slices = projected_intensity_stack_result_.rows / _vertical_scans;
+
+    int morph_shape = cv::MORPH_RECT;
+    if (auto_label_morph_kernel_shape_ == "ellipse") {
+      morph_shape = cv::MORPH_ELLIPSE;
+    } else if (auto_label_morph_kernel_shape_ == "cross") {
+      morph_shape = cv::MORPH_CROSS;
+    }
+    const bool apply_morph_close = (auto_label_morph_kernel_width_ > 1 || auto_label_morph_kernel_height_ > 1);
+    const int pad_x = auto_label_morph_kernel_width_ / 2 + 1;
+    const int pad_y = auto_label_morph_kernel_height_ / 2 + 1;
+    cv::Mat close_kernel;
+    if (apply_morph_close) {
+      close_kernel = cv::getStructuringElement(
+        morph_shape, cv::Size(auto_label_morph_kernel_width_, auto_label_morph_kernel_height_));
+    }
+
+    for (int s = 0; s < num_slices; ++s) {
+      int y_offset = s * _vertical_scans;
+      cv::Mat slice_img = projected_intensity_stack_result_(cv::Rect(0, y_offset, _horizontal_scans, _vertical_scans));
+
+      cv::Mat gray, mask, closed;
+      cv::cvtColor(slice_img, gray, cv::COLOR_BGR2GRAY);
+      cv::threshold(gray, mask, 0, 255, cv::THRESH_BINARY);
+
+      if (apply_morph_close) {
+        cv::Mat padded, closed_padded;
+        // Pad before morphological closing so boundary pixels (e.g. y = _vertical_scans - 1) are not eroded
+        cv::copyMakeBorder(mask, padded, pad_y, pad_y, pad_x, pad_x, cv::BORDER_CONSTANT, cv::Scalar(0));
+        cv::morphologyEx(padded, closed_padded, cv::MORPH_CLOSE, close_kernel);
+        closed = closed_padded(cv::Rect(pad_x, pad_y, mask.cols, mask.rows));
+        cv::bitwise_or(closed, mask, closed);
+      } else {
+        closed = mask;
+      }
+
+      std::vector<std::vector<cv::Point>> contours;
+      cv::findContours(closed, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+
+      for (size_t c = 0; c < contours.size(); ++c) {
+        if (contours[c].size() < 3 || cv::contourArea(contours[c]) < 2.0) {
+          continue;
+        }
+
+        std::vector<cv::Point> poly;
+        cv::approxPolyDP(contours[c], poly, 0.75, true);
+        if (poly.size() < 3) {
+          poly = contours[c];
+        }
+        if (poly.size() < 3) {
+          continue;
+        }
+
+        std::vector<cv::Point2f> poly_global;
+        for (const auto& pt : poly) {
+          poly_global.emplace_back(static_cast<float>(pt.x), static_cast<float>(pt.y + y_offset));
+        }
+        all_polygons.push_back(poly_global);
+      }
+    }
+
+    std::string json_file_name = mapping_dir_string_ + "/" + timestamp + "_" + spec + ".json";
+    std::ofstream json_file(json_file_name);
+    if (json_file.is_open()) {
+      json_file << "{\n";
+      json_file << "  \"version\": \"0.4.30\",\n";
+      json_file << "  \"flags\": {},\n";
+      json_file << "  \"shapes\": [\n";
+      for (size_t i = 0; i < all_polygons.size(); ++i) {
+        json_file << "    {\n";
+        json_file << "      \"label\": \"stair\",\n";
+        json_file << "      \"text\": \"\",\n";
+        json_file << "      \"points\": [\n";
+        for (size_t j = 0; j < all_polygons[i].size(); ++j) {
+          json_file << "        [\n";
+          json_file << "          " << all_polygons[i][j].x << ",\n";
+          json_file << "          " << all_polygons[i][j].y << "\n";
+          json_file << "        ]" << (j + 1 < all_polygons[i].size() ? "," : "") << "\n";
+        }
+        json_file << "      ],\n";
+        json_file << "      \"group_id\": null,\n";
+        json_file << "      \"shape_type\": \"polygon\",\n";
+        json_file << "      \"flags\": {}\n";
+        json_file << "    }" << (i + 1 < all_polygons.size() ? "," : "") << "\n";
+      }
+      json_file << "  ],\n";
+      json_file << "  \"imagePath\": \"" << base_image_name << "\",\n";
+      json_file << "  \"imageData\": null,\n";
+      json_file << "  \"imageHeight\": " << projected_intensity_stack_result_.rows << ",\n";
+      json_file << "  \"imageWidth\": " << projected_intensity_stack_result_.cols << "\n";
+      json_file << "}\n";
+      json_file.close();
+      RCLCPP_INFO(this->get_logger(), "Saved annotation json: %s", json_file_name.c_str());
+    }
+  }
+}
+
+void ImageProjectionTool::cliffSegmentation(
+  cv::Mat& projected_intensity_image,
+  const pcl::PointCloud<PointType>::Ptr& projected_intensity_cloud)
+{
+  if (projected_intensity_image.empty() || !projected_intensity_cloud || projected_intensity_cloud->empty()) {
+    return;
+  }
+
+  const int rows = projected_intensity_image.rows;
+  const int cols = projected_intensity_image.cols;
+
+  // Map each pixel (img_row, viscolumnIdn) to its point index in projected_intensity_cloud
+  // and compute average x, y, z over the last 5 img_row
+  cv::Mat pt_idx_mat(rows, cols, CV_32S, cv::Scalar(-1));
+  double sum_x = 0.0, sum_y = 0.0, sum_z = 0.0;
+  int bottom_count = 0;
+  const int min_last_row = std::max(0, rows - 5);
+
+  for (int i = 0; i < static_cast<int>(projected_intensity_cloud->points.size()); ++i) {
+    const auto& pt = projected_intensity_cloud->points[i];
+    int img_row = static_cast<int>(pt.intensity);
+    int viscolumnIdn = static_cast<int>(std::lround((pt.intensity - img_row) * 10000.0f));
+
+    if (img_row < 0 || img_row >= rows || viscolumnIdn < 0 || viscolumnIdn >= cols) {
+      continue;
+    }
+    pt_idx_mat.at<int>(img_row, viscolumnIdn) = i;
+
+    if (img_row >= min_last_row) {
+      sum_x += pt.x;
+      sum_y += pt.y;
+      sum_z += pt.z;
+      ++bottom_count;
+    }
+  }
+
+  float avg_x = 0.0f, avg_y = 0.0f, avg_z = 0.0f;
+  if (bottom_count > 0) {
+    avg_x = static_cast<float>(sum_x / bottom_count);
+    avg_y = static_cast<float>(sum_y / bottom_count);
+    avg_z = static_cast<float>(sum_z / bottom_count);
+  }
+
+  cv::Mat segmented_image = projected_intensity_image.clone();
+  const float cliff_dist_thresh_sq = 1.0f;
+
+  for (int r = 0; r < rows; ++r) {
+    for (int c = 0; c < cols; ++c) {
+      int idx = pt_idx_mat.at<int>(r, c);
+      if (idx < 0) {
+        continue;
+      }
+      const auto& p1 = projected_intensity_cloud->points[idx];
+
+      for (int dr = -1; dr <= 1; ++dr) {
+        int nr = r + dr;
+        if (nr < 0 || nr >= rows) {
+          continue;
+        }
+        for (int dc = -1; dc <= 1; ++dc) {
+          if (dr == 0 && dc == 0) {
+            continue;
+          }
+          int nc = c + dc;
+          if (nc < 0 || nc >= cols) {
+            continue;
+          }
+
+          int nidx = pt_idx_mat.at<int>(nr, nc);
+          if (nidx < 0) {
+            continue;
+          }
+          const auto& p2 = projected_intensity_cloud->points[nidx];
+
+          float dx = p1.x - p2.x;
+          float dy = p1.y - p2.y;
+          float dz = p1.z - p2.z;
+          if (dx * dx + dy * dy + dz * dz > cliff_dist_thresh_sq) {
+            segmented_image.at<cv::Vec3b>(r, c) = cv::Vec3b(0, 0, 0);
+            segmented_image.at<cv::Vec3b>(nr, nc) = cv::Vec3b(0, 0, 0);
+          }
+        }
+      }
+    }
+  }
+
+  projected_intensity_image = segmented_image;
 }
 
 

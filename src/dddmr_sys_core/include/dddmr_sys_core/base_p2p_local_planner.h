@@ -65,7 +65,7 @@ namespace dddmr_sys_core {
        * @brief  Check the heading of the robot is pointing to the future plan
        * @return True if aligned, false otherwise
        */
-      virtual bool isInitialHeadingAligned() = 0;
+      virtual bool isInitialHeadingAligned(double m_tolerance) = 0;
 
       /**
        * @brief  Check the shortest angle between goal and robot heading is aligned

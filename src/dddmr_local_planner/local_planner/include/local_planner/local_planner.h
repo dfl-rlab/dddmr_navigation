@@ -78,7 +78,7 @@ class Local_Planner : public rclcpp::Node {
       
       bool isGoalReached();
       
-      bool isInitialHeadingAligned();
+      bool isInitialHeadingAligned(double m_tolerance);
       bool isGoalHeadingAligned();
 
       void updateGlobalPose();

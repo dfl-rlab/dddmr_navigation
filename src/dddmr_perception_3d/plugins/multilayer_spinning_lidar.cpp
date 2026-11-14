@@ -394,7 +394,7 @@ void MultiLayerSpinningLidar::updateDGraphInWindow(){
   std::vector<pcl::index_t> idx_ground_filtered;
   shared_data_->kdtree_ground_->radiusSearch(robot_position, 2*perception_window_size_, idx_ground, sqdist_ground);
   for (auto point_idx : idx_ground) {
-    if(fabs(shared_data_->pcl_ground_->points[point_idx].z - robot_position.z)<0.2)
+    if(fabs(shared_data_->pcl_ground_->points[point_idx].z - robot_position.z)<1.0)
       idx_ground_filtered.push_back(point_idx);
   }
 

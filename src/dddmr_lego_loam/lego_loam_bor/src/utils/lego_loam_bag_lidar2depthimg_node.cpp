@@ -1,6 +1,4 @@
 #include "imageProjectionTool.h"
-#include "featureAssociation.h"
-#include "mapOptimization.h"
 #include <chrono>
 #include <functional>
 #include <memory>

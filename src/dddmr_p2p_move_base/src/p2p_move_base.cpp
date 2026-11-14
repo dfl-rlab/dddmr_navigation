@@ -342,7 +342,7 @@ bool P2PMoveBase::executeCycle(const std::shared_ptr<rclcpp_action::ServerGoalHa
     
     else if(STATE_->isCurrentDecision("d_align_heading")){
 
-      if(LP_->isInitialHeadingAligned()){
+      if(LP_->isInitialHeadingAligned(1.0)){
         STATE_->setDecision("d_controlling");  
       }
       else{
@@ -516,6 +516,11 @@ bool P2PMoveBase::executeCycle(const std::shared_ptr<rclcpp_action::ServerGoalHa
         GPM_->copyPlan(plan);
         LP_->setPlan(plan);
       }
+
+      if(!LP_->isInitialHeadingAligned(2.0)){
+        STATE_->setDecision("d_align_heading");  
+      }
+
       //@Behavior for oscillation here
       
       if(STATE_->oscillation_patience_ >0 && (clock_->now()-STATE_->last_oscillation_reset_).seconds() >= STATE_->oscillation_patience_){

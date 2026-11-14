@@ -50,6 +50,8 @@ class ImageProjectionTool : public rclcpp::Node
     void publishProjectedPointClouds();
     void projectImageBySelection();
     void exportProjectedImages();
+    void autoLabelProjectedIntensityImages();
+    void cliffSegmentation(cv::Mat& projected_intensity_image, const pcl::PointCloud<PointType>::Ptr& projected_intensity_cloud);
 
     
     bool to_fa_;
@@ -58,6 +60,7 @@ class ImageProjectionTool : public rclcpp::Node
     pcl::PointCloud<PointType>::Ptr selected_cloud_;
     cv::Mat projected_stack_result_;
     cv::Mat projected_selected_stack_result_;
+    cv::Mat projected_intensity_stack_result_;
     float xmax_{50.0f}, xmin_{-50.0f}, ymax_{50.0f}, ymin_{-50.0f}, zmax_{50.0f}, zmin_{-50.0f};
     std::string base_ground_frame_, sensor_frame_;
     bool got_baselink2sensor_tf_;
@@ -143,6 +146,7 @@ class ImageProjectionTool : public rclcpp::Node
     std::string trt_model_path_;
     int projected_image_stack_size_;
     std::deque<cv::Mat> projected_image_queue_;
+    std::deque<cv::Mat> projected_intensity_image_queue_;
     std::deque<pcl::PointCloud<PointType>> projected_pc_queue_;
     
     double sensor_install_pitch_;
@@ -170,6 +174,9 @@ class ImageProjectionTool : public rclcpp::Node
     double pitch_correction_;
     tf2::Stamped<tf2::Transform> ideal_sensor_orientation2sensor_;
 
+    int auto_label_morph_kernel_width_;
+    int auto_label_morph_kernel_height_;
+    std::string auto_label_morph_kernel_shape_;
 
 };
 

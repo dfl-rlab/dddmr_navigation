@@ -85,6 +85,7 @@ class ImageProjection : public rclcpp::Node
     pcl::PointCloud<PointType>::Ptr ds_patched_ground_;
     pcl::PointCloud<PointType>::Ptr ds_patched_ground_edge_;
     pcl::PointCloud<PointType>::Ptr yolo_labelled_point_cloud_;
+    pcl::PointCloud<PointType>::Ptr objects_excluding_cloud_;
 
     pcl::VoxelGrid<PointType> dsf_patched_ground_;
 
@@ -113,6 +114,7 @@ class ImageProjection : public rclcpp::Node
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr _pub_segmented_cloud_pure;
     rclcpp::Publisher<cloud_msgs::msg::CloudInfo>::SharedPtr _pub_segmented_cloud_info;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr _pub_outlier_cloud;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_objects_excluding_cloud_;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr _pub_projected_image;
     
     cloud_msgs::msg::CloudInfo _seg_msg;
@@ -120,6 +122,7 @@ class ImageProjection : public rclcpp::Node
     int _label_count;
     
     cv::Mat range_mat_removing_moving_object_;
+    cv::Mat range_mat_objects_excluding_object_;
     Eigen::MatrixXf _range_mat;   // range matrix for range image
     Eigen::MatrixXi _label_mat;   // label matrix for segmentaiton marking
     Eigen::Matrix<int8_t,Eigen::Dynamic,Eigen::Dynamic> _ground_mat;  // ground matrix for ground cloud marking
@@ -144,12 +147,11 @@ class ImageProjection : public rclcpp::Node
     
     int stitcher_num_;
     
-    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_annotated_img_;
-    
     bool is_trt_engine_exist_;
     std::string trt_model_path_;
     int projected_image_stack_size_;
     std::vector<int64_t> moving_object_labels_;
+    std::vector<int64_t> objects_excluding_labels_;
     std::deque<cv::Mat> projected_image_queue_;
     
     double sensor_install_pitch_;

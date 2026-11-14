@@ -228,7 +228,7 @@ double Local_Planner::getShortestAngleFromPose2RobotHeading(tf2::Transform m_pos
 
 }
 
-bool Local_Planner::isInitialHeadingAligned(){
+bool Local_Planner::isInitialHeadingAligned(double m_tolerance){
 
   prunePlan(heading_tracking_distance_, 0.0);
   if(prune_plan_.poses.size()<3){
@@ -278,7 +278,7 @@ bool Local_Planner::isInitialHeadingAligned(){
   
   RCLCPP_DEBUG(this->get_logger().get_child(name_), "Heading difference from the prune plan starting at %.2f is %.2f", heading_tracking_distance_, yaw);
 
-  if(fabs(yaw) < heading_align_angle_)
+  if(fabs(yaw) < heading_align_angle_ * m_tolerance)
     return true;
   else
     return false;
