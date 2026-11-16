@@ -28,6 +28,10 @@
       <description>TBW</description>
     </class>
 
+    <class type="perception_3d::OscillationLayer"  base_class_type="perception_3d::Sensor">
+      <description>TBW</description>
+    </class>
+
   </library>
 </class_libraries>
 

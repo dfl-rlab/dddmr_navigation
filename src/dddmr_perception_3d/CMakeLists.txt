@@ -162,6 +162,7 @@ ament_target_dependencies(depth_camera_buffer
 
 # layers
 add_library(layers SHARED
+  plugins/oscillation_layer.cpp
   plugins/nothing_layer.cpp
   plugins/no_entry_layer.cpp
   plugins/speed_limit_layer.cpp

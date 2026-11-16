@@ -507,6 +507,16 @@ void GlobalPlanner::makePlan(const std::shared_ptr<rclcpp_action::ServerGoalHand
   }
   else{
     //postSmoothPath(path, smoothed_path);
+
+    //@ queue projected image
+    if(perception_3d_ros_->getSharedDataPtr()->history_global_plan_.size()<5){
+      perception_3d_ros_->getSharedDataPtr()->history_global_plan_.push_back(ros_path);
+    }
+    else{
+      perception_3d_ros_->getSharedDataPtr()->history_global_plan_.push_back(ros_path);
+      perception_3d_ros_->getSharedDataPtr()->history_global_plan_.pop_front();
+    }
+
     pub_path_->publish(ros_path);
     global_plan_result_->path = ros_path;
     goal_handle->succeed(global_plan_result_);

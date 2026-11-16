@@ -42,6 +42,8 @@
 #include <perception_3d/dynamic_graph.h>
 #include <perception_3d/static_graph.h>
 
+#include <nav_msgs/msg/path.hpp>
+
 namespace perception_3d
 {
 
@@ -86,6 +88,8 @@ class SharedData{
     std::recursive_mutex ground_kdtree_cb_mutex_;
     
     bool mapping_mode_;
+
+    std::deque<nav_msgs::msg::Path> history_global_plan_;
   private:
 
 
