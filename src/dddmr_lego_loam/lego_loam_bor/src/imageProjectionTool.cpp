@@ -26,6 +26,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+#include <random>
 #include <boost/circular_buffer.hpp>
 #include "imageProjectionTool.h"
 
@@ -394,8 +395,7 @@ void ImageProjectionTool::projectPointCloud() {
     //@ to visualize the depth image more intuitively, we make line 0 to the last row (bottom row in projected in line 0)
 
     if (rowIdn >= 0 && rowIdn < _vertical_scans && viscolumnIdn >= 0 && viscolumnIdn < _horizontal_scans) {
-      float range_span = 50.0f;
-      float norm = (range) / range_span;
+      float norm = (range) / range_span_;
       norm = std::max(0.0f, std::min(1.0f, norm));
 
       // Continuous 4-segment BGR gradient: Blue -> Cyan -> Green -> Yellow -> Red
@@ -495,7 +495,9 @@ void ImageProjectionTool::projectPointCloud() {
     std::string file_name = mapping_dir_string_ + "/" + timestamp + "_" + spec + ".png";
     cv::imwrite(file_name, projected_stack_result_);
     last_save_depth_img_time_ = image_time;
-    autoLabelProjectedIntensityImages();
+    for(int i_ptb=0; i_ptb<3; i_ptb++){
+      autoLabelProjectedIntensityImages(i_ptb);
+    }
   }
   
 }
@@ -606,8 +608,7 @@ void ImageProjectionTool::projectImageBySelection() {
             continue;
           }
 
-          float range_span = 20.0f;
-          float norm = (range - _minimum_detection_range) / range_span;
+          float norm = (range - _minimum_detection_range) / range_span_;
           norm = std::max(0.0f, std::min(1.0f, norm));
 
           uint8_t b = 0, g = 0, r = 0;
@@ -757,9 +758,82 @@ void ImageProjectionTool::exportProjectedImages() {
   }
 }
 
-void ImageProjectionTool::autoLabelProjectedIntensityImages() {
-  if (projected_intensity_image_queue_.empty()) {
+void ImageProjectionTool::autoLabelProjectedIntensityImages(int ptb_number) {
+  if (projected_intensity_image_queue_.empty() ||
+      (ptb_number != 0 && projected_pc_queue_.empty())) {
     return;
+  }
+
+  cv::Mat output_stack_result;
+  if (ptb_number == 0) {
+    output_stack_result = projected_stack_result_;
+  } else {
+    // Gaussian random noise model clamped to [-0.05, 0.05] meters per pixel
+    static thread_local std::mt19937 noise_gen(std::random_device{}());
+    constexpr float noise_min = -0.05f;
+    constexpr float noise_max = 0.05f;
+    constexpr float noise_mean = 0.0f;
+    constexpr float noise_stddev = 0.05f / 3.0f;  // 3-sigma spans [-0.05, 0.05]
+    std::normal_distribution<float> noise_dist(noise_mean, noise_stddev);
+    auto sample_noise = [&]() -> float {
+      return std::clamp(noise_dist(noise_gen), noise_min, noise_max);
+    };
+
+    // Re-project each stacked cloud with per-pixel range perturbation in [-0.05, 0.05] m
+    std::deque<cv::Mat> perturbed_image_queue;
+    for (const auto& pc : projected_pc_queue_) {
+      cv::Mat perturbed_image(_vertical_scans, _horizontal_scans, CV_8UC3, cv::Scalar(0, 0, 0));
+      for (int rowIdn = 0; rowIdn < _vertical_scans; ++rowIdn) {
+        int img_row = _vertical_scans - 1 - rowIdn;
+        for (int viscolumnIdn = 0; viscolumnIdn < _horizontal_scans; ++viscolumnIdn) {
+          size_t index = static_cast<size_t>(viscolumnIdn) +
+                         static_cast<size_t>(rowIdn) * static_cast<size_t>(_horizontal_scans);
+          if (index >= pc.points.size()) {
+            continue;
+          }
+          const PointType& pt = pc.points[index];
+          if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z) ||
+              !std::isfinite(pt.intensity)) {
+            continue;
+          }
+
+          float perturbed_range = pt.intensity + sample_noise();
+          float norm = std::clamp(perturbed_range / range_span_, 0.0f, 1.0f);
+
+          // Continuous 4-segment BGR gradient: Blue -> Cyan -> Green -> Yellow -> Red
+          uint8_t b = 0, g = 0, r = 0;
+          if (norm < 0.25f) {
+            float f = norm / 0.25f;
+            b = 255;
+            g = static_cast<uint8_t>(f * 255.0f);
+            r = 0;
+          } else if (norm < 0.5f) {
+            float f = (norm - 0.25f) / 0.25f;
+            b = static_cast<uint8_t>((1.0f - f) * 255.0f);
+            g = 255;
+            r = 0;
+          } else if (norm < 0.75f) {
+            float f = (norm - 0.5f) / 0.25f;
+            b = 0;
+            g = 255;
+            r = static_cast<uint8_t>(f * 255.0f);
+          } else {
+            float f = (norm - 0.75f) / 0.25f;
+            b = 0;
+            g = static_cast<uint8_t>((1.0f - f) * 255.0f);
+            r = 255;
+          }
+
+          perturbed_image.at<cv::Vec3b>(img_row, viscolumnIdn) = cv::Vec3b(b, g, r);
+        }
+      }
+      perturbed_image_queue.push_back(perturbed_image);
+    }
+
+    output_stack_result = perturbed_image_queue.front();
+    for (auto it = perturbed_image_queue.begin() + 1; it != perturbed_image_queue.end(); ++it) {
+      cv::vconcat(output_stack_result, (*it), output_stack_result);
+    }
   }
 
   projected_intensity_stack_result_ = projected_intensity_image_queue_.front();
@@ -773,13 +847,14 @@ void ImageProjectionTool::autoLabelProjectedIntensityImages() {
   std::string spec =
     std::to_string(_vertical_scans) + "x" + std::to_string(_horizontal_scans) +
     "_stitch" + std::to_string(stitcher_num_) +
-    "_vstack" + std::to_string(projected_image_stack_size_);
+    "_vstack" + std::to_string(projected_image_stack_size_) +
+    "_perturbation" + std::to_string(ptb_number);
 
   std::string base_image_name = timestamp + "_" + spec + ".png";
 
-  if (!projected_stack_result_.empty()) {
+  if (!output_stack_result.empty()) {
     std::string file_name = mapping_dir_string_ + "/" + base_image_name;
-    cv::imwrite(file_name, projected_stack_result_);
+    cv::imwrite(file_name, output_stack_result);
     RCLCPP_INFO(this->get_logger(), "Saved projected image: %s", file_name.c_str());
   }
 

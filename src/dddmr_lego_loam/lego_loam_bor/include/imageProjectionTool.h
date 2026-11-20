@@ -50,7 +50,7 @@ class ImageProjectionTool : public rclcpp::Node
     void publishProjectedPointClouds();
     void projectImageBySelection();
     void exportProjectedImages();
-    void autoLabelProjectedIntensityImages();
+    void autoLabelProjectedIntensityImages(int ptb_number);
     void cliffSegmentation(cv::Mat& projected_intensity_image, const pcl::PointCloud<PointType>::Ptr& projected_intensity_cloud);
 
     
@@ -177,6 +177,8 @@ class ImageProjectionTool : public rclcpp::Node
     int auto_label_morph_kernel_width_;
     int auto_label_morph_kernel_height_;
     std::string auto_label_morph_kernel_shape_;
+
+    float range_span_{50.0f};
 
 };
 
