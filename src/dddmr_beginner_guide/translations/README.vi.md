@@ -1,84 +1,136 @@
 # Hướng dẫn cho người mới bắt đầu DDDMR
 
-Hướng dẫn này là bài giới thiệu về hệ thống điều hướng DDDMR. Bao gồm ví dụ mô phỏng robot bốn chân trong Gazebo và hướng dẫn triển khai trên robot thực, giúp bạn nhanh chóng bắt đầu và tận hưởng điều hướng 3D.
+Hướng dẫn này giúp bạn bắt đầu với DDDMR Navigation. Mô phỏng Lite3 trong Gazebo và hướng dẫn triển khai trên robot thực giúp bạn nhanh chóng khám phá điều hướng 3D.
 
 ## Mục lục
 
 | # | Phần | Mô tả |
 |:-:|:--------|:------------|
-| 1 | [Điều hướng mô phỏng Gazebo](#-dddmr-navigation-with-gazebo) | Demo mô phỏng robot bốn chân |
+| 1 | [Điều hướng mô phỏng Gazebo](#-dddmr-navigation-with-gazebo) | Demo mô phỏng robot bốn chân Lite3 dùng RL |
 | 2 | [Điều hướng robot thực](#-start-dddmr-navigation-with-a-real-robot) | Triển khai trên robot thực của bạn (robot bánh xe, bốn chân, hình người, v.v.) |
 
 ## 🖥️ Yêu cầu phần mềm
-- **Ubuntu 22.04** (đã test trên 22.04, hỗ trợ 24.04)
+- **Ubuntu 22.04** (đã kiểm thử; máy chủ Ubuntu 24.04 cũng có thể chạy container Humble).
 - **Docker** — [Cài đặt Docker](https://docs.docker.com/engine/install/)
+- **GPU NVIDIA và NVIDIA Container Toolkit** để chạy mô phỏng bằng GPU và demo điều hướng với TensorRT.
 
 ## ✨ DDDMR Navigation with Gazebo
 
-Demo này trình bày cách chạy DDDMR Navigation Stack trong Gazebo với robot bốn chân.
-- Xây dựng các image cần thiết để chuẩn bị môi trường.
-- Chạy hệ thống trong hai terminal — một cho Gazebo world, một cho navigation stack.
+Chạy DDDMR Navigation với **robot bốn chân Lite3 điều khiển bằng RL**, LiDAR dạng vòm và thế giới Gazebo nhiều tầng. Demo sử dụng hai image và container riêng biệt:
+
+| Terminal | Mục đích | Image | Container |
+|:---------|:--------|:------|:----------|
+| 1 | Mô phỏng Lite3 trong Gazebo | `dddmr_simulation:rl_lite3` | `rl_lite3` |
+| 2 | Định vị và điều hướng 3D với TensorRT | `dddmr:humble-cuda` | `dddmr_humble_cuda_dev` |
+
+Các lệnh bên dưới dùng `~/dddmr_navigation` cho kho mã điều hướng và `~/dfl_mobilerobot_simulator` cho trình mô phỏng.
 
 ### 1. Tạo Docker image
 
-Clone repo và chạy ./build.bash, chọn **`x64_gz`**, đã bao gồm tất cả các thành phần cần thiết cho navigation và Gazebo.
+Trước tiên, sao chép kho mã điều hướng. Cả hai cách lấy image bên dưới đều cần bước này:
 
 ```bash
 cd ~
 git clone https://github.com/dfl-rlab/dddmr_navigation.git
-cd ~/dddmr_navigation/dddmr_docker/docker_file && ./build.bash
 ```
+
+Sau đó chọn **một** trong các cách sau để lấy image điều hướng.
+
+#### Cách A: Tự dựng trên máy
+
+Chạy script dựng image, chọn **`x64`**, rồi trả lời **`Y`** khi được hỏi về CUDA. Script tạo `dddmr:humble-cuda` với các thành phần phụ thuộc CUDA và TensorRT.
+
+```bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./build.bash
+```
+
+#### Cách B: Tải image công khai
+
+Image dựng sẵn đã được công bố. Tải image và thêm tag cục bộ mà `run_x64_gpu.bash` sử dụng:
+
+```bash
+docker pull tsengapola/dddmr:humble-cuda
+docker tag tsengapola/dddmr:humble-cuda dddmr:humble-cuda
+```
+
+Sau khi hoàn thành một trong hai cách, tiếp tục tải bản đồ bên dưới. Workspace điều hướng được biên dịch trong container ở Terminal 2. Image mô phỏng Lite3 được dựng riêng tại bước **Terminal 1** bên dưới.
 
 ### 2. Tải bản đồ điều hướng
 
-Để chạy dddmr_navigation trong Gazebo, bạn cần tải bản đồ điều hướng demo (12.3MB).
+Tải và giải nén bản đồ `stair_2_map.zip` cho thế giới Lite3. Trả lời **`Y`** khi được hỏi:
 
 ```bash
-cd ~ && mkdir dddmr_bags
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./download_files.bash
+cd ~/dddmr_navigation/src/dddmr_beginner_guide
+./download_files.bash
 ```
+
+Script tạo `~/dddmr_bags` và giải nén bản đồ vào `~/dddmr_bags/stair_2_map`. Script khởi động gắn thư mục bản đồ vào `/root/dddmr_bags` trong container điều hướng.
 
 ### 3. Chuẩn bị môi trường demo
 
-#### Tạo hai Docker container (Gazebo và navigation)
+Mở **hai terminal riêng biệt**: một cho trình mô phỏng và một cho điều hướng. Cả hai container phải dùng **`ROS_DOMAIN_ID=22`**.
 
-> [!IMPORTANT] 
-> Lệnh sau sẽ khởi động hai Docker container tương tác sử dụng image đã xây dựng. Vui lòng mở **hai terminal riêng biệt** để chuẩn bị môi trường demo.
+#### 🖥️ Terminal 1: Khởi động mô phỏng Lite3 trong Gazebo
 
-#### 🖥️ Terminal 1: Khởi chạy mô phỏng Go2 trong Gazebo
+Làm theo [hướng dẫn Gazebo — Lite3](../GAZEBO_GUIDE.md#lite3--rl-quadruped) để sao chép nhánh `rl_lite3`, khởi tạo các submodule, dựng image và chạy `./rl_lite3_gpu.bash`.
 
-Trong terminal đầu tiên, làm theo cả hai bước trong [Hướng dẫn Gazebo — Go2](../GAZEBO_GUIDE.md#go2--quadruped) để xây dựng image mô phỏng và khởi động container Gazebo.
+Sau khi robot rơi xuống mặt đất, đặt tiêu điểm vào terminal mô phỏng và nhấn lần lượt **`r` → `0` → `1` → `n`**. Các bước này đặt lại tư thế, cho robot đứng dậy, khởi động bộ điều khiển RL và cho phép nhận lệnh điều hướng. **Chờ ít nhất một giây giữa các phím; sau `0`, cũng phải chờ robot đứng dậy xong.**
 
-Khi mô phỏng Go2 đã chạy, hãy giữ terminal này mở và quay lại đây để tiếp tục với **Terminal 2** bên dưới.
+| Phím | Chức năng |
+|:----|:-------|
+| `r` | Đặt robot về tư thế ban đầu trong thế giới mô phỏng. |
+| `0` | Cho robot đứng dậy và chuẩn bị di chuyển. |
+| `1` | Kích hoạt chính sách di chuyển RL. |
+| `n` | Bật đầu vào `/cmd_vel` để hệ thống điều hướng có thể điều khiển robot. |
 
-#### 🖥️ Terminal 2 (tạo container cho hệ thống navigation)
+Giữ terminal mô phỏng mở rồi chuyển sang Terminal 2.
 
-- ##### Bước 1 (trên host): tạo container cho hệ thống navigation
+#### 🖥️ Terminal 2: Tạo container điều hướng
+
+##### Bước 1 (trên máy chủ): Khởi động container CUDA
+
 ```bash
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./run_x64_navigation.bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./run_x64_gpu.bash
 ```
 
-- ##### Bước 2 (trong container navigation): build và khởi chạy
+Nhập **`22`** khi script hỏi `ROS_DOMAIN_ID`. Script tạo container `dddmr_humble_cuda_dev` từ `dddmr:humble-cuda` và gắn kho mã vào `/root/dddmr_navigation`.
+
+##### Bước 2 (trong container điều hướng): Biên dịch với TensorRT
+
 ```bash
-cd dddmr_navigation/ && source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash && ros2 launch p2p_move_base go2_localization.launch
+cd /root/dddmr_navigation
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=22
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON
+```
+
+`TRT_ENABLED=ON` bật mã suy luận của hệ thống điều hướng. Với kho mã mới sao chép, hãy tạo thêm engine TensorRT từ mô hình có sẵn bằng script chuyển đổi:
+
+```bash
+cd /root/dddmr_navigation/src/dddmr_lego_loam/lego_loam_bor/engine
+bash onnx2trt.bash
+cd /root/dddmr_navigation
+```
+
+##### Bước 3 (trong container điều hướng): Khởi động định vị và điều hướng
+
+```bash
+source install/setup.bash
+export ROS_DOMAIN_ID=22
+ros2 launch p2p_move_base lite3_localization_launch.py
 ```
 
 ### 4. Chạy demo
 
-- Trong demo Gazebo, bản đồ đã được căn chỉnh sẵn, nên bạn không cần đặt pose ban đầu trừ khi tự tạo bản đồ
-- Đặt mục tiêu (3D Goal Pose) trong RViz, robot sẽ di chuyển đến điểm mục tiêu
+1. Xác nhận Lite3 ở Terminal 1 đang dùng chính sách RL và đầu vào `/cmd_vel` đã được bật.
+2. Trong RViz, kiểm tra đám mây điểm trực tiếp có trùng với bản đồ được cung cấp hay không. Cấu hình demo có sẵn tư thế ban đầu cho thế giới này. Nếu robot đã được di chuyển hoặc đặt lại ở vị trí khác, dùng **3D Pose Estimate** để căn chỉnh.
+3. Chọn **3D Goal Pose** trong RViz và chỉ định một điểm có thể tiếp cận trên mặt đất. Lite3 sẽ làm theo lệnh điều hướng để đến đích.
 
-<p align='center'>
-    <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/give_goal_in_demo_.png" width="920" height="460"/>
+<p align="center">
+  <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/3d_nav_rl_quadruped_deep_learning.png?raw=true" alt="Điều hướng 3D với học sâu cho robot bốn chân Lite3 RL trong Gazebo và RViz" width="920" />
 </p>
-
-### 5. Các vấn đề đã biết
-
-> [!WARNING]
-> Sau đây là các hành vi hiện được quan sát, đang được điều tra và sẽ được sửa trong các bản cập nhật tương lai.
-> - Gazebo: Thỉnh thoảng trượt trên dốc
-> - Mapping: Các lớp sàn bị trùng lặp
 
 ---
 

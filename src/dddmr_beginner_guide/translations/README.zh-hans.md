@@ -1,84 +1,136 @@
 # DDDMR 新手指南
 
-本指南是 DDDMR 导航系统的入门教程。包含 Gazebo 四足机器人仿真示例和真实机器人部署指南，帮助你快速上手，探索并享受 3D 导航的乐趣。
+本指南是 DDDMR 导航系统的入门教程，包含 Lite3 Gazebo 仿真与真实机器人部署，帮助你快速上手并探索 3D 导航。
 
 ## 目录
 
 | # | 章节 | 描述 |
 |:-:|:--------|:------------|
-| 1 | [Gazebo 仿真导航](#-dddmr-navigation-with-gazebo) | 四足机器人仿真演示 |
+| 1 | [Gazebo 仿真导航](#-dddmr-navigation-with-gazebo) | Lite3 RL 四足机器人仿真演示 |
 | 2 | [真实机器人导航](#-start-dddmr-navigation-with-a-real-robot) | 部署到你的真实机器人（轮式、四足、人形等） |
 
 ## 🖥️ 软件需求
-- **Ubuntu 22.04**（已在 22.04 测试，应支持 24.04）
+- **Ubuntu 22.04**（已测试；Ubuntu 24.04 主机也可运行 Humble 容器）。
 - **Docker** — [安装 Docker](https://docs.docker.com/engine/install/)
+- **NVIDIA GPU 与 NVIDIA Container Toolkit**，用于 GPU 仿真与 TensorRT 导航演示。
 
 ## ✨ DDDMR Navigation with Gazebo
 
-本演示展示如何在 Gazebo 中运行 DDDMR 导航系统与四足机器人。
-- 构建所需镜像以准备环境。
-- 在两个终端中运行系统 — 一个用于 Gazebo 世界，另一个用于导航系统。
+在多楼层 Gazebo 世界中，使用搭载穹顶式激光雷达的 **Lite3 RL 四足机器人**运行 DDDMR 导航。本演示使用两个独立的镜像与容器：
+
+| 终端 | 用途 | 镜像 | 容器 |
+|:---------|:--------|:------|:----------|
+| 1 | Lite3 Gazebo 仿真 | `dddmr_simulation:rl_lite3` | `rl_lite3` |
+| 2 | 使用 TensorRT 的定位与 3D 导航 | `dddmr:humble-cuda` | `dddmr_humble_cuda_dev` |
+
+以下命令使用 `~/dddmr_navigation` 作为导航仓库路径，`~/dfl_mobilerobot_simulator` 作为仿真器路径。
 
 ### 1. 创建 Docker 镜像
 
-克隆仓库并运行 ./build.bash，请选择 **`x64_gz`**，它已包含导航和 Gazebo 所需的所有组件。
+先克隆导航仓库。以下两种获取镜像的方式都需要此步骤：
 
 ```bash
 cd ~
 git clone https://github.com/dfl-rlab/dddmr_navigation.git
-cd ~/dddmr_navigation/dddmr_docker/docker_file && ./build.bash
 ```
+
+接着从以下方式中**选择一种**获取导航镜像。
+
+#### 方式 A：在本地构建
+
+运行构建脚本，选择 **`x64`**，并在 CUDA 提示时回答 **`Y`**。这会构建包含 CUDA 与 TensorRT 依赖项的 `dddmr:humble-cuda`。
+
+```bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./build.bash
+```
+
+#### 方式 B：拉取公开镜像
+
+预构建镜像已公开发布。拉取后，添加 `run_x64_gpu.bash` 使用的本地标签：
+
+```bash
+docker pull tsengapola/dddmr:humble-cuda
+docker tag tsengapola/dddmr:humble-cuda dddmr:humble-cuda
+```
+
+完成任一方式后，继续下载下面的地图。导航工作空间会在终端 2 的容器内编译；Lite3 仿真镜像则在下面的**终端 1** 步骤中单独构建。
 
 ### 2. 下载导航地图
 
-要在 Gazebo 中运行 dddmr_navigation，你需要下载演示导航地图（12.3MB）。
+下载并解压 Lite3 世界使用的导航地图 `stair_2_map.zip`。出现提示时回答 **`Y`**：
 
 ```bash
-cd ~ && mkdir dddmr_bags
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./download_files.bash
+cd ~/dddmr_navigation/src/dddmr_beginner_guide
+./download_files.bash
 ```
+
+脚本会创建 `~/dddmr_bags`，并将地图解压到 `~/dddmr_bags/stair_2_map`。导航容器的启动脚本会将此地图目录挂载到容器内的 `/root/dddmr_bags`。
 
 ### 3. 准备演示环境
 
-#### 创建两个 Docker 容器（Gazebo 和导航）
+打开**两个独立终端**，分别运行仿真器与导航。两个容器都必须使用 **`ROS_DOMAIN_ID=22`**。
 
-> [!IMPORTANT] 
-> 以下命令将使用我们构建的镜像启动两个交互式 Docker 容器。请打开**两个独立的终端**来准备演示环境。
+#### 🖥️ 终端 1：启动 Lite3 Gazebo 仿真
 
-#### 🖥️ 终端 1：启动 Go2 Gazebo 仿真
+按照 [Gazebo 指南 — Lite3](../GAZEBO_GUIDE.md#lite3--rl-quadruped)，克隆 `rl_lite3` 分支、初始化子模块、构建镜像，并运行 `./rl_lite3_gpu.bash`。
 
-在第一个终端中，按照 [Gazebo 指南 — Go2](../GAZEBO_GUIDE.md#go2--quadruped) 的两个步骤，构建仿真镜像并启动 Gazebo 容器。
+机器人落地后，保持仿真器终端处于输入焦点，依次按下 **`r` → `0` → `1` → `n`**，以重置姿态、站立、启动 RL 控制器并接受导航速度指令。**每次按键至少间隔一秒；按下 `0` 后，还要等站立动作完成。**
 
-Go2 仿真启动后，请保持此终端打开，并返回这里继续下方的**终端 2** 步骤。
+| 按键 | 功能 |
+|:----|:-------|
+| `r` | 将机器人重置到世界中的起始姿态。 |
+| `0` | 站起来，准备行走。 |
+| `1` | 启用 RL 行走策略。 |
+| `n` | 启用 `/cmd_vel` 输入，让导航系统控制机器人。 |
 
-#### 🖥️ 终端 2（创建导航系统容器）
+保持仿真器终端开启，接着进行终端 2 的步骤。
 
-- ##### 步骤 1（在主机上）：创建导航系统容器
+#### 🖥️ 终端 2：创建导航容器
+
+##### 步骤 1（主机上）：启动 CUDA 容器
+
 ```bash
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./run_x64_navigation.bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./run_x64_gpu.bash
 ```
 
-- ##### 步骤 2（在导航容器内）：构建并启动
+脚本询问 `ROS_DOMAIN_ID` 时输入 **`22`**。它会使用 `dddmr:humble-cuda` 创建 `dddmr_humble_cuda_dev` 容器，并将导航仓库挂载到 `/root/dddmr_navigation`。
+
+##### 步骤 2（导航容器内）：启用 TensorRT 编译
+
 ```bash
-cd dddmr_navigation/ && source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash && ros2 launch p2p_move_base go2_localization.launch
+cd /root/dddmr_navigation
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=22
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON
+```
+
+`TRT_ENABLED=ON` 会启用导航推理代码。全新克隆的仓库还需要使用附带的模型与转换脚本生成 TensorRT 引擎：
+
+```bash
+cd /root/dddmr_navigation/src/dddmr_lego_loam/lego_loam_bor/engine
+bash onnx2trt.bash
+cd /root/dddmr_navigation
+```
+
+##### 步骤 3（导航容器内）：启动定位与导航
+
+```bash
+source install/setup.bash
+export ROS_DOMAIN_ID=22
+ros2 launch p2p_move_base lite3_localization_launch.py
 ```
 
 ### 4. 运行演示
 
-- 在 Gazebo 演示中，地图已经对齐，除非你自己建图，否则不需要设置初始位姿
-- 在 RViz 中给出目标点（3D Goal Pose），机器人将移动到目标点
+1. 确认终端 1 中的 Lite3 已进入 RL 策略模式，并启用 `/cmd_vel` 输入。
+2. 在 RViz 中确认实时点云与提供的地图重叠。演示配置已包含此世界的初始姿态；若机器人被移动或重置到其他位置，请用 **3D Pose Estimate** 对齐。
+3. 在 RViz 中选择 **3D Goal Pose**，并指定可到达的地面位置。Lite3 会按照导航指令前往目标。
 
-<p align='center'>
-    <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/give_goal_in_demo_.png" width="920" height="460"/>
+<p align="center">
+  <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/3d_nav_rl_quadruped_deep_learning.png?raw=true" alt="Lite3 RL 四足机器人在 Gazebo 与 RViz 中使用深度学习进行 3D 导航" width="920" />
 </p>
-
-### 5. 已知问题
-
-> [!WARNING]
-> 以下是目前观察到的行为，正在调查中，将在未来更新中修复。
-> - Gazebo：斜坡上偶尔打滑
-> - 建图：重复的地板层
 
 ---
 

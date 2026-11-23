@@ -1,84 +1,136 @@
 # DDDMR 초보자 가이드
 
-이 가이드는 DDDMR 내비게이션 시스템의 입문 튜토리얼입니다. Gazebo 4족 로봇 시뮬레이션 예제와 실제 로봇 배포 가이드를 포함하여, 빠르게 시작하고 3D 내비게이션을 탐색하고 즐길 수 있도록 도와드립니다.
+이 가이드는 DDDMR 내비게이션 입문 튜토리얼입니다. Lite3 Gazebo 시뮬레이션과 실제 로봇 배포 과정을 따라 3D 내비게이션을 시작할 수 있습니다.
 
 ## 목차
 
 | # | 섹션 | 설명 |
 |:-:|:--------|:------------|
-| 1 | [Gazebo 시뮬레이션 내비게이션](#-dddmr-navigation-with-gazebo) | 4족 로봇 시뮬레이션 데모 |
+| 1 | [Gazebo 시뮬레이션 내비게이션](#-dddmr-navigation-with-gazebo) | Lite3 RL 4족 로봇 시뮬레이션 데모 |
 | 2 | [실제 로봇 내비게이션](#-start-dddmr-navigation-with-a-real-robot) | 실제 로봇에 배포 (바퀴형, 4족, 휴머노이드 등) |
 
 ## 🖥️ 소프트웨어 요구 사항
-- **Ubuntu 22.04** (22.04에서 테스트됨, 24.04 지원 예정)
+- **Ubuntu 22.04** (테스트 완료. Ubuntu 24.04 호스트에서도 Humble 컨테이너를 실행할 수 있습니다).
 - **Docker** — [Docker 설치](https://docs.docker.com/engine/install/)
+- GPU 시뮬레이션과 TensorRT 내비게이션 데모를 위한 **NVIDIA GPU 및 NVIDIA Container Toolkit**.
 
 ## ✨ DDDMR Navigation with Gazebo
 
-이 데모는 Gazebo에서 4족 로봇과 함께 DDDMR 내비게이션 스택을 실행하는 방법을 보여줍니다.
-- 환경 준비를 위한 필요한 이미지를 빌드합니다.
-- 두 개의 터미널에서 시스템을 실행합니다 — 하나는 Gazebo 월드용, 다른 하나는 내비게이션 스택용입니다.
+돔형 LiDAR를 장착한 **Lite3 RL 4족 로봇**으로 여러 층으로 구성된 Gazebo 월드에서 DDDMR 내비게이션을 실행합니다. 데모는 두 개의 별도 이미지와 컨테이너를 사용합니다.
+
+| 터미널 | 용도 | 이미지 | 컨테이너 |
+|:---------|:--------|:------|:----------|
+| 1 | Lite3 Gazebo 시뮬레이션 | `dddmr_simulation:rl_lite3` | `rl_lite3` |
+| 2 | TensorRT를 사용하는 위치 추정 및 3D 내비게이션 | `dddmr:humble-cuda` | `dddmr_humble_cuda_dev` |
+
+아래 명령은 내비게이션 저장소 경로로 `~/dddmr_navigation`, 시뮬레이터 경로로 `~/dfl_mobilerobot_simulator`를 사용합니다.
 
 ### 1. Docker 이미지 생성
 
-저장소를 복제하고 ./build.bash를 실행하세요. **`x64_gz`**를 선택하세요. 내비게이션과 Gazebo에 필요한 모든 구성 요소가 포함되어 있습니다.
+먼저 내비게이션 저장소를 복제합니다. 아래의 두 이미지 준비 방법 모두 이 단계가 필요합니다.
 
 ```bash
 cd ~
 git clone https://github.com/dfl-rlab/dddmr_navigation.git
-cd ~/dddmr_navigation/dddmr_docker/docker_file && ./build.bash
 ```
 
-### 2. 내비게이션 맵 다운로드
+다음 방법 중 **하나를 선택**하여 내비게이션 이미지를 준비합니다.
 
-Gazebo에서 dddmr_navigation을 실행하려면 데모용 내비게이션 맵(12.3MB)을 다운로드해야 합니다.
+#### 방법 A: 로컬 빌드
+
+빌드 스크립트를 실행하여 **`x64`**를 선택하고 CUDA 사용 질문에 **`Y`**로 답합니다. CUDA 및 TensorRT 의존성이 포함된 `dddmr:humble-cuda`가 생성됩니다.
 
 ```bash
-cd ~ && mkdir dddmr_bags
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./download_files.bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./build.bash
 ```
+
+#### 방법 B: 공개 이미지 가져오기
+
+미리 빌드된 이미지가 공개되어 있습니다. 이미지를 가져온 다음 `run_x64_gpu.bash`에서 사용하는 로컬 태그를 추가합니다.
+
+```bash
+docker pull tsengapola/dddmr:humble-cuda
+docker tag tsengapola/dddmr:humble-cuda dddmr:humble-cuda
+```
+
+어느 방법이든 완료한 후 아래의 지도를 다운로드합니다. 내비게이션 작업 공간은 터미널 2의 컨테이너 안에서 컴파일합니다. Lite3 시뮬레이션 이미지는 아래 **터미널 1** 단계에서 별도로 빌드합니다.
+
+### 2. 내비게이션 지도 다운로드
+
+Lite3 월드용 지도 `stair_2_map.zip`을 다운로드하고 압축을 풉니다. 질문이 나오면 **`Y`**로 답합니다.
+
+```bash
+cd ~/dddmr_navigation/src/dddmr_beginner_guide
+./download_files.bash
+```
+
+스크립트는 `~/dddmr_bags`를 생성하고 지도를 `~/dddmr_bags/stair_2_map`에 풉니다. 내비게이션 시작 스크립트는 지도 디렉터리를 컨테이너 안의 `/root/dddmr_bags`에 마운트합니다.
 
 ### 3. 데모 환경 준비
 
-#### 두 개의 Docker 컨테이너 생성 (Gazebo 및 내비게이션)
+시뮬레이터용과 내비게이션용으로 **별도의 터미널 두 개**를 엽니다. 두 컨테이너 모두 **`ROS_DOMAIN_ID=22`**를 사용해야 합니다.
 
-> [!IMPORTANT] 
-> 다음 명령은 빌드한 이미지를 사용하여 두 개의 대화형 Docker 컨테이너를 시작합니다. 데모 환경을 준비하기 위해 **두 개의 별도 터미널**을 여세요.
+#### 🖥️ 터미널 1: Lite3 Gazebo 시뮬레이션 시작
 
-#### 🖥️ 터미널 1: Go2 Gazebo 시뮬레이션 시작
+[Gazebo 가이드 — Lite3](../GAZEBO_GUIDE.md#lite3--rl-quadruped)를 따라 `rl_lite3` 브랜치를 복제하고 서브모듈을 초기화한 뒤 이미지를 빌드하고 `./rl_lite3_gpu.bash`를 실행합니다.
 
-첫 번째 터미널에서 [Gazebo 가이드 — Go2](../GAZEBO_GUIDE.md#go2--quadruped)의 두 단계를 따라 시뮬레이션 이미지를 빌드하고 Gazebo 컨테이너를 시작하세요.
+로봇이 바닥에 내려오면 시뮬레이터 터미널에 포커스를 두고 **`r` → `0` → `1` → `n`** 순서로 누릅니다. 자세 초기화, 일어서기, RL 제어기 시작, 내비게이션 속도 명령 허용 순서입니다. **각 키 입력 사이에 최소 1초를 기다리고, `0` 이후에는 일어서기 동작이 완료될 때까지 기다립니다.**
 
-Go2 시뮬레이션이 실행되면 이 터미널을 열린 상태로 유지하고, 여기로 돌아와 아래의 **터미널 2** 단계를 진행하세요.
+| 키 | 동작 |
+|:----|:-------|
+| `r` | 로봇을 월드의 시작 자세로 초기화합니다. |
+| `0` | 일어서서 이동을 준비합니다. |
+| `1` | RL 보행 정책을 활성화합니다. |
+| `n` | 내비게이션이 로봇을 제어할 수 있도록 `/cmd_vel` 입력을 활성화합니다. |
 
-#### 🖥️ 터미널 2 (내비게이션 시스템 컨테이너 생성)
+시뮬레이션 터미널을 열어 둔 채 터미널 2 단계로 진행합니다.
 
-- ##### 단계 1 (호스트에서): 내비게이션 시스템 컨테이너 생성
+#### 🖥️ 터미널 2: 내비게이션 컨테이너 생성
+
+##### 단계 1 (호스트): CUDA 컨테이너 시작
+
 ```bash
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./run_x64_navigation.bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./run_x64_gpu.bash
 ```
 
-- ##### 단계 2 (내비게이션 컨테이너 내부): 빌드 및 실행
+`ROS_DOMAIN_ID`를 물으면 **`22`**를 입력합니다. `dddmr:humble-cuda` 이미지로 `dddmr_humble_cuda_dev` 컨테이너를 생성하고 저장소를 `/root/dddmr_navigation`에 마운트합니다.
+
+##### 단계 2 (내비게이션 컨테이너 내부): TensorRT를 활성화하여 빌드
+
 ```bash
-cd dddmr_navigation/ && source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash && ros2 launch p2p_move_base go2_localization.launch
+cd /root/dddmr_navigation
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=22
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON
+```
+
+`TRT_ENABLED=ON`은 내비게이션 추론 코드를 활성화합니다. 새로 복제한 저장소에서는 포함된 모델과 변환 스크립트로 TensorRT 엔진도 생성해야 합니다.
+
+```bash
+cd /root/dddmr_navigation/src/dddmr_lego_loam/lego_loam_bor/engine
+bash onnx2trt.bash
+cd /root/dddmr_navigation
+```
+
+##### 단계 3 (내비게이션 컨테이너 내부): 위치 추정 및 내비게이션 시작
+
+```bash
+source install/setup.bash
+export ROS_DOMAIN_ID=22
+ros2 launch p2p_move_base lite3_localization_launch.py
 ```
 
 ### 4. 데모 실행
 
-- Gazebo 데모에서는 맵이 이미 정렬되어 있으므로, 직접 매핑하지 않는 한 초기 포즈를 설정할 필요가 없습니다
-- RViz에서 목표점(3D Goal Pose)을 지정하면 로봇이 목표 지점으로 이동합니다
+1. 터미널 1의 Lite3가 RL 정책 모드이고 `/cmd_vel` 입력이 활성화되어 있는지 확인합니다.
+2. RViz에서 실시간 포인트 클라우드와 제공된 지도가 겹치는지 확인합니다. 데모 설정에는 이 월드의 초기 자세가 포함됩니다. 로봇을 다른 위치로 이동하거나 초기화했다면 **3D Pose Estimate**로 정렬합니다.
+3. RViz에서 **3D Goal Pose**를 선택하고 도달 가능한 지면 위치를 지정합니다. Lite3가 내비게이션 명령에 따라 목표로 이동합니다.
 
-<p align='center'>
-    <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/give_goal_in_demo_.png" width="920" height="460"/>
+<p align="center">
+  <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/3d_nav_rl_quadruped_deep_learning.png?raw=true" alt="Gazebo 및 RViz에서 딥 러닝을 사용하는 Lite3 RL 4족 로봇의 3D 내비게이션" width="920" />
 </p>
-
-### 5. 알려진 문제
-
-> [!WARNING]
-> 다음은 현재 관찰된 동작이며, 조사 중이고 향후 업데이트에서 수정될 예정입니다.
-> - Gazebo: 경사면에서 가끔 미끄러짐
-> - 매핑: 중복된 바닥 레이어
 
 ---
 

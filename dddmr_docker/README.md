@@ -117,7 +117,8 @@ cd dddmr_docker/docker_file_2404
 ```bash
 cd dddmr_docker/docker_file
 ./build.bash
-# Follow prompts to build dddmr:humble, dddmr:humble-cuda, dddmr:l4t_r36, or dddmr_gz:humble
+# Type 'x64' and 'Y' for dddmr:humble-cuda (Lite3 navigation demo)
+# Type 'x64' and 'N' for dddmr:humble, or 'l4t' for dddmr:l4t_r36
 ```
 
 ### 2. Verifying CUDA Enablement

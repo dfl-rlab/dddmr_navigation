@@ -2,74 +2,140 @@
 
 [العربية](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_beginner_guide/translations/README.ar.md) | [繁體中文](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_beginner_guide/translations/README.zh-hant.md) | [简体中文](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_beginner_guide/translations/README.zh-hans.md) | [Русский](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_beginner_guide/translations/README.ru.md) | [Deutsch](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_beginner_guide/translations/README.de.md) | [Español](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_beginner_guide/translations/README.es.md) | [한국어](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_beginner_guide/translations/README.ko.md) | [Português](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_beginner_guide/translations/README.pt.md) | [Türkçe](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_beginner_guide/translations/README.tr.md) | [Tiếng Việt](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_beginner_guide/translations/README.vi.md) | [Français](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_beginner_guide/translations/README.fr.md) | [日本語](https://github.com/dfl-rlab/dddmr_navigation/blob/main/src/dddmr_beginner_guide/translations/README.ja.md)
 
-This README is a beginner's guide to the DDDMR Navigation Stack. With both a gazebo quadruped robot example and a real robot guide, it's designed to help you get up and running fast, explore, and have fun along the way.
+This README is a beginner's guide to the DDDMR Navigation Stack. With both a Lite3 Gazebo simulation and a real robot guide, it's designed to help you get up and running fast, explore, and have fun along the way.
 
 ## Table of Contents
 
 | # | Section | Description |
 |:-:|:--------|:------------|
-| 1 | [DDDMR Navigation with Gazebo](#-dddmr-navigation-with-gazebo) | Simulation demo with quadruped robot |
+| 1 | [DDDMR Navigation with Gazebo](#-dddmr-navigation-with-gazebo) | Lite3 RL quadruped simulation demo |
 | 2 | [DDDMR Navigation with a Real Robot](#-start-dddmr-navigation-with-a-real-robot) | Deploy on your real robot (wheeled robot, quadruped, humanoid, and more) |
 
 ## 🖥️ Software Requirements
-- **Ubuntu 22.04** (tested in 22.04, should support 24.04)
-- **Docker**  [install Docker](https://docs.docker.com/engine/install/)
+
+- **Ubuntu 22.04** (tested; Ubuntu 24.04 hosts can also run the Humble containers).
+- **Docker** — see [Install Docker Engine](https://docs.docker.com/engine/install/).
+- **NVIDIA GPU and NVIDIA Container Toolkit** for the GPU simulator and TensorRT navigation demo.
+
 ## ✨ DDDMR Navigation with Gazebo
-This demo demonstrates how to run the DDDMR Navigation Stack in Gazebo with a quadruped robot.
-- Build the required images to prepare the environment.
-- Run the system in two terminals — one for the Gazebo world and another for the navigation stack. 
+
+Run the DDDMR Navigation Stack with the **Lite3 RL quadruped**, dome LiDAR and a multi-level Gazebo world. The demo uses two separate images and containers:
+
+| Terminal | Purpose | Image | Container |
+|:---------|:--------|:------|:----------|
+| 1 | Lite3 Gazebo simulation | `dddmr_simulation:rl_lite3` | `rl_lite3` |
+| 2 | Localization and 3D navigation with TensorRT | `dddmr:humble-cuda` | `dddmr_humble_cuda_dev` |
+
+The commands below use `~/dddmr_navigation` for the navigation repository and `~/dfl_mobilerobot_simulator` for the simulator.
 
 ### 1. Create docker image
-Clone the repo and run ./build.bash, please select **`x64_gz`**, which already contains all the necessary components for both navigation and Gazebo.
-```
+
+First, clone the navigation repository. This is needed for both image options below:
+
+```bash
 cd ~
 git clone https://github.com/dfl-rlab/dddmr_navigation.git
-cd ~/dddmr_navigation/dddmr_docker/docker_file && ./build.bash
 ```
+
+Then choose **one** of the following ways to obtain the navigation image.
+
+#### Option A: Build locally
+
+Run the image builder, select **`x64`**, then answer **`Y`** to the CUDA prompt. This builds `dddmr:humble-cuda`, including the CUDA and TensorRT dependencies.
+
+```bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./build.bash
+```
+
+#### Option B: Pull the public image
+
+A prebuilt image is already published. Pull it and add the local tag expected by `run_x64_gpu.bash`:
+
+```bash
+docker pull tsengapola/dddmr:humble-cuda
+docker tag tsengapola/dddmr:humble-cuda dddmr:humble-cuda
+```
+
+After either option, continue with the map download below. The navigation workspace is compiled inside the container in Terminal 2.
+
+The Lite3 simulation image is built separately in **Terminal 1** below.
 
 ### 2. Download navigation map
-To play gazebo with dddmr_navigation, you will need to download demo navigation map (12.3MB).
-```
-cd ~ && mkdir dddmr_bags
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./download_files.bash
-```
 
-### 3. Prepare demo enviroment
-#### Create a two docker container (gazebo and navigaiton)
-> [!IMPORTANT] 
-> The following command will start two interactive Docker containers using the image we built.  Please open **two separate terminals** to prepare the demo environment
+Download and extract the `stair_2_map.zip` navigation map for the Lite3 world. Answer **`Y`** when prompted:
 
-#### 🖥️ Terminal 1: Start the Go2 Gazebo Simulation
-
-In the first terminal, follow the [Gazebo Guide — Go2](GAZEBO_GUIDE.md#go2--quadruped) to build the simulation image and start Gazebo.
-
-Once the Go2 simulation is running, keep this terminal open and return here to continue with **Terminal 2** below.
-
-#### 🖥️ Terminal 2   (create the container for navigation system)
-
-   - ##### Step 1 (on host): create the container for navigation system
-```
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./run_x64_navigation.bash
-```
-   - ##### Step 2 (inside the navigation container): build and launch
-```
-cd dddmr_navigation/ && source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash && ros2 launch p2p_move_base go2_localization.launch
+```bash
+cd ~/dddmr_navigation/src/dddmr_beginner_guide
+./download_files.bash
 ```
 
-### 4. Run demo 
-- In the Gazebo demo, the map is already aligned, so you don’t need to set the initial pose unless you are mapping yourself
-- Give the goal (3D Goal Pose) in RViz , then the robot will move to target point
+The script creates `~/dddmr_bags` and extracts the map into `~/dddmr_bags/stair_2_map`. The navigation launcher mounts this directory at `/root/dddmr_bags` inside its container.
 
-<p align='center'>
-    <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/give_goal_in_demo_.png" width="920" height="460"/>
+### 3. Prepare demo environment
+
+Open **two separate terminals**: one for the simulator and one for navigation. Both containers must use **`ROS_DOMAIN_ID=22`**.
+
+#### 🖥️ Terminal 1: Start the Lite3 Gazebo Simulation
+
+Follow the [Gazebo Guide — Lite3](GAZEBO_GUIDE.md#lite3--rl-quadruped) to clone the `rl_lite3` branch, initialize its submodules, build the image and run `./rl_lite3_gpu.bash`.
+
+After the robot drops onto the ground, keep the simulator terminal focused and press **`r` → `0` → `1` → `n`**. This resets the pose, stands the robot up, starts the RL controller and lets navigation send movement commands. **Wait at least one second between keys; after `0`, also wait until standing up is complete.**
+
+| Key | Action |
+|:----|:-------|
+| `r` | Reset the robot to its starting pose in the world. |
+| `0` | Stand up and prepare the robot for locomotion. |
+| `1` | Activate the RL locomotion policy. |
+| `n` | Enable `/cmd_vel` input so the navigation stack can control the robot. |
+
+Keep the simulation terminal open, then continue with Terminal 2.
+
+#### 🖥️ Terminal 2: Create the Navigation Container
+
+##### Step 1 (on host): Start the CUDA container
+
+```bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./run_x64_gpu.bash
+```
+
+Enter **`22`** when the script asks for `ROS_DOMAIN_ID`. It creates the `dddmr_humble_cuda_dev` container using `dddmr:humble-cuda` and mounts the navigation repository at `/root/dddmr_navigation`.
+
+##### Step 2 (inside the navigation container): Build with TensorRT
+
+```bash
+cd /root/dddmr_navigation
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=22
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON
+```
+
+`TRT_ENABLED=ON` enables the navigation inference code. On a fresh checkout, also generate the TensorRT engine from the included model using the repository's conversion script:
+
+```bash
+cd /root/dddmr_navigation/src/dddmr_lego_loam/lego_loam_bor/engine
+bash onnx2trt.bash
+cd /root/dddmr_navigation
+```
+
+##### Step 3 (inside the navigation container): Launch localization and navigation
+
+```bash
+source install/setup.bash
+export ROS_DOMAIN_ID=22
+ros2 launch p2p_move_base lite3_localization_launch.py
+```
+
+### 4. Run demo
+
+1. Confirm Lite3 is in RL policy mode and `/cmd_vel` input is enabled in Terminal 1.
+2. In RViz, check that the live point cloud overlaps the supplied map. The demo configuration provides an initial pose for this world; if the robot has been moved or reset elsewhere, use **3D Pose Estimate** to align it.
+3. Select **3D Goal Pose** in RViz and choose a reachable ground point. Lite3 will follow the navigation commands toward the goal.
+
+<p align="center">
+  <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/3d_nav_rl_quadruped_deep_learning.png?raw=true" alt="Lite3 RL quadruped 3D navigation with deep learning in Gazebo and RViz" width="920" />
 </p>
-
-### 5. Known Issues
-> [!WARNING]
-> The following are currently observed behaviors. They are under investigation and will be fixed in future updates.
- - Gazebo: Occasional slipping on slopes 
- - Mapping: Duplicate floor layers  
 
 
 
