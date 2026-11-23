@@ -1,7 +1,8 @@
 bag_reader:
   ros__parameters:
     use_sim_time: true
-    bag_file_dir: "/root/dddmr_bags/dddmr_jt128_odom_bag"
+    bag_file_dir: "/root/dddmr_bags/jt128_stair_real"
+    bag_format: "mcap"
     point_cloud_topic: "/lidar_points"
     odometry_topic: "/odom"
     skip_frame: 1
@@ -26,8 +27,11 @@ lego_loam_ip:
         maximum_detection_range: 60.0            # point cloud within this range will be used to project image
         distance_for_patch_between_rings: 1.0    # patch ground between rings within this range, i.e. ring0 and ring1 is smaller than 1 meter, patch them
         stitcher_num: 0                          # for non-repetitive scan lidar use 2~4 (i.e. mid360)
-        trt_model_path: ""                       # provide trt engine for yolo
-        projected_image_stack_size: 1            # Stack this number of image for yolo11n to inference as time elapsed yolo (only work when TRT is loaded)
+        deep_learning:
+          trt_model_path: "/root/dddmr_navigation/src/dddmr_lego_loam/lego_loam_bor/engine/yolo11n_dddmr.trt"                       # provide trt engine for yolo
+          projected_image_stack_size: 4            # Stack this number of image for yolo11n to inference as time elapsed yolo (only work when TRT is loaded)
+          moving_object_labels: [0] #people
+          objects_excluding_labels: [1] #stair
         patch_first_ring_to_baselink: false      
         ground_slope_tolerance: 0.3
         

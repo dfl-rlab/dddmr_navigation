@@ -1,7 +1,7 @@
 bag_reader:
   ros__parameters:
     use_sim_time: true
-    bag_file_dir: "/root/dddmr_bags/jt128_stair_11"
+    bag_file_dir: "/root/dddmr_bags/jt128_stair_gz_1"
     bag_format: "mcap"
     point_cloud_topic: "/dome_lidar/points"
     odometry_topic: "/odom"
