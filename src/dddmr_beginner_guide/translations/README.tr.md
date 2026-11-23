@@ -1,84 +1,136 @@
 # DDDMR Başlangıç Kılavuzu
 
-Bu kılavuz, DDDMR navigasyon sistemine giriş niteliğinde bir öğreticidir. Gazebo'da dört ayaklı robot simülasyonu örneği ve gerçek robot dağıtım kılavuzu içerir, böylece hızlıca başlayabilir ve 3D navigasyonun keyfini çıkarabilirsiniz.
+Bu kılavuz DDDMR Navigation sistemine giriş sunar. Lite3 Gazebo simülasyonu ve gerçek robot kurulum adımlarıyla 3D navigasyonu hızla keşfetmeye başlayabilirsiniz.
 
 ## İçindekiler
 
 | # | Bölüm | Açıklama |
 |:-:|:--------|:------------|
-| 1 | [Gazebo Simülasyon Navigasyonu](#-dddmr-navigation-with-gazebo) | Dört ayaklı robot simülasyon demosu |
+| 1 | [Gazebo Simülasyon Navigasyonu](#-dddmr-navigation-with-gazebo) | RL kontrollü Lite3 dört ayaklı robot simülasyonu |
 | 2 | [Gerçek Robot Navigasyonu](#-start-dddmr-navigation-with-a-real-robot) | Gerçek robotunuza dağıtım (tekerlekli, dört ayaklı, insansı vb.) |
 
 ## 🖥️ Yazılım Gereksinimleri
-- **Ubuntu 22.04** (22.04'te test edildi, 24.04 desteklemeli)
+- **Ubuntu 22.04** (test edildi; Ubuntu 24.04 ana makinelerde de Humble konteynerleri çalıştırılabilir).
 - **Docker** — [Docker Kurulumu](https://docs.docker.com/engine/install/)
+- GPU simülasyonu ve TensorRT navigasyon demosu için **NVIDIA GPU ve NVIDIA Container Toolkit**.
 
 ## ✨ DDDMR Navigation with Gazebo
 
-Bu demo, DDDMR navigasyon yığınının Gazebo'da dört ayaklı bir robotla nasıl çalıştırılacağını gösterir.
-- Ortamı hazırlamak için gerekli imajları oluşturun.
-- Sistemi iki terminalde çalıştırın — biri Gazebo dünyası için, diğeri navigasyon yığını için.
+DDDMR Navigation sistemini **RL kontrollü Lite3 dört ayaklı robot**, kubbe tipi LiDAR ve çok seviyeli bir Gazebo dünyası ile çalıştırın. Demo iki ayrı imaj ve konteyner kullanır:
 
-### 1. Docker İmajı Oluşturma
+| Terminal | Amaç | İmaj | Konteyner |
+|:---------|:--------|:------|:----------|
+| 1 | Lite3 Gazebo simülasyonu | `dddmr_simulation:rl_lite3` | `rl_lite3` |
+| 2 | TensorRT ile konum belirleme ve 3D navigasyon | `dddmr:humble-cuda` | `dddmr_humble_cuda_dev` |
 
-Depoyu klonlayın ve ./build.bash çalıştırın, navigasyon ve Gazebo için gerekli tüm bileşenleri içeren **`x64_gz`** seçeneğini seçin.
+Aşağıdaki komutlarda navigasyon deposu için `~/dddmr_navigation`, simülatör için `~/dfl_mobilerobot_simulator` kullanılır.
+
+### 1. Docker imajını oluşturma
+
+Önce navigasyon deposunu klonlayın. Aşağıdaki iki seçenek için de bu adım gereklidir:
 
 ```bash
 cd ~
 git clone https://github.com/dfl-rlab/dddmr_navigation.git
-cd ~/dddmr_navigation/dddmr_docker/docker_file && ./build.bash
 ```
 
-### 2. Navigasyon Haritasını İndirme
+Ardından navigasyon imajını edinmek için aşağıdaki yöntemlerden **birini** seçin.
 
-Gazebo'da dddmr_navigation çalıştırmak için demo navigasyon haritasını (12.3MB) indirmeniz gerekir.
+#### Seçenek A: Yerel olarak oluşturma
+
+Oluşturma betiğini çalıştırın, **`x64`** seçin ve CUDA sorusuna **`Y`** yanıtını verin. Böylece CUDA ve TensorRT bağımlılıklarını içeren `dddmr:humble-cuda` oluşturulur.
 
 ```bash
-cd ~ && mkdir dddmr_bags
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./download_files.bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./build.bash
 ```
 
-### 3. Demo Ortamını Hazırlama
+#### Seçenek B: Herkese açık imajı indirme
 
-#### İki Docker Konteyneri Oluşturma (Gazebo ve navigasyon)
+Önceden oluşturulmuş bir imaj yayımlanmıştır. İmajı indirin ve `run_x64_gpu.bash` tarafından beklenen yerel etiketi ekleyin:
 
-> [!IMPORTANT] 
-> Aşağıdaki komut, oluşturduğumuz imajı kullanarak iki etkileşimli Docker konteyneri başlatacaktır. Demo ortamını hazırlamak için lütfen **iki ayrı terminal** açın.
-
-#### 🖥️ Terminal 1: Go2 Gazebo Simülasyonunu Başlatma
-
-İlk terminalde, simülasyon imajını oluşturmak ve Gazebo konteynerini başlatmak için [Gazebo Kılavuzu — Go2](../GAZEBO_GUIDE.md#go2--quadruped) içindeki iki adımı da uygulayın.
-
-Go2 simülasyonu çalışmaya başladığında bu terminali açık bırakın ve aşağıdaki **Terminal 2** adımlarına devam etmek için buraya dönün.
-
-#### 🖥️ Terminal 2 (navigasyon sistemi için konteyner oluşturma)
-
-- ##### Adım 1 (ana bilgisayarda): navigasyon sistemi için konteyner oluşturma
 ```bash
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./run_x64_navigation.bash
+docker pull tsengapola/dddmr:humble-cuda
+docker tag tsengapola/dddmr:humble-cuda dddmr:humble-cuda
 ```
 
-- ##### Adım 2 (navigasyon konteyneri içinde): derleme ve başlatma
+Her iki seçeneğin ardından aşağıdaki harita indirme adımına geçin. Navigasyon çalışma alanı Terminal 2'deki konteyner içinde derlenir. Lite3 simülasyon imajı aşağıdaki **Terminal 1** adımında ayrıca oluşturulur.
+
+### 2. Navigasyon haritasını indirme
+
+Lite3 dünyası için `stair_2_map.zip` navigasyon haritasını indirin ve açın. Sorulduğunda **`Y`** yanıtını verin:
+
 ```bash
-cd dddmr_navigation/ && source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash && ros2 launch p2p_move_base go2_localization.launch
+cd ~/dddmr_navigation/src/dddmr_beginner_guide
+./download_files.bash
 ```
 
-### 4. Demo Çalıştırma
+Betik `~/dddmr_bags` dizinini oluşturur ve haritayı `~/dddmr_bags/stair_2_map` içine açar. Başlatma betiği harita dizinini navigasyon konteynerinde `/root/dddmr_bags` konumuna bağlar.
 
-- Gazebo demosunda harita zaten hizalanmış durumda, bu yüzden kendiniz haritalamıyorsanız başlangıç pozunu ayarlamanıza gerek yok
-- RViz'de hedef verin (3D Goal Pose), robot hedef noktaya hareket edecektir
+### 3. Demo ortamını hazırlama
 
-<p align='center'>
-    <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/give_goal_in_demo_.png" width="920" height="460"/>
+Biri simülatör, diğeri navigasyon için **iki ayrı terminal** açın. Her iki konteyner de **`ROS_DOMAIN_ID=22`** kullanmalıdır.
+
+#### 🖥️ Terminal 1: Lite3 Gazebo simülasyonunu başlatma
+
+[Gazebo Kılavuzu — Lite3](../GAZEBO_GUIDE.md#lite3--rl-quadruped) adımlarını izleyerek `rl_lite3` dalını klonlayın, alt modülleri başlatın, imajı oluşturun ve `./rl_lite3_gpu.bash` komutunu çalıştırın.
+
+Robot yere indikten sonra simülatör terminaline odaklanın ve **`r` → `0` → `1` → `n`** tuşlarına sırayla basın. Bu adımlar pozu sıfırlar, robotu ayağa kaldırır, RL denetleyicisini başlatır ve navigasyon komutlarını etkinleştirir. **Tuşlar arasında en az bir saniye bekleyin; `0` sonrasında ayağa kalkma hareketinin tamamlanmasını da bekleyin.**
+
+| Tuş | İşlem |
+|:----|:-------|
+| `r` | Robotu dünyadaki başlangıç pozuna sıfırlar. |
+| `0` | Robotu ayağa kaldırır ve yürümeye hazırlar. |
+| `1` | RL hareket politikasını etkinleştirir. |
+| `n` | Navigasyonun robotu kontrol edebilmesi için `/cmd_vel` girişini etkinleştirir. |
+
+Simülasyon terminalini açık bırakın ve Terminal 2 adımlarına geçin.
+
+#### 🖥️ Terminal 2: Navigasyon konteynerini oluşturma
+
+##### Adım 1 (ana makinede): CUDA konteynerini başlatma
+
+```bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./run_x64_gpu.bash
+```
+
+Betik `ROS_DOMAIN_ID` değerini sorduğunda **`22`** girin. `dddmr:humble-cuda` imajıyla `dddmr_humble_cuda_dev` konteynerini oluşturur ve depoyu `/root/dddmr_navigation` konumuna bağlar.
+
+##### Adım 2 (navigasyon konteynerinde): TensorRT ile derleme
+
+```bash
+cd /root/dddmr_navigation
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=22
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON
+```
+
+`TRT_ENABLED=ON`, navigasyonun çıkarım kodunu etkinleştirir. Yeni klonlanmış bir depoda, içerilen modelden dönüşüm betiğiyle TensorRT motorunu da oluşturun:
+
+```bash
+cd /root/dddmr_navigation/src/dddmr_lego_loam/lego_loam_bor/engine
+bash onnx2trt.bash
+cd /root/dddmr_navigation
+```
+
+##### Adım 3 (navigasyon konteynerinde): Konum belirleme ve navigasyonu başlatma
+
+```bash
+source install/setup.bash
+export ROS_DOMAIN_ID=22
+ros2 launch p2p_move_base lite3_localization_launch.py
+```
+
+### 4. Demoyu çalıştırma
+
+1. Terminal 1'de Lite3'ün RL politika modunda olduğunu ve `/cmd_vel` girişinin etkin olduğunu doğrulayın.
+2. RViz'de canlı nokta bulutunun verilen haritayla örtüştüğünü kontrol edin. Demo yapılandırması bu dünya için bir başlangıç pozu içerir. Robot başka bir yere taşındıysa veya sıfırlandıysa **3D Pose Estimate** ile hizalayın.
+3. RViz'de **3D Goal Pose** seçin ve yerde ulaşılabilir bir nokta belirleyin. Lite3, navigasyon komutlarını izleyerek hedefe ilerler.
+
+<p align="center">
+  <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/3d_nav_rl_quadruped_deep_learning.png?raw=true" alt="Gazebo ve RViz'de derin öğrenme ile Lite3 RL dört ayaklı robotun 3D navigasyonu" width="920" />
 </p>
-
-### 5. Bilinen Sorunlar
-
-> [!WARNING]
-> Aşağıdakiler şu anda gözlemlenen davranışlardır, araştırılmakta olup gelecek güncellemelerde düzeltilecektir.
-> - Gazebo: Eğimlerde ara sıra kayma
-> - Haritalama: Yinelenen zemin katmanları
 
 ---
 

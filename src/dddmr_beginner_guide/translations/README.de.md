@@ -1,84 +1,136 @@
 # DDDMR Anfängerhandbuch
 
-Dieses Handbuch ist ein Einführungs-Tutorial für das DDDMR-Navigationssystem. Es enthält ein Gazebo-Simulationsbeispiel mit einem vierbeinigen Roboter und eine Anleitung zur Bereitstellung auf einem echten Roboter, um Ihnen den schnellen Einstieg zu ermöglichen und 3D-Navigation zu erkunden und zu genießen.
+Diese Anleitung führt in DDDMR Navigation ein. Mit der Lite3-Gazebo-Simulation und der Anleitung für echte Roboter können Sie schnell mit der 3D-Navigation beginnen.
 
 ## Inhaltsverzeichnis
 
 | # | Abschnitt | Beschreibung |
 |:-:|:--------|:------------|
-| 1 | [Gazebo-Simulationsnavigation](#-dddmr-navigation-with-gazebo) | Demo der Simulation eines vierbeinigen Roboters |
+| 1 | [Gazebo-Simulationsnavigation](#-dddmr-navigation-with-gazebo) | Simulationsdemo mit dem vierbeinigen Lite3 und RL |
 | 2 | [Navigation mit echtem Roboter](#-start-dddmr-navigation-with-a-real-robot) | Bereitstellung auf Ihrem echten Roboter (Radroboter, Vierbeinige, Humanoide usw.) |
 
 ## 🖥️ Softwareanforderungen
-- **Ubuntu 22.04** (getestet auf 22.04, sollte 24.04 unterstützen)
+- **Ubuntu 22.04** (getestet; auch Ubuntu-24.04-Hosts können die Humble-Container ausführen).
 - **Docker** — [Docker installieren](https://docs.docker.com/engine/install/)
+- **NVIDIA-GPU und NVIDIA Container Toolkit** für die GPU-Simulation und die Navigationsdemo mit TensorRT.
 
 ## ✨ DDDMR Navigation with Gazebo
 
-Diese Demo zeigt, wie der DDDMR Navigation Stack in Gazebo mit einem vierbeinigen Roboter ausgeführt wird.
-- Erstellen Sie die erforderlichen Images zur Vorbereitung der Umgebung.
-- Führen Sie das System in zwei Terminals aus — eines für die Gazebo-Welt, das andere für den Navigation Stack.
+Führen Sie DDDMR Navigation mit dem **vierbeinigen Lite3 mit RL-Steuerung**, einem Dome-LiDAR und einer mehrstöckigen Gazebo-Welt aus. Die Demo verwendet zwei separate Images und Container:
+
+| Terminal | Zweck | Image | Container |
+|:---------|:--------|:------|:----------|
+| 1 | Lite3-Gazebo-Simulation | `dddmr_simulation:rl_lite3` | `rl_lite3` |
+| 2 | Lokalisierung und 3D-Navigation mit TensorRT | `dddmr:humble-cuda` | `dddmr_humble_cuda_dev` |
+
+Die folgenden Befehle verwenden `~/dddmr_navigation` für das Navigationsrepository und `~/dfl_mobilerobot_simulator` für den Simulator.
 
 ### 1. Docker-Image erstellen
 
-Klonen Sie das Repository und führen Sie ./build.bash aus. Wählen Sie **`x64_gz`**, das bereits alle notwendigen Komponenten für Navigation und Gazebo enthält.
+Klonen Sie zuerst das Navigationsrepository. Dieser Schritt ist für beide folgenden Optionen erforderlich:
 
 ```bash
 cd ~
 git clone https://github.com/dfl-rlab/dddmr_navigation.git
-cd ~/dddmr_navigation/dddmr_docker/docker_file && ./build.bash
 ```
+
+Wählen Sie anschließend **eine** der folgenden Möglichkeiten, um das Navigationsimage zu erhalten.
+
+#### Option A: Lokal bauen
+
+Führen Sie das Build-Skript aus, wählen Sie **`x64`** und beantworten Sie die CUDA-Abfrage mit **`Y`**. Damit wird `dddmr:humble-cuda` einschließlich der CUDA- und TensorRT-Abhängigkeiten erstellt.
+
+```bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./build.bash
+```
+
+#### Option B: Öffentliches Image herunterladen
+
+Ein vorgefertigtes Image ist bereits veröffentlicht. Laden Sie es herunter und ergänzen Sie den von `run_x64_gpu.bash` erwarteten lokalen Tag:
+
+```bash
+docker pull tsengapola/dddmr:humble-cuda
+docker tag tsengapola/dddmr:humble-cuda dddmr:humble-cuda
+```
+
+Fahren Sie bei beiden Optionen mit dem Kartendownload fort. Der Navigationsworkspace wird im Container in Terminal 2 kompiliert. Das Lite3-Simulationsimage wird weiter unten in **Terminal 1** separat gebaut.
 
 ### 2. Navigationskarte herunterladen
 
-Um dddmr_navigation in Gazebo auszuführen, müssen Sie die Demo-Navigationskarte (12,3 MB) herunterladen.
+Laden Sie die Navigationskarte `stair_2_map.zip` für die Lite3-Welt herunter und entpacken Sie sie. Antworten Sie auf die Abfrage mit **`Y`**:
 
 ```bash
-cd ~ && mkdir dddmr_bags
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./download_files.bash
+cd ~/dddmr_navigation/src/dddmr_beginner_guide
+./download_files.bash
 ```
 
-### 3. Demo-Umgebung vorbereiten
+Das Skript erstellt `~/dddmr_bags` und entpackt die Karte nach `~/dddmr_bags/stair_2_map`. Das Startskript bindet das Kartenverzeichnis im Navigationscontainer unter `/root/dddmr_bags` ein.
 
-#### Zwei Docker-Container erstellen (Gazebo und Navigation)
+### 3. Demoumgebung vorbereiten
 
-> [!IMPORTANT] 
-> Der folgende Befehl startet zwei interaktive Docker-Container mit dem erstellten Image. Bitte öffnen Sie **zwei separate Terminals**, um die Demo-Umgebung vorzubereiten.
+Öffnen Sie **zwei separate Terminals**: eines für den Simulator und eines für die Navigation. Beide Container müssen **`ROS_DOMAIN_ID=22`** verwenden.
 
-#### 🖥️ Terminal 1: Go2-Simulation in Gazebo starten
+#### 🖥️ Terminal 1: Lite3-Gazebo-Simulation starten
 
-Befolgen Sie im ersten Terminal beide Schritte im [Gazebo-Leitfaden — Go2](../GAZEBO_GUIDE.md#go2--quadruped), um das Simulationsimage zu erstellen und den Gazebo-Container zu starten.
+Folgen Sie der [Gazebo-Anleitung — Lite3](../GAZEBO_GUIDE.md#lite3--rl-quadruped), um den Branch `rl_lite3` zu klonen, die Submodule zu initialisieren, das Image zu bauen und `./rl_lite3_gpu.bash` auszuführen.
 
-Sobald die Go2-Simulation läuft, lassen Sie dieses Terminal geöffnet und kehren Sie hierher zurück, um mit **Terminal 2** unten fortzufahren.
+Sobald der Roboter auf dem Boden angekommen ist, fokussieren Sie das Simulatorterminal und drücken Sie **`r` → `0` → `1` → `n`**. Dadurch werden die Pose zurückgesetzt, das Aufstehen ausgeführt, die RL-Steuerung gestartet und Navigationsbefehle freigegeben. **Warten Sie zwischen den Tasten mindestens eine Sekunde; warten Sie nach `0` zusätzlich, bis das Aufstehen abgeschlossen ist.**
 
-#### 🖥️ Terminal 2 (Container für Navigationssystem erstellen)
+| Taste | Aktion |
+|:----|:-------|
+| `r` | Den Roboter auf seine Startpose in der Welt zurücksetzen. |
+| `0` | Aufstehen und den Roboter für die Fortbewegung vorbereiten. |
+| `1` | Die RL-Laufstrategie aktivieren. |
+| `n` | Den Eingang `/cmd_vel` aktivieren, damit die Navigation den Roboter steuern kann. |
 
-- ##### Schritt 1 (auf dem Host): Container für Navigationssystem erstellen
+Lassen Sie das Simulationsterminal geöffnet und fahren Sie mit Terminal 2 fort.
+
+#### 🖥️ Terminal 2: Navigationscontainer erstellen
+
+##### Schritt 1 (auf dem Host): CUDA-Container starten
+
 ```bash
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./run_x64_navigation.bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./run_x64_gpu.bash
 ```
 
-- ##### Schritt 2 (im Navigations-Container): Bauen und starten
+Geben Sie **`22`** ein, wenn das Skript nach `ROS_DOMAIN_ID` fragt. Es erstellt mit `dddmr:humble-cuda` den Container `dddmr_humble_cuda_dev` und bindet das Repository unter `/root/dddmr_navigation` ein.
+
+##### Schritt 2 (im Navigationscontainer): Mit TensorRT bauen
+
 ```bash
-cd dddmr_navigation/ && source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash && ros2 launch p2p_move_base go2_localization.launch
+cd /root/dddmr_navigation
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=22
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON
+```
+
+`TRT_ENABLED=ON` aktiviert den Inferenzcode der Navigation. Erzeugen Sie bei einem frisch geklonten Repository außerdem die TensorRT-Engine aus dem enthaltenen Modell mit dem Konvertierungsskript:
+
+```bash
+cd /root/dddmr_navigation/src/dddmr_lego_loam/lego_loam_bor/engine
+bash onnx2trt.bash
+cd /root/dddmr_navigation
+```
+
+##### Schritt 3 (im Navigationscontainer): Lokalisierung und Navigation starten
+
+```bash
+source install/setup.bash
+export ROS_DOMAIN_ID=22
+ros2 launch p2p_move_base lite3_localization_launch.py
 ```
 
 ### 4. Demo ausführen
 
-- In der Gazebo-Demo ist die Karte bereits ausgerichtet, sodass Sie keine Anfangspose setzen müssen, es sei denn, Sie kartieren selbst
-- Geben Sie das Ziel (3D Goal Pose) in RViz an, und der Roboter bewegt sich zum Zielpunkt
+1. Prüfen Sie, dass Lite3 in Terminal 1 im RL-Modus läuft und der Eingang `/cmd_vel` aktiviert ist.
+2. Prüfen Sie in RViz, ob die aktuelle Punktwolke mit der mitgelieferten Karte übereinstimmt. Die Demokonfiguration enthält eine Startpose für diese Welt. Falls der Roboter an eine andere Stelle bewegt oder zurückgesetzt wurde, richten Sie ihn mit **3D Pose Estimate** aus.
+3. Wählen Sie in RViz **3D Goal Pose** und geben Sie einen erreichbaren Punkt auf dem Boden an. Lite3 folgt den Navigationsbefehlen zum Ziel.
 
-<p align='center'>
-    <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/give_goal_in_demo_.png" width="920" height="460"/>
+<p align="center">
+  <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/3d_nav_rl_quadruped_deep_learning.png?raw=true" alt="3D-Navigation mit Deep Learning für den vierbeinigen Lite3 mit RL in Gazebo und RViz" width="920" />
 </p>
-
-### 5. Bekannte Probleme
-
-> [!WARNING]
-> Die folgenden Verhaltensweisen werden derzeit beobachtet, werden untersucht und in zukünftigen Updates behoben.
-> - Gazebo: Gelegentliches Rutschen an Hängen
-> - Kartierung: Doppelte Bodenschichten
 
 ---
 

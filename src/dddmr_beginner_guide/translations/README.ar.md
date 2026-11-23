@@ -1,84 +1,136 @@
 # دليل المبتدئين لـ DDDMR
 
-هذا الدليل هو مقدمة تعليمية لنظام الملاحة DDDMR. يتضمن مثال محاكاة روبوت رباعي الأرجل في Gazebo ودليل نشر على روبوت حقيقي، لمساعدتك على البدء بسرعة والاستمتاع بالملاحة ثلاثية الأبعاد.
+يساعدك هذا الدليل على البدء باستخدام DDDMR Navigation. يتضمن محاكاة Lite3 في Gazebo وإرشادات إعداد روبوت حقيقي لاستكشاف الملاحة ثلاثية الأبعاد بسرعة.
 
 ## جدول المحتويات
 
 | # | القسم | الوصف |
 |:-:|:--------|:------------|
-| 1 | [الملاحة في محاكاة Gazebo](#-dddmr-navigation-with-gazebo) | عرض محاكاة روبوت رباعي الأرجل |
+| 1 | [الملاحة في محاكاة Gazebo](#-dddmr-navigation-with-gazebo) | عرض محاكاة روبوت Lite3 رباعي الأرجل باستخدام RL |
 | 2 | [الملاحة مع روبوت حقيقي](#-start-dddmr-navigation-with-a-real-robot) | النشر على روبوتك الحقيقي (روبوت بعجلات، رباعي الأرجل، بشري، إلخ) |
 
 ## 🖥️ متطلبات البرمجيات
-- **Ubuntu 22.04** (تم اختباره على 22.04، يجب أن يدعم 24.04)
+- **Ubuntu 22.04** (تم اختباره؛ يمكن أيضًا تشغيل حاويات Humble على أجهزة مضيفة تعمل بنظام Ubuntu 24.04).
 - **Docker** — [تثبيت Docker](https://docs.docker.com/engine/install/)
+- **بطاقة NVIDIA GPU وNVIDIA Container Toolkit** لتشغيل المحاكاة على GPU وعرض الملاحة باستخدام TensorRT.
 
 ## ✨ DDDMR Navigation with Gazebo
 
-يوضح هذا العرض كيفية تشغيل حزمة ملاحة DDDMR في Gazebo مع روبوت رباعي الأرجل.
-- قم ببناء الصور المطلوبة لتحضير البيئة.
-- قم بتشغيل النظام في نافذتي طرفية — واحدة لعالم Gazebo والأخرى لحزمة الملاحة.
+شغّل DDDMR Navigation باستخدام **روبوت Lite3 رباعي الأرجل المتحكم به عبر RL**، ومستشعر LiDAR قببي، وعالم Gazebo متعدد المستويات. يستخدم العرض صورتين وحاويتين منفصلتين:
+
+| الطرفية | الغرض | الصورة | الحاوية |
+|:---------|:--------|:------|:----------|
+| 1 | محاكاة Lite3 في Gazebo | `dddmr_simulation:rl_lite3` | `rl_lite3` |
+| 2 | تحديد الموقع والملاحة ثلاثية الأبعاد باستخدام TensorRT | `dddmr:humble-cuda` | `dddmr_humble_cuda_dev` |
+
+تستخدم الأوامر أدناه المسار `~/dddmr_navigation` لمستودع الملاحة والمسار `~/dfl_mobilerobot_simulator` للمحاكي.
 
 ### 1. إنشاء صورة Docker
 
-قم باستنساخ المستودع وتشغيل ./build.bash، اختر **`x64_gz`**، الذي يحتوي بالفعل على جميع المكونات اللازمة للملاحة و Gazebo.
+استنسخ مستودع الملاحة أولًا. هذه الخطوة مطلوبة لكلا الخيارين أدناه:
 
 ```bash
 cd ~
 git clone https://github.com/dfl-rlab/dddmr_navigation.git
-cd ~/dddmr_navigation/dddmr_docker/docker_file && ./build.bash
 ```
 
-### 2. تحميل خريطة الملاحة
+ثم اختر **طريقة واحدة** من الطرق التالية للحصول على صورة الملاحة.
 
-لتشغيل dddmr_navigation في Gazebo، تحتاج إلى تحميل خريطة الملاحة التجريبية (12.3 ميجابايت).
+#### الخيار A: البناء محليًا
+
+شغّل سكربت البناء، واختر **`x64`**، ثم أجب بـ **`Y`** عند السؤال عن CUDA. ينشئ ذلك الصورة `dddmr:humble-cuda` بما فيها اعتماديات CUDA وTensorRT.
 
 ```bash
-cd ~ && mkdir dddmr_bags
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./download_files.bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./build.bash
 ```
 
-### 3. تحضير بيئة العرض
+#### الخيار B: تنزيل الصورة العامة
 
-#### إنشاء حاويتي Docker (Gazebo والملاحة)
+توجد صورة مبنية مسبقًا ومنشورة بالفعل. نزّلها وأضف الوسم المحلي الذي يتوقعه `run_x64_gpu.bash`:
 
-> [!IMPORTANT] 
-> سيقوم الأمر التالي بتشغيل حاويتي Docker تفاعليتين باستخدام الصورة التي قمنا ببنائها. يرجى فتح **نافذتي طرفية منفصلتين** لتحضير بيئة العرض.
-
-#### 🖥️ الطرفية 1: تشغيل محاكاة Go2 في Gazebo
-
-في الطرفية الأولى، اتبع الخطوتين في [دليل Gazebo — Go2](../GAZEBO_GUIDE.md#go2--quadruped) لبناء صورة المحاكاة وتشغيل حاوية Gazebo.
-
-بعد تشغيل محاكاة Go2، اترك هذه الطرفية مفتوحة وعد إلى هنا لمتابعة خطوات **الطرفية 2** أدناه.
-
-#### 🖥️ الطرفية 2 (إنشاء حاوية لنظام الملاحة)
-
-- ##### الخطوة 1 (على المضيف): إنشاء حاوية لنظام الملاحة
 ```bash
-cd ~/dddmr_navigation/src/dddmr_beginner_guide && ./run_x64_navigation.bash
+docker pull tsengapola/dddmr:humble-cuda
+docker tag tsengapola/dddmr:humble-cuda dddmr:humble-cuda
 ```
 
-- ##### الخطوة 2 (داخل حاوية الملاحة): البناء والتشغيل
+بعد إكمال أي من الخيارين، تابع تنزيل الخريطة أدناه. تُترجم مساحة عمل الملاحة داخل حاوية الطرفية 2. أما صورة محاكاة Lite3 فتُبنى بشكل منفصل في خطوة **الطرفية 1** أدناه.
+
+### 2. تنزيل خريطة الملاحة
+
+نزّل خريطة الملاحة `stair_2_map.zip` الخاصة بعالم Lite3 وفك ضغطها. أجب بـ **`Y`** عند المطالبة:
+
 ```bash
-cd dddmr_navigation/ && source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash && ros2 launch p2p_move_base go2_localization.launch
+cd ~/dddmr_navigation/src/dddmr_beginner_guide
+./download_files.bash
+```
+
+ينشئ السكربت المجلد `~/dddmr_bags` ويفك ضغط الخريطة إلى `~/dddmr_bags/stair_2_map`. يربط سكربت التشغيل مجلد الخرائط بالمسار `/root/dddmr_bags` داخل حاوية الملاحة.
+
+### 3. تجهيز بيئة العرض
+
+افتح **طرفيتين منفصلتين**: واحدة للمحاكي والأخرى للملاحة. يجب أن تستخدم كلتا الحاويتين **`ROS_DOMAIN_ID=22`**.
+
+#### 🖥️ الطرفية 1: تشغيل محاكاة Lite3 في Gazebo
+
+اتبع [دليل Gazebo — Lite3](../GAZEBO_GUIDE.md#lite3--rl-quadruped) لاستنساخ الفرع `rl_lite3` وتهيئة الوحدات الفرعية وبناء الصورة وتشغيل `./rl_lite3_gpu.bash`.
+
+بعد هبوط الروبوت على الأرض، اجعل طرفية المحاكي هي النافذة النشطة واضغط بالترتيب: **`r` ثم `0` ثم `1` ثم `n`**. تعيد هذه الخطوات ضبط الوضعية، وتجعل الروبوت يقف، وتشغّل متحكم RL، وتسمح باستقبال أوامر الملاحة. **انتظر ثانية واحدة على الأقل بين المفاتيح؛ وبعد `0` انتظر أيضًا حتى تكتمل حركة الوقوف.**
+
+| المفتاح | الإجراء |
+|:----|:-------|
+| `r` | إعادة الروبوت إلى وضعيته الابتدائية في العالم. |
+| `0` | جعل الروبوت يقف ويستعد للمشي. |
+| `1` | تفعيل سياسة الحركة المعتمدة على RL. |
+| `n` | تفعيل دخل `/cmd_vel` لتمكين نظام الملاحة من التحكم بالروبوت. |
+
+اترك طرفية المحاكاة مفتوحة، ثم تابع الخطوات في الطرفية 2.
+
+#### 🖥️ الطرفية 2: إنشاء حاوية الملاحة
+
+##### الخطوة 1 (على الجهاز المضيف): تشغيل حاوية CUDA
+
+```bash
+cd ~/dddmr_navigation/dddmr_docker/docker_file
+./run_x64_gpu.bash
+```
+
+أدخل **`22`** عندما يطلب السكربت قيمة `ROS_DOMAIN_ID`. ينشئ الحاوية `dddmr_humble_cuda_dev` باستخدام `dddmr:humble-cuda` ويربط المستودع بالمسار `/root/dddmr_navigation`.
+
+##### الخطوة 2 (داخل حاوية الملاحة): البناء مع TensorRT
+
+```bash
+cd /root/dddmr_navigation
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=22
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON
+```
+
+يُفعّل `TRT_ENABLED=ON` شيفرة الاستدلال الخاصة بالملاحة. عند استنساخ المستودع من جديد، أنشئ أيضًا محرك TensorRT من النموذج المرفق باستخدام سكربت التحويل:
+
+```bash
+cd /root/dddmr_navigation/src/dddmr_lego_loam/lego_loam_bor/engine
+bash onnx2trt.bash
+cd /root/dddmr_navigation
+```
+
+##### الخطوة 3 (داخل حاوية الملاحة): تشغيل تحديد الموقع والملاحة
+
+```bash
+source install/setup.bash
+export ROS_DOMAIN_ID=22
+ros2 launch p2p_move_base lite3_localization_launch.py
 ```
 
 ### 4. تشغيل العرض
 
-- في عرض Gazebo، الخريطة محاذية بالفعل، لذا لا تحتاج إلى تعيين الوضع الأولي إلا إذا كنت تقوم برسم الخريطة بنفسك
-- أعط الهدف (3D Goal Pose) في RViz، وسيتحرك الروبوت إلى نقطة الهدف
+1. تأكد من أن Lite3 في الطرفية 1 يعمل بوضع سياسة RL وأن دخل `/cmd_vel` مُفعّل.
+2. تحقق في RViz من تطابق سحابة النقاط المباشرة مع الخريطة المرفقة. يتضمن إعداد العرض وضعية ابتدائية لهذا العالم. إذا نُقل الروبوت أو أُعيد ضبطه في مكان آخر، فاستخدم **3D Pose Estimate** لمحاذاته.
+3. اختر **3D Goal Pose** في RViz وحدد نقطة على الأرض يمكن الوصول إليها. سيتبع Lite3 أوامر الملاحة للوصول إلى الهدف.
 
-<p align='center'>
-    <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/give_goal_in_demo_.png" width="920" height="460"/>
+<p align="center">
+  <img src="https://github.com/dfl-rlab/dddmr_documentation_materials/blob/main/dddmr_beginner_guide/3d_nav_rl_quadruped_deep_learning.png?raw=true" alt="الملاحة ثلاثية الأبعاد بالتعلم العميق لروبوت Lite3 رباعي الأرجل باستخدام RL في Gazebo وRViz" width="920" />
 </p>
-
-### 5. المشاكل المعروفة
-
-> [!WARNING]
-> فيما يلي السلوكيات الملاحظة حاليًا، وهي قيد التحقيق وسيتم إصلاحها في التحديثات المستقبلية.
-> - Gazebo: انزلاق عرضي على المنحدرات
-> - رسم الخرائط: طبقات أرضية مكررة
 
 ---
 

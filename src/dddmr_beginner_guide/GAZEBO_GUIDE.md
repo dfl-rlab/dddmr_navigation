@@ -7,36 +7,54 @@ Explore DDDMR navigation with different robot models in Gazebo. Use separate ter
 
 | Robot | Model | Guide |
 |:------|:------|:------|
-| Go2 | Quadruped with a conventional walking gait | [Go2 simulation](#go2--quadruped) |
+| Lite3 | Quadruped with an RL locomotion policy | [Lite3 simulation](#lite3--rl-quadruped) |
 | Zinger | Four-wheel steering (4WS), using the omni drive model | [Zinger simulation](#zinger--four-wheel-steering) |
 | Saye | Ackermann steering | [Saye simulation](#saye--ackermann-steering) |
 
 ## Software Requirements
 
-- **Ubuntu 22.04** (the existing Go2 guide was tested on 22.04).
+- **Ubuntu 22.04** (tested host platform).
 - **Docker** — see [Install Docker Engine](https://docs.docker.com/engine/install/).
 
-## Go2 — Quadruped
+## Lite3 — RL Quadruped
 
-Build the simulation using the `go2` branch of [dfl_mobilerobot_simulator](https://github.com/dfl-rlab/dfl_mobilerobot_simulator/tree/go2), based on [unitree-go2-ros2](https://github.com/anujjain-dev/unitree-go2-ros2) for ROS 2 Humble and Gazebo Classic.
+Use the `rl_lite3` branch of [dfl_mobilerobot_simulator](https://github.com/dfl-rlab/dfl_mobilerobot_simulator/tree/rl_lite3). It provides ROS 2 Humble / Gazebo Classic, the Lite3 HIMLoco RL policy, dome LiDAR, odometry and a multi-level terrain. See the [simulator README](https://github.com/dfl-rlab/dfl_mobilerobot_simulator/blob/rl_lite3/README.md) for its full instructions.
 
 ### Step 1 (on host): Build the Simulation Image
 
 ```bash
 cd ~
-git clone --branch go2 https://github.com/dfl-rlab/dfl_mobilerobot_simulator.git
-cd dfl_mobilerobot_simulator/docker
-docker build -t dddmr_gz:humble -f Dockerfile_x64_gazebo .
+git clone --branch rl_lite3 \
+  https://github.com/dfl-rlab/dfl_mobilerobot_simulator.git
+cd dfl_mobilerobot_simulator
+git submodule update --init --recursive
+cd docker
+docker build -t dddmr_simulation:rl_lite3 -f Dockerfile ..
 ```
 
-### Step 2 (on host): Start the Simulation
+### Step 2 (on host): Start the GPU Simulation
+
+Run from a graphical desktop. NVIDIA GPUs require NVIDIA Container Toolkit.
 
 ```bash
 cd ~/dfl_mobilerobot_simulator/docker
-./run_x64_gazebo.bash
+./rl_lite3_gpu.bash
 ```
 
-The script starts the Go2 simulation in the `dddmr_humble_gazebo` container using the workspace compiled into the image. Keep this terminal open, then continue with **Terminal 2** in the [beginner guide](README.md#-dddmr-navigation-with-gazebo).
+This creates the `rl_lite3` container using `dddmr_simulation:rl_lite3` and starts Gazebo, Lite3, its policy controller, dome LiDAR and odometry. The launcher sets **`ROS_DOMAIN_ID=22`** and loads the included Fast DDS transport profile for the point cloud. Use domain **22** in the navigation container too.
+
+### Step 3: Enable the RL Policy and Navigation Commands
+
+After the robot drops onto the ground, keep the simulation terminal focused and press **`r` → `0` → `1` → `n`**. These steps reset the pose, stand the robot up, start the RL controller and enable navigation commands. **Wait at least one second between keys; after `0`, also wait until standing up is complete.**
+
+| Key | Action |
+|:----|:-------|
+| `r` | Reset the robot to its starting pose in the world. |
+| `0` | Stand up and prepare the robot for locomotion. |
+| `1` | Activate the RL locomotion policy. |
+| `n` | Enable `/cmd_vel` input from navigation. |
+
+Keep this terminal open and continue with **Terminal 2** in the [beginner guide](README.md#-dddmr-navigation-with-gazebo). Press Ctrl-C in the simulation terminal when you want to stop the simulator.
 
 ## Zinger — Four-Wheel Steering
 

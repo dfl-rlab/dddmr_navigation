@@ -518,7 +518,10 @@ bool P2PMoveBase::executeCycle(const std::shared_ptr<rclcpp_action::ServerGoalHa
       }
 
       if(!LP_->isInitialHeadingAligned(2.0)){
-        STATE_->setDecision("d_align_heading");  
+        STATE_->setDecision("d_align_heading");
+        RCLCPP_WARN(this->get_logger(), "Heading deviates from the prune plan too much, switch to d_align_heading."); 
+        publishZeroVelocity();
+        return false;
       }
 
       //@Behavior for oscillation here
