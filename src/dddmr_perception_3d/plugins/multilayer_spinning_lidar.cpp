@@ -317,14 +317,6 @@ void MultiLayerSpinningLidar::cbSensor(const sensor_msgs::msg::PointCloud2::Shar
   //pcl_msg_.reset(new pcl::PointCloud<pcl::PointXYZ>);
   //pcl_msg_ = pcl_msg;
 
-  if(is_local_planner_){
-    //@ put to current observation, different for global/local
-    Eigen::Affine3d trans_gbl2b_af3 = tf2::transformToEigen(trans_gbl2b_);
-    pcl::transformPointCloud(*pcl_msg_, *pcl_msg_, trans_gbl2b_af3);
-    pcl_msg_->header.frame_id = gbl_utils_->getGblFrame();
-    pcl::copyPointCloud(*pcl_msg_, *sensor_current_observation_);
-  }
-
   //@ update time
   last_observation_time_ = clock_->now();
 
@@ -341,6 +333,7 @@ void MultiLayerSpinningLidar::updateLethalPointCloud(){
   if(is_local_planner_){return;}
 
   std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
+  std::unique_lock<std::recursive_mutex> dgraph_lock(dgraph_mutex_);
   
   current_lethal_.reset(new pcl::PointCloud<pcl::PointXYZI>);
   for(auto it=pct_marking_->lethal_map_.begin(); it!=pct_marking_->lethal_map_.end(); it++){
@@ -351,6 +344,8 @@ void MultiLayerSpinningLidar::updateLethalPointCloud(){
     current_lethal_->push_back(ipt);
     //RCLCPP_INFO(node_->get_logger(), "Lethal: %.2f, %.2f, %2.f", ipt.x, ipt.y, ipt.z);
   }
+  dgraph_lock.unlock();
+  lock.unlock();
 
   if(pub_lethal_->get_subscription_count()>0){
     sensor_msgs::msg::PointCloud2 ros_pc2_msg;
@@ -361,8 +356,9 @@ void MultiLayerSpinningLidar::updateLethalPointCloud(){
   
 }
 
-void MultiLayerSpinningLidar::updateDGraphInWindow(){
+void MultiLayerSpinningLidar::updateDGraphInWindow(const geometry_msgs::msg::TransformStamped& trans_gbl2b_local){
 
+  std::unique_lock<std::recursive_mutex> dgraph_lock(dgraph_mutex_);
   //@ all cluster examined, rebuild kdtree for clearing
   pct_marking_->updateKDTree();
   
@@ -371,9 +367,9 @@ void MultiLayerSpinningLidar::updateDGraphInWindow(){
   //@ find centroids if not empty
   if(!pct_marking_->marking_pc_->empty()){
     PointXYZU64 robot_position_u64;
-    robot_position_u64.x = trans_gbl2b_.transform.translation.x;
-    robot_position_u64.y = trans_gbl2b_.transform.translation.y;
-    robot_position_u64.z = trans_gbl2b_.transform.translation.z;
+    robot_position_u64.x = trans_gbl2b_local.transform.translation.x;
+    robot_position_u64.y = trans_gbl2b_local.transform.translation.y;
+    robot_position_u64.z = trans_gbl2b_local.transform.translation.z;
     std::vector<pcl::index_t> idx_centroids;
     std::vector<float> sqdist_centroids;
     //pct_marking_->kdtree_marking_->radiusSearch(robot_position_u64, 1.2*perception_window_size_, idx_centroids, sqdist_centroids);
@@ -386,9 +382,9 @@ void MultiLayerSpinningLidar::updateDGraphInWindow(){
 
   //@ extract ground region for update
   pcl::PointXYZI robot_position;
-  robot_position.x = trans_gbl2b_.transform.translation.x;
-  robot_position.y = trans_gbl2b_.transform.translation.y;
-  robot_position.z = trans_gbl2b_.transform.translation.z;
+  robot_position.x = trans_gbl2b_local.transform.translation.x;
+  robot_position.y = trans_gbl2b_local.transform.translation.y;
+  robot_position.z = trans_gbl2b_local.transform.translation.z;
   std::vector<pcl::index_t> idx_ground;
   std::vector<float> sqdist_ground;
   std::vector<pcl::index_t> idx_ground_filtered;
@@ -403,11 +399,28 @@ void MultiLayerSpinningLidar::updateDGraphInWindow(){
   pct_marking_->updateDGraph(centroids_for_dgraph, idx_ground_filtered, projected_cloud_clusters_);
 }
 
+void MultiLayerSpinningLidar::convertPclMsgToGbl(geometry_msgs::msg::TransformStamped* trans_gbl2b_out){
+  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
+  if(pcl_msg_->points.size()<=5){
+    observation_clear_ = true;
+  }
+  observation_clear_ = false;
+  if(trans_gbl2b_out != nullptr){
+    *trans_gbl2b_out = trans_gbl2b_;
+  }
+  pcl_msg_gbl_.reset(new pcl::PointCloud<pcl::PointXYZ>);
+  Eigen::Affine3d trans_gbl2b_af3 = tf2::transformToEigen(trans_gbl2b_);
+  pcl::transformPointCloud(*pcl_msg_, *pcl_msg_gbl_, trans_gbl2b_af3);
+  pcl_msg_gbl_->header.frame_id = gbl_utils_->getGblFrame();
+  std::vector<int> indices;
+  pcl_msg_gbl_->is_dense = false;
+  pcl::removeNaNFromPointCloud(*pcl_msg_gbl_, *pcl_msg_gbl_, indices);
+
+}
+
 void MultiLayerSpinningLidar::selfMark(){
 
   if(is_local_planner_){return;}
-
-  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
 
   if(! get_first_tf_){
     RCLCPP_INFO_THROTTLE(node_->get_logger().get_child(name_), *clock_, 1, "Wait for TF between global frame to sensor, either your TF tree is corrupted or your sensor did not send any msg to topic: %s", topic_.c_str());
@@ -423,23 +436,13 @@ void MultiLayerSpinningLidar::selfMark(){
     return;
   }
 
-  if(pcl_msg_->points.size()<=5){
-    observation_clear_ = true;
-    updateDGraphInWindow();
+  //@ Transform into global frame (locks ground_kdtree_cb_mutex_ during conversion and unlocks on return)
+  geometry_msgs::msg::TransformStamped trans_gbl2b_local;
+  convertPclMsgToGbl(&trans_gbl2b_local);
+  if(observation_clear_){
+    updateDGraphInWindow(trans_gbl2b_local);
     return;
   }
-  else{
-    observation_clear_ = false;
-  }
-  
-  //@ Transform into global frame
-  pcl_msg_gbl_.reset(new pcl::PointCloud<pcl::PointXYZ>);
-  Eigen::Affine3d trans_gbl2b_af3 = tf2::transformToEigen(trans_gbl2b_);
-  pcl::transformPointCloud(*pcl_msg_, *pcl_msg_gbl_, trans_gbl2b_af3);
-  pcl_msg_gbl_->header.frame_id = gbl_utils_->getGblFrame();
-  std::vector<int> indices;
-  pcl_msg_gbl_->is_dense = false;
-  pcl::removeNaNFromPointCloud(*pcl_msg_gbl_, *pcl_msg_gbl_, indices);
   
   pcl::search::KdTree<pcl::PointXYZ>::Ptr pc_kdtree (new pcl::search::KdTree<pcl::PointXYZ>);
   pc_kdtree->setInputCloud (pcl_msg_gbl_);
@@ -534,7 +537,7 @@ void MultiLayerSpinningLidar::selfMark(){
       coefficients->values[3] = d;
       */
       pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
-      transformToPlaneEquation(trans_gbl2b_, coefficients, Eigen::Vector3d::UnitZ());
+      transformToPlaneEquation(trans_gbl2b_local, coefficients, Eigen::Vector3d::UnitZ());
       //@ store the cluster in marking
       //@ consider rounding problem, we have to convert the centroid coordinate back by resolution
       pcl::PointXYZ voxelized_centroid;
@@ -551,6 +554,7 @@ void MultiLayerSpinningLidar::selfMark(){
       if(isinLidarObservation(voxelized_centroid)){
         PointXYZU64 p64;
         p64.x = centroid.x; p64.y=centroid.y; p64.z=centroid.z;
+        std::unique_lock<std::recursive_mutex> dgraph_lock(dgraph_mutex_);
         pct_marking_->addPCPtr(p64, cloud_cluster, coefficients);
       }
     }
@@ -560,7 +564,7 @@ void MultiLayerSpinningLidar::selfMark(){
     
   }
   
-  updateDGraphInWindow();
+  updateDGraphInWindow(trans_gbl2b_local);
 
   if(pub_current_projected_->get_subscription_count()>0){
     sensor_msgs::msg::PointCloud2 ros_pc2_msg;
@@ -582,8 +586,6 @@ void MultiLayerSpinningLidar::selfClear(){
   
   if(is_local_planner_){return;}
 
-  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
-
   if(! get_first_tf_){
     RCLCPP_INFO_THROTTLE(node_->get_logger().get_child(name_), *clock_, 1, "Wait for TF between global frame to sensor, either your TF tree is corrupted or your sensor did not send any msg to topic: %s", topic_.c_str());
     return;
@@ -599,6 +601,8 @@ void MultiLayerSpinningLidar::selfClear(){
     resetdGraph();
     shared_data_->dgraph_update_request_[name_] = false;
   }
+
+  convertPclMsgToGbl();
   
   /* uncomment below to consider cross floor clearing: good ground needed
   //@ extract ground region for casting, for example, the marking at lower/higher level should not be casting, they will be rejected by floors
@@ -626,6 +630,7 @@ void MultiLayerSpinningLidar::selfClear(){
     kdtree_last_observation->setInputCloud(pcl_msg_gbl_);
   }
   
+  std::unique_lock<std::recursive_mutex> dgraph_lock(dgraph_mutex_);
   //@ if we have few marking
   if(pct_marking_->marking_pc_->points.size()<5){
     RCLCPP_INFO_THROTTLE(node_->get_logger().get_child(name_), *clock_, 1000, "Marking less than 5 points");
@@ -812,7 +817,11 @@ void MultiLayerSpinningLidar::selfClear(){
     sensor_msgs::msg::PointCloud2 ros_pc2_msg;
     pct_marking_->marking_pc_->header.frame_id = gbl_utils_->getGblFrame();
     pcl::toROSMsg(*pct_marking_->marking_pc_, ros_pc2_msg);
+    dgraph_lock.unlock();
     pub_marked_voxel_->publish(ros_pc2_msg);     
+  }
+  else{
+    dgraph_lock.unlock();
   }
 
 }
@@ -956,10 +965,12 @@ void MultiLayerSpinningLidar::pubUpdateLoop()
   }
   
   if(pub_gbl_marking_for_visualization_){
-    std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
     pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_msg (new pcl::PointCloud<pcl::PointXYZI>);
-    for(const auto& [key, value] : pct_marking_->marking_map_){
-      *pcl_msg += (*value.pc_);  
+    {
+      std::unique_lock<std::recursive_mutex> dgraph_lock(dgraph_mutex_);
+      for(const auto& [key, value] : pct_marking_->marking_map_){
+        *pcl_msg += (*value.pc_);  
+      }
     }
     sensor_msgs::msg::PointCloud2 ros_pc2_msg;
     pcl_msg->header.frame_id = gbl_utils_->getGblFrame();
@@ -970,13 +981,16 @@ void MultiLayerSpinningLidar::pubUpdateLoop()
   if(!shared_data_->mapping_mode_){
     //we have no choice but to ignore accessing shared_data_->pcl_ground_, otherwise we have to mutex lock here, reducing perception efficiency
     pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_msg2 (new pcl::PointCloud<pcl::PointXYZI>);
-    for(size_t index=0;index<shared_data_->static_ground_size_;index++){
-      pcl::PointXYZI ipt;
-      ipt.x = shared_data_->pcl_ground_->points[index].x;
-      ipt.y = shared_data_->pcl_ground_->points[index].y;
-      ipt.z = shared_data_->pcl_ground_->points[index].z;   
-      ipt.intensity = pct_marking_->get_dGraphValue(index);
-      pcl_msg2->push_back(ipt);
+    {
+      std::unique_lock<std::recursive_mutex> dgraph_lock(dgraph_mutex_);
+      for(size_t index=0;index<shared_data_->static_ground_size_;index++){
+        pcl::PointXYZI ipt;
+        ipt.x = shared_data_->pcl_ground_->points[index].x;
+        ipt.y = shared_data_->pcl_ground_->points[index].y;
+        ipt.z = shared_data_->pcl_ground_->points[index].z;   
+        ipt.intensity = pct_marking_->get_dGraphValue(index);
+        pcl_msg2->push_back(ipt);
+      }
     }
     sensor_msgs::msg::PointCloud2 ros_pc2_msg2;
     pcl_msg2->header.frame_id = gbl_utils_->getGblFrame();
@@ -1017,7 +1031,7 @@ void MultiLayerSpinningLidar::addCastingMarker(const pcl::PointXYZ& pt, size_t i
 
 
 void MultiLayerSpinningLidar::resetdGraph(){
-  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
+  std::unique_lock<std::recursive_mutex> dgraph_lock(dgraph_mutex_);
   RCLCPP_INFO(node_->get_logger().get_child(name_), "%s starts to reset dynamic graph.", name_.c_str());
   dGraph_.clear();
   dGraph_.initial(shared_data_->static_ground_size_, gbl_utils_->getMaxObstacleDistance());
@@ -1027,7 +1041,7 @@ void MultiLayerSpinningLidar::resetdGraph(){
 }
 
 double MultiLayerSpinningLidar::get_dGraphValue(const unsigned int index){
-  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
+  std::unique_lock<std::recursive_mutex> dgraph_lock(dgraph_mutex_);
   return pct_marking_->get_dGraphValue(index);
 }
 
@@ -1043,6 +1057,7 @@ bool MultiLayerSpinningLidar::isCurrent(){
 }
 
 pcl::PointCloud<pcl::PointXYZI>::Ptr MultiLayerSpinningLidar::getObservation(){
+  convertPclMsgToGbl();
   return sensor_current_observation_;
 }
 

@@ -145,50 +145,48 @@ void StaticLayer::ptrInitial(){
 
 void StaticLayer::cbMap(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
-  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
   /*transform to point cloud library format first so we can leverage PCL*/
-  pcl::fromROSMsg(*msg, *pcl_map_);
+  pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_map_tmp(new pcl::PointCloud<pcl::PointXYZI>);
+  pcl::fromROSMsg(*msg, *pcl_map_tmp);
   // remove NaN
   std::vector<int> indices;
-  pcl_map_->is_dense = false;
-  pcl::removeNaNFromPointCloud(*pcl_map_, *pcl_map_, indices);
+  pcl_map_tmp->is_dense = false;
+  pcl::removeNaNFromPointCloud(*pcl_map_tmp, *pcl_map_tmp, indices);
 
+  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
+  pcl_map_ = pcl_map_tmp;
   if(shared_data_->static_map_size_!=pcl_map_->points.size()){
     new_map_ = true;
     RCLCPP_WARN(node_->get_logger().get_child(name_), "%s receive new \033[1;32mMap\033[0m with size: %lu", name_.c_str(), pcl_map_->points.size());
   }
-  shared_data_->static_map_size_ = pcl_map_->points.size();
-  shared_data_->kdtree_map_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
-  shared_data_->kdtree_map_->setInputCloud(pcl_map_);
-  shared_data_->pcl_map_ = pcl_map_;
+  lock.unlock();
 }
 
 void StaticLayer::cbGround(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
-
-  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
-  pcl::fromROSMsg(*msg, *pcl_ground_);  
+  pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_ground_tmp(new pcl::PointCloud<pcl::PointXYZI>);
+  pcl::fromROSMsg(*msg, *pcl_ground_tmp);  
   // remove NaN
   std::vector<int> indices;
-  pcl_ground_->is_dense = false;
-  pcl::removeNaNFromPointCloud(*pcl_ground_, *pcl_ground_, indices);
+  pcl_ground_tmp->is_dense = false;
+  pcl::removeNaNFromPointCloud(*pcl_ground_tmp, *pcl_ground_tmp, indices);
 
+  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
+  pcl_ground_ = pcl_ground_tmp;
   if(shared_data_->static_ground_size_!=pcl_ground_->points.size()){
     new_ground_ = true;
     RCLCPP_WARN(node_->get_logger().get_child(name_), "%s receive new \033[1;32mGround\033[0m with size: %lu", name_.c_str(), pcl_ground_->points.size());
   }  
-  shared_data_->static_ground_size_ = pcl_ground_->points.size();
-  shared_data_->kdtree_ground_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
-  shared_data_->kdtree_ground_->setInputCloud(pcl_ground_);
-  shared_data_->pcl_ground_ = pcl_ground_;
- 
+  lock.unlock();
 }
 
 void StaticLayer::updateLethalPointCloud(){
 }
 
 void StaticLayer::selfMark(){
-  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
+  
+  //@ No need to lock here anymore, because shared_data_->pcl_ground_ only change in selfClear, and selfClear is gurantee to be called 
+  //@ seperately in stacked_perception 
   if(pub_dGraph_->get_subscription_count()>0){
     pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_msg2 (new pcl::PointCloud<pcl::PointXYZI>);
     for(size_t index=0;index<shared_data_->static_ground_size_;index++){
@@ -208,8 +206,20 @@ void StaticLayer::selfMark(){
 
 void StaticLayer::selfClear(){
 
-  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
   if(new_ground_ && new_map_){
+    
+    //@ only lock when shared_data_ is being assigned, then unlock immediately
+    std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
+
+    shared_data_->static_map_size_ = pcl_map_->points.size();
+    shared_data_->kdtree_map_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
+    shared_data_->kdtree_map_->setInputCloud(pcl_map_);
+    shared_data_->pcl_map_ = pcl_map_;
+
+    shared_data_->static_ground_size_ = pcl_ground_->points.size();
+    shared_data_->kdtree_ground_.reset(new pcl::KdTreeFLANN<pcl::PointXYZI>());
+    shared_data_->kdtree_ground_->setInputCloud(pcl_ground_);
+    shared_data_->pcl_ground_ = pcl_ground_;
 
     RCLCPP_WARN(node_->get_logger().get_child(name_), "%s has already received two msg.", name_.c_str());
     shared_data_->requestAllLayersToResetDGraph();
@@ -221,8 +231,12 @@ void StaticLayer::selfClear(){
     //@ radius search connection to generate sGraph
     resetdGraph();
     if(!is_local_planner_){
+      shared_data_->sGraph_ptr_->allocateGraph(shared_data_->pcl_ground_->points.size());
+    }
+    lock.unlock();
+
+    if(!is_local_planner_){
       //@ it is static layer of a global planner
-      shared_data_->sGraph_ptr_->allocateGraph(pcl_ground_->points.size());
       if(!mapping_mode_ && enable_edge_detection_){
         radiusSearchConnection();
         RCLCPP_INFO(node_->get_logger().get_child(name_), "Computation of Edge from ground point cloud is done.");
@@ -233,22 +247,28 @@ void StaticLayer::selfClear(){
       }
     }
 
+    lock.lock();
     shared_data_->is_static_layer_ready_ = true;
+    lock.unlock();
     is_ground_and_map_being_initialized_once_ = true;
   }
   else{ //@ disable ready flag when state is different
-    if(!is_ground_and_map_being_initialized_once_)
+    if(!is_ground_and_map_being_initialized_once_){
+      std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
       shared_data_->is_static_layer_ready_ = false;
+      lock.unlock();
+    }
   }
 
 }
 
 void StaticLayer::generateStaticGraph(){
   
+  const auto pcl_ground = shared_data_->pcl_ground_;
   #pragma omp parallel for
-  for(unsigned int index_cnt = 0; index_cnt<pcl_ground_->points.size(); index_cnt++){
+  for(unsigned int index_cnt = 0; index_cnt<pcl_ground->points.size(); index_cnt++){
 
-    pcl::PointXYZI pcl_node = pcl_ground_->points[index_cnt];
+    pcl::PointXYZI pcl_node = pcl_ground->points[index_cnt];
 
     //@Kd-tree to find nn point for planar equation
     std::vector<int> pointIdxRadiusSearch;
@@ -280,7 +300,7 @@ void StaticLayer::generateStaticGraph(){
       auto node = index_cnt;
       a_edge.first = (*it);
       //@Create an edge
-      double distance_between_pair = sqrt(pcl::geometry::squaredDistance(pcl_ground_->points[node], pcl_ground_->points[a_edge.first]));
+      double distance_between_pair = sqrt(pcl::geometry::squaredDistance(pcl_ground->points[node], pcl_ground->points[a_edge.first]));
       a_edge.second = distance_between_pair;
       shared_data_->sGraph_ptr_->insertEdgeInNode(node, a_edge);
 
@@ -299,15 +319,17 @@ void StaticLayer::generateStaticGraph(){
 
 void StaticLayer::radiusSearchConnection(){
   
+  const auto pcl_ground = shared_data_->pcl_ground_;
+  const auto pcl_map = shared_data_->pcl_map_;
   // 1. Determine total loop size
-  const unsigned int total_points = pcl_ground_->points.size();
+  const unsigned int total_points = pcl_ground->points.size();
 
   // 2. OpenMP Parallel For Loop
   // We specify that 'index_cnt' is the loop variable (implicitly private)
   #pragma omp parallel for
   for(unsigned int index_cnt = 0; index_cnt < total_points; index_cnt++){
     
-    pcl::PointXYZI pcl_node = pcl_ground_->points[index_cnt];
+    pcl::PointXYZI pcl_node = pcl_ground->points[index_cnt];
 
     //@Kd-tree to find nn point for planar equation
     std::vector<int> pointIdxRadiusSearch;
@@ -337,7 +359,7 @@ void StaticLayer::radiusSearchConnection(){
     pcl::PointCloud<pcl::PointXYZI>::Ptr nn_pc (new pcl::PointCloud<pcl::PointXYZI>);
     for(auto it = pointIdxRadiusSearch.begin(); it!=pointIdxRadiusSearch.end();it++){
       //@Push back the points for plane equation later
-      nn_pc->push_back(pcl_ground_->points[(*it)]);
+      nn_pc->push_back(pcl_ground->points[(*it)]);
     }
 
     float weight = 1.0;
@@ -397,7 +419,7 @@ void StaticLayer::radiusSearchConnection(){
       shared_data_->kdtree_map_->radiusSearch (pcl_node, static_imposing_radius_, pointIdxRadiusSearch, pointRadiusSquaredDistance);
       pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_z_axes(new pcl::PointCloud<pcl::PointXYZI>);
       for(auto i_pcl_z_axes=pointIdxRadiusSearch.begin();i_pcl_z_axes!=pointIdxRadiusSearch.end();i_pcl_z_axes++){
-        pcl_z_axes->push_back(pcl_map_->points[*i_pcl_z_axes]);
+        pcl_z_axes->push_back(pcl_map->points[*i_pcl_z_axes]);
       }
 
       // Local Filter instantiation

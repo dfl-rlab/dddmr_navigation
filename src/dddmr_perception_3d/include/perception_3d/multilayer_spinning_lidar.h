@@ -58,6 +58,7 @@
 
 /*For map*/
 #include <map>
+#include <mutex>
 #include <set>
 
 /*For sqrt*/
@@ -133,7 +134,9 @@ class MultiLayerSpinningLidar: public Sensor{
     /*For casting visualization*/
     void addCastingMarker(const pcl::PointXYZ& pt, size_t id, visualization_msgs::msg::MarkerArray& markerArray);
     
-    void updateDGraphInWindow();
+    void updateDGraphInWindow(const geometry_msgs::msg::TransformStamped& trans_gbl2b_local);
+
+    void convertPclMsgToGbl(geometry_msgs::msg::TransformStamped* trans_gbl2b_out = nullptr);
 
     void transformToPlaneEquation(
       const geometry_msgs::msg::TransformStamped& transform,
@@ -152,6 +155,7 @@ class MultiLayerSpinningLidar: public Sensor{
     /*Voxel structure*/
     //std::shared_ptr<Marking> pct_marking_;
     std::shared_ptr<KDTreeMarking> pct_marking_;
+    std::recursive_mutex dgraph_mutex_;
 
 
     /*plugin parameter*/
