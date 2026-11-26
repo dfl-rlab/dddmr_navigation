@@ -28,9 +28,6 @@ RUN apt-get update && apt-get install -y git
 RUN apt install -y ros-jazzy-desktop
 # --- Jazzy has been installed
 
-# ROS2 that are not included in Desktop but required for DDDMR
-RUN apt install -y ros-jazzy-ackermann-msgs ros-jazzy-rqt-tf-tree ros-jazzy-rosbag2-storage-mcap ros-jazzy-apriltag-msgs
-
 #install some tool
 RUN apt install -y nano openssh-server usbutils
 #for ping hardware etc...
@@ -84,6 +81,8 @@ RUN apt install -y libasio-dev can-utils
 #install apriltag
 RUN cd /tmp && git clone https://github.com/AprilRobotics/apriltag.git && cd apriltag && git checkout 3806edf38ac4400153677e510c9f9dcb81f472c8 && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target install
 
+# ROS2 that are not included in Desktop but required for DDDMR
+RUN apt install -y ros-jazzy-ackermann-msgs ros-jazzy-rqt-tf-tree ros-jazzy-rosbag2-storage-mcap ros-jazzy-apriltag-msgs ros-jazzy-vision-msgs
 RUN echo "function ws_build(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release\n}" >> ~/.bashrc
 RUN echo "function ws_build_wi_test(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=OFF -DTEST_ENABLED=ON\n}" >> ~/.bashrc
 RUN echo "function ws_build_wi_test_trt(){\ncolcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DTRT_ENABLED=ON -DTEST_ENABLED=ON\n}" >> ~/.bashrc
