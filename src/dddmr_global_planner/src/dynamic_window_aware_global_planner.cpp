@@ -205,7 +205,7 @@ void DWA_GlobalPlanner::determineDWAPlan(){
     return;
   }
   //@protect kdtree_ground
-  std::unique_lock<std::recursive_mutex> lock(perception_3d_ros_->getSharedDataPtr()->ground_kdtree_cb_mutex_);
+  //std::unique_lock<std::recursive_mutex> lock(perception_3d_ros_->getSharedDataPtr()->ground_kdtree_cb_mutex_);
   //@check is dwa goal being blocked, if yes, shift ahead distance 1.0 m
   bool dwa_goal_clear = false;
   double look_ahead_step = 0.0;

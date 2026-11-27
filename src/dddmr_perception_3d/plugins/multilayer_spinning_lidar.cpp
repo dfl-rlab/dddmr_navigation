@@ -325,7 +325,6 @@ void MultiLayerSpinningLidar::cbSensor(const sensor_msgs::msg::PointCloud2::Shar
     pcl::toROSMsg(*pcl_msg_, ros_pc2_msg);
     pub_current_observation_->publish(ros_pc2_msg);
   }
-
 }
 
 void MultiLayerSpinningLidar::updateLethalPointCloud(){
@@ -1057,7 +1056,8 @@ bool MultiLayerSpinningLidar::isCurrent(){
 }
 
 pcl::PointCloud<pcl::PointXYZI>::Ptr MultiLayerSpinningLidar::getObservation(){
-  convertPclMsgToGbl();
+  std::unique_lock<std::recursive_mutex> lock(shared_data_->ground_kdtree_cb_mutex_);
+  pcl::copyPointCloud(*pcl_msg_, *sensor_current_observation_);
   return sensor_current_observation_;
 }
 
